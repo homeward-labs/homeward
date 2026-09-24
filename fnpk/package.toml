@@ -1,0 +1,43 @@
+# 飞牛应用包配置文件
+# 参考飞牛官方 fpk 打包规范
+
+[package]
+name = "homeward"
+display_name = "家卫"
+version = "0.1.0"
+description = "家庭 IoT 隐私守护 — 帮你看懂家里的智能设备在跟谁说话，并能一键拦下可疑外联"
+author = "Homeward Community"
+license = "MIT"
+homepage = "https://github.com/homeward/homeward"
+icon = "icon.png"
+
+[requirements]
+min_fnos_version = "0.8.0"
+arch = ["x86_64", "aarch64"]
+min_ram_mb = 256
+min_disk_mb = 512
+
+[deployment]
+type = "docker-compose"
+compose_file = "docker-compose.yaml"
+health_check_url = "http://localhost:9595/api/health"
+
+[ports]
+web_ui = 9595
+
+[permissions]
+network = "host"          # 需要访问网络抓包
+privileged = true         # 需要配置 iptables / nftables
+volumes = ["./data", "./logs"]
+
+[ui]
+icon_url = "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/icon.png"
+screenshot_urls = [
+    "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/screenshot1.png",
+    "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/screenshot2.png"
+]
+
+[category]
+primary = "security"
+secondary = "privacy"
+tags = ["隐私", "安全", "IoT", "智能家居", "流量监控", "防火墙"]
