@@ -38,6 +38,8 @@ from rule_engine.engine import (
 )
 from ai.analyzer import AIAnalyzer, AnalysisRequest, AnalysisResult
 from knowledge_base.updater import KnowledgeBaseUpdater
+from inventory.device import DeviceRegistry
+from inventory.attribution import DomainAttribution
 
 
 class HomewardService:
@@ -72,6 +74,15 @@ class HomewardService:
 
         # 建议阻断队列（社区版只产出"建议"，从不产生已生效的阻断规则）
         self.suggested_rules: list[dict] = []
+
+        # W2：设备台账 + 域名归属
+        # 两者都可能在缺少本地数据源时"识别不出东西" —— 那是预期行为，
+        # 由 blind_spots() 显式告诉 UI，而不是假装认得。
+        self.device_registry = DeviceRegistry()
+        self.attribution = DomainAttribution()
+        if self.config.get("load_system_devices", True):
+            stat = self.device_registry.load_from_system()
+            logger.info(f"devices loaded: leases={stat['leases']} arp={stat['arp']}")
 
         # 统计
         self.stats = {
@@ -118,6 +129,9 @@ class HomewardService:
         确认为准」。这里即使命中了阻断类规则，也只是把建议放进队列等用户确认。
         """
         self.stats["flows_processed"] += 1
+
+        # W2：把这条流量归到某台设备上，并解析域名归属
+        self.device_registry.observe_flow(flow)
 
         decision = self.engine.evaluate(flow)
         self.stats["decisions_made"] += 1
@@ -201,9 +215,59 @@ class HomewardService:
         logger.info(f"[AI] Result saved to pending: {fname}")
         return True
 
+    # ---------------------------------------------------------------- W2 查询接口
+
+    def get_device(self, ip: str) -> Optional[dict]:
+        """给 UI / 告警用的设备视图：查不到 MAC 也会返回一个 IP 兜底设备"""
+        dev = self.device_registry.get_by_ip(ip)
+        if dev is None:
+            dev = self.device_registry.observe_ip(ip)
+        return {
+            "name": dev.display_name,
+            "mac": dev.mac,
+            "ips": sorted(dev.ips),
+            "vendor": dev.vendor_cn or dev.vendor,
+            "device_type": dev.device_type,
+            "type_source": dev.type_source,
+        }
+
+    def describe_domain(self, domain: str) -> dict:
+        """域名归属视图；未知时 organization 为 None，上层应把它交给未知域名列表"""
+        r = self.attribution.resolve(domain or "")
+        return {
+            "domain": r.domain,
+            "organization": r.organization,
+            "category": r.category,
+            "confidence": r.confidence,
+            "known": r.known,
+            "side_effects": r.side_effects,
+            "explain": r.explain(),
+        }
+
     def get_unknown_domains(self) -> list[str]:
         """获取所有未识别域名"""
         return sorted(self.stats["unknown_domains"])
+
+    def get_blind_spots(self) -> list[str]:
+        """当前部署形态下，家卫**看不见 / 认不出**的地方 —— UI 必须展示"""
+        spots = list(self.device_registry.blind_spots())
+        cov = self.attribution_coverage()
+        if cov["total"] and cov["hit_rate"] < 0.8:
+            spots.append(f"域名归属覆盖偏低：观测到的 {cov['total']} 个域名里 "
+                         f"只有 {cov['hit']} 个能在知识库中查到组织，"
+                         f"其余 {cov['total'] - cov['hit']} 个仍属未知（可手动触发 AI 分析）。")
+        return spots
+
+    def attribution_coverage(self) -> dict:
+        """归属覆盖率：衡量知识库够不够用，也是社区共建的进度指标"""
+        domains = sorted(self.stats["unknown_domains"] | set(self.attribution._cache))
+        rep = self.attribution.coverage(domains)
+        return {
+            "total": rep.total,
+            "hit": rep.hit,
+            "hit_rate": rep.rate,
+            "by_parent": rep.by_parent,
+        }
 
     def get_stats(self) -> dict:
         """获取统计信息"""
@@ -211,6 +275,12 @@ class HomewardService:
             **self.stats,
             "unknown_domains_count": len(self.stats["unknown_domains"]),
             "unknown_domains": sorted(self.stats["unknown_domains"]),
+            "devices_total": len(self.device_registry.devices),
+            "vendors_resolved": sum(
+                1 for d in self.device_registry.devices.values() if d.vendor
+            ),
+            "vendor_lookup_enabled": self.device_registry.vendor_lookup_enabled,
+            "attribution_queries": self.attribution.stats["queries"],
         }
 
     def _load_suggestions(self):
@@ -269,13 +339,27 @@ if __name__ == "__main__":
 
     for flow in test_flows:
         decision = service.process_flow(flow)
-        print(f"\n观测: {flow.sni}")
+        dev = service.get_device(flow.src_ip)
+        attr = service.describe_domain(flow.sni)
+        print(f"\n观测: {dev['name']} ({flow.src_ip}) → {attr['domain']}")
+        print(f"   归属: {attr['organization'] or '未知'} "
+              f"[{attr['category']} / 置信度 {attr['confidence']}]")
         print(f"   决策: [{decision.action}] {decision.reason}")
         if decision.requires_user_input:
             print("   提示: 可点击「帮我分析」进行 AI 辅助分析")
 
     print(f"\n{'=' * 70}")
     print(f"统计: {json.dumps(service.get_stats(), ensure_ascii=False, indent=2)}")
+
+    print(f"\n{'=' * 70}")
+    print("当前识别能力的盲区（UI 应如实展示）")
+    print("=" * 70)
+    spots = service.get_blind_spots()
+    if spots:
+        for s in spots:
+            print(f"  - {s}")
+    else:
+        print("  （无）")
 
     # AI 分析演示（模拟）
     print(f"\n{'=' * 70}")

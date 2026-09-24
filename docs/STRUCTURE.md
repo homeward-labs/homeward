@@ -28,11 +28,15 @@ homeward/
 │   │   ├── dns.py                   # Tier 1：dnsmasq 查询日志
 │   │   └── conntrack.py             # Tier 2：连接元数据（字节数 / 直连 IP）
 │   ├── enforcers/                   # 执行器实现（标准版闭源，gitignore + pre-commit 拦截）
+│   ├── inventory/                   # W2：设备台账 + 域名归属
+│   │   ├── device.py                # IP → MAC → 厂商 / 品类；MAC 变 IP 仍是同一台
+│   │   └── attribution.py           # 域名 → 组织：精确 + 逐级向上，认输不猜
 │   ├── rule_engine/                 # 规则匹配引擎
 │   │   └── engine.py                # 知识库加载 + 行为匹配 + 决策（产出建议，不产出动作）
 │   ├── knowledge_base/              # 知识库（数据 CC BY 4.0，使用须署名）
 │   │   ├── domains.csv              # 域名 → 组织归属
 │   │   ├── behaviors.json           # 行为模式库（8 个行为）
+│   │   ├── oui_prefixes.csv         # MAC 前缀 → 厂商（脚本生成，见 tools/build_oui_table.py）
 │   │   ├── updater.py               # 在线更新（默认关闭；无遥测回传）
 │   │   └── LICENSE                  # CC BY 4.0 许可与署名要求
 │   └── ai/                          # AI 辅助层（默认关闭，手动触发）
@@ -40,6 +44,8 @@ homeward/
 │
 ├── tests/                           # 标准库 unittest，无需装 pytest
 │   ├── test_collectors.py           # 采集层：解析 / 增量 / 能力位 / 降级链
+│   ├── test_behavior_matching.py    # 行为判定语义（duration 按秒 / interval 真算间隔）
+│   ├── test_inventory.py            # W2：设备识别 + 域名归属（含「不猜」红线断言）
 │   └── test_revert_contract.py      # 撤销契约端到端往返
 │
 ├── docker/
@@ -50,13 +56,23 @@ homeward/
 │   └── package.toml                 # 素材 icon.png / screenshot*.png 待补
 │
 ├── hooks/
-│   └── pre-commit                   # 闭源防误传（git config core.hooksPath hooks）
+│   ├── pre-commit                   # 闭源防误传（提交前：暂存 diff）
+│   └── pre-push                     # 闭源防误传（推送前：整棵提交树 + 历史）
+│
+├── .github/
+│   ├── CONTRIBUTING.md
+│   └── workflows/
+│       └── open-boundary.yml        # CI 兜底：重扫全历史 + 跑社区版单测
 │
 ├── reports/                         # 阶段性报告
 │   └── 03-revert-contract-2026-09-24.md
 │
 ├── tools/
-│   └── asn_hit_test.py              # ASN 命中率测试脚本
+│   ├── asn_hit_test.py              # ASN 命中率测试脚本
+│   ├── build_oui_table.py           # 生成 oui_prefixes.csv（默认拉 Wireshark 官方 manuf）
+│   ├── check_open_boundary.sh       # 开源边界自检（Linux / Git Bash）
+│   ├── check_open_boundary.py       # 同上（装了 Python 的环境）
+│   └── check_open_boundary.ps1      # 同上（PowerShell，无依赖）
 │
 └── .github/
     └── CONTRIBUTING.md              # 开源边界红线与贡献流程
