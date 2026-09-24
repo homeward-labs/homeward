@@ -1,0 +1,81 @@
+name: open-source-boundary
+
+# 第三道闸：CI 兜底。
+# hooks/ 里的 pre-commit / pre-push 只在「配好 core.hooksPath 的本地环境」生效，
+# 一旦有人用 --no-verify、或在别人机器上推送，本地钩子就形同虚设。
+# 这个 workflow 在 GitHub 侧重扫一遍全历史，出问题直接红叉并阻断合并。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  boundary:
+    name: 闭源边界检查
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出（拉取完整历史）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 扫描闭源目录 / 闭源标记
+        run: |
+          set -u
+          # 闭源区是「整个目录」，不只是其下的 standard/ pro/ 子目录
+          CLOSED_DIRS="src/enforcers src/editions"
+          SENTINEL_RE='@closed-source|@standard-only|@pro-only'
+          fail=0
+
+          echo "--- 1) 工作树中是否出现闭源目录 ---"
+          for d in $CLOSED_DIRS; do
+            if [ -d "$d" ]; then
+              echo "::error::闭源目录出现在工作树: $d"
+              fail=1
+            fi
+          done
+
+          echo "--- 2) 全部提交历史中出现过的文件名（含已删除文件） ---"
+          git log --all --pretty=format: --name-only | sort -u > /tmp/all_files.txt
+          for d in $CLOSED_DIRS; do
+            if grep -q "^$d/" /tmp/all_files.txt; then
+              echo "::error::提交历史中出现闭源路径: $d/"
+              grep "^$d/" /tmp/all_files.txt || true
+              fail=1
+            fi
+          done
+
+          echo "--- 3) src/ 下的闭源标记哨兵 ---"
+          # 只扫 src/：docs/ 与 hooks/ 需要合法地「提及」这些标记词，不应误报。
+          if git grep -l -E "$SENTINEL_RE" -- src/ > /tmp/sentinels.txt 2>/dev/null; then
+            echo "::error::以下 src/ 文件含闭源标记，不得开源："
+            cat /tmp/sentinels.txt
+            fail=1
+          fi
+
+          echo "--- 4) .gitignore 防线是否完好 ---"
+          for d in $CLOSED_DIRS; do
+            if ! grep -qE "^${d}/?$" .gitignore; then
+              echo "::error::.gitignore 缺少规则: $d"
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "闭源边界检查失败。公开仓库绝不能包含标准版 / 专业版实现。"
+            echo "若已推送，视为泄露：立即将仓库置私有，并清理历史（见 docs/EDITIONS.md）。"
+            exit 1
+          fi
+          echo "OK: 未发现闭源代码。"
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 社区版单测回归
+        run: |
+          python -m unittest discover -s tests -v

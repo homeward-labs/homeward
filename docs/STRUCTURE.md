@@ -14,6 +14,7 @@ homeward/
 │   ├── ARCHITECTURE.md              # 架构设计
 │   ├── BLOCKING.md                  # 阻断策略（标准版）+ 撤销契约语义
 │   ├── COMPETITORS.md               # 竞品分析
+│   ├── DEPLOYMENT.md                # 部署形态与安装方式（接入方式/平台/装法 三维度）
 │   ├── EDITIONS.md                  # 版本矩阵与开源边界（唯一权威）
 │   └── ROADMAP.md                   # 路线图与社区版 MVP 计划
 │

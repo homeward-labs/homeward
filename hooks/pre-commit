@@ -4,7 +4,9 @@
 # 触发：每次 git commit 前自动运行（见 git config core.hooksPath）。
 # 兼容 Windows git bash：不使用 mktemp/touch/rm，改用管道子shell退出码传递。
 
-CLOSED_DIRS="src/enforcers src/editions/standard src/editions/pro"
+# 闭源区是「整个目录」，不只是其下的 standard/ pro/ 子目录 ——
+# 否则直接放在 src/editions/ 下的文件会绕过拦截。
+CLOSED_DIRS="src/enforcers src/editions"
 SENTINELS="@closed-source @standard-only @pro-only"
 
 # 管道子shell 内做检查；命中违规则 exit 1，否则 exit 0。
