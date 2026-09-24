@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  homeward:
+    build: .
+    container_name: homeward
+    restart: unless-stopped
+    privileged: true  # 需要抓包和配置 iptables
+    network_mode: host  # 需要访问宿主机网络
+    volumes:
+      - ./data:/app/data          # 数据持久化
+      - ./logs:/app/logs          # 日志
+      - /etc/hosts:/etc/hosts:ro  # 读取 hosts
+    environment:
+      - HOST=0.0.0.0
+      - PORT=9595
+      - LOG_LEVEL=info
+      - KNOWLEDGE_BASE_AUTO_UPDATE=true
+      - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800  # 7 天
+    ports:
+      - "9595:9595"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    devices:
+      - /dev/null:/dev/null
