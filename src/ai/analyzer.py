@@ -4,8 +4,11 @@ AI 辅助层
 只分析域名和行为元数据，不上传任何 payload
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger("homeward.ai")
 
 
 @dataclass
@@ -43,15 +46,27 @@ class AIAnalyzer:
     2. 用户自备 API Key（OpenAI 兼容接口）
     """
 
-    def __init__(self, backend: str = "none", api_key: str = None, base_url: str = None):
+    # 各后端的默认模型；用户可通过 model 参数覆盖（不同部署的模型名差异很大，
+    # 硬编码一个名字等于换个环境就跑不了）
+    DEFAULT_MODELS = {"ollama": "qwen2.5:7b", "openai": "gpt-4o-mini"}
+
+    def __init__(
+        self,
+        backend: str = "none",
+        api_key: str = None,
+        base_url: str = None,
+        model: str = None,
+    ):
         """
         backend: none | ollama | openai
         api_key: 用户自备 API Key
         base_url: 自定义 API 端点（支持国内中转）
+        model: 模型名；留空则用 DEFAULT_MODELS 里该后端的默认值
         """
         self.backend = backend
         self.api_key = api_key
         self.base_url = base_url
+        self.model = model
 
     def is_enabled(self) -> bool:
         """AI 是否可用"""
@@ -61,16 +76,23 @@ class AIAnalyzer:
         """
         分析未知域名
         默认不执行，需用户手动调用
+
+        AI 是**可选增强**，不是主链路：后端没起、超时、返回了非 JSON，
+        一律降级成 None（上层提示「分析暂不可用」），绝不把异常抛给调用方——
+        一个隐私工具的流量判定流程，不能因为 AI 服务抽风就整体崩掉。
         """
         if not self.is_enabled():
             return None
 
-        if self.backend == "ollama":
-            return self._analyze_ollama(request)
-        elif self.backend == "openai":
-            return self._analyze_openai(request)
+        handler = {"ollama": self._analyze_ollama, "openai": self._analyze_openai}.get(self.backend)
+        if handler is None:
+            return None
 
-        return None
+        try:
+            return handler(request)
+        except Exception as e:  # 网络 / 解析 / 后端返回异常，统一吞掉并留日志
+            logger.warning("AI 分析失败（backend=%s）：%s", self.backend, e)
+            return None
 
     def _build_prompt(self, request: AnalysisRequest) -> str:
         """构建分析提示词（结构化、确定性输出）"""
@@ -101,7 +123,7 @@ ASN: {request.destination_asn or "未知"}
 
         prompt = self._build_prompt(request)
         data = json.dumps({
-            "model": "qwen2.5:7b",
+            "model": self.model or self.DEFAULT_MODELS["ollama"],
             "prompt": prompt,
             "stream": False,
             "format": "json",
@@ -134,7 +156,7 @@ ASN: {request.destination_asn or "未知"}
 
         prompt = self._build_prompt(request)
         data = json.dumps({
-            "model": "gpt-4o-mini",
+            "model": self.model or self.DEFAULT_MODELS["openai"],
             "messages": [
                 {"role": "system", "content": "你是联网设备流量分析专家，只输出严格 JSON。"},
                 {"role": "user", "content": prompt},

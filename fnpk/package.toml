@@ -1,15 +1,21 @@
 # 飞牛应用包配置文件
 # 参考飞牛官方 fpk 打包规范
+#
+# 状态：**草稿，尚未可用**。飞牛 OS 一键安装是「计划中、未实现」的能力，
+# 本文件未提交飞牛审核、也未上架应用中心。打包前必须先补齐下面标注缺失的素材。
+#
+# 版本边界：本包是**社区版**，只做「看见」+「建议阻断预览」。
+# 真实拦截属于标准版（闭源付费），不在本包内 —— 因此本包不申请抓包、
+# 不申请防火墙配置权、不申请 privileged。社区版读 dnsmasq 查询日志即可工作。
 
 [package]
 name = "homeward"
 display_name = "家卫"
 version = "0.1.0"
-description = "家庭联网设备隐私守护 — 帮你看懂家里每个联网设备（智能硬件 / 手机 / 电脑）在跟谁说话，并能一键拦下可疑外联"
+description = "家庭联网设备隐私守护 — 看清家里每个联网设备（智能硬件 / 手机 / 电脑）在跟谁说话；阻断后果可预览，实际拦截属标准版能力"
 author = "Homeward Community"
 license = "MIT"
 homepage = "https://github.com/homeward-labs/homeward"
-icon = "icon.png"
 
 [requirements]
 min_fnos_version = "0.8.0"
@@ -26,18 +32,23 @@ health_check_url = "http://localhost:9595/api/health"
 web_ui = 9595
 
 [permissions]
-network = "host"          # 需要访问网络抓包
-privileged = true         # 需要配置 iptables / nftables
-volumes = ["./data", "./logs"]
+# 最小权限：社区版唯一的外界输入是 dnsmasq 查询日志（只读挂载）。
+network = "bridge"
+privileged = false
+volumes = ["./data", "./logs", "/var/log/dnsmasq.log:/var/log/dnsmasq.log:ro"]
 
 [ui]
-icon_url = "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/icon.png"
-screenshot_urls = [
-    "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot1.png",
-    "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot2.png"
-]
+# 素材缺失：icon.png / screenshot1.png / screenshot2.png 均未提供。
+# 打包前必须补齐并放到 fnpk/ 目录，否则应用中心上架会被拒。
+icon = "icon.png"
+# icon_url / screenshot_urls 待素材补齐后再启用（当前指向的文件不存在）：
+# icon_url = "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/icon.png"
+# screenshot_urls = [
+#     "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot1.png",
+#     "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot2.png"
+# ]
 
 [category]
 primary = "security"
 secondary = "privacy"
-tags = ["隐私", "安全", "IoT", "智能家居", "流量监控", "防火墙"]
+tags = ["隐私", "安全", "联网设备", "智能家居", "流量审计"]
