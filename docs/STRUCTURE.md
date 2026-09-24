@@ -1,7 +1,7 @@
 # 项目目录结构
 
 ```
-iot-privacy-router/
+homeward/
 ├── README.md
 ├── docs/
 │   ├── README.md                    # 项目总览
@@ -74,7 +74,7 @@ iot-privacy-router/
 |---|---|---|
 | `base.py` | `Capabilities`(frozen dataclass) + `Collector` / `Enforcer` 两个抽象基类 + `EnforceAction` / `EnforceResult` / `Observation` / `ProbeResult` 数据模型 + **撤销契约**（`RevertPayload` 三子类 / `RevertResult` / `ActionRegistry`） | 接口骨架（本期） |
 | `capability.py` | `CapabilitySet`：`can_show()` / `can_enforce()` / `blind_spots()`，直接生成 D22「首页明示盲区」文案 | 协商助手（本期） |
-| `nftables.py` / `dnsmasq.py` / `pcap.py` / `ebpf.py` / `openwrt.py` | 具体平台实现 | **本期未实现**（先做架构） |
+| `nftables.py` / `dnsmasq.py` / `pcap.py` / `ebpf.py` / `openwrt.py` | 具体平台实现（**标准版闭源**） | **本期未实现**（先做架构） |
 
 ### 能力协商层（Capabilities）
 
