@@ -116,6 +116,36 @@ def decide(record, rule_hits) -> Decision:
 > 三级阻断的实现细节见 [BLOCKING.md](./BLOCKING.md)；撤销语义（30 分钟一键撤销、
 > `redeemable_until` / `auto_release_at`）与工程载体 `revert_payload` 同样在该文第四节。
 
+### 2.6 行为识别与告警层（`src/analysis/`）
+
+域名判定回答「这是谁」，行为判定回答「它在干什么」。后者不能只看一条记录 ——
+**行为是一段时间里的重复动作**，所以这一层要解决规则引擎不管的三件事：
+
+```
+采集 Observation ──ingest──> FlowRecord ──feed──> 时间窗（按规则 window_seconds 切分）
+                                                      │
+                                        scope=device / destination
+                                                      ▼
+                                        BehaviorMatcher（失败关闭）
+                                                      ▼
+                                        BehaviorFinding（带证据：次数/字节/时间/间隔）
+                                                      ▼
+                                        AlertCenter（去重 + 冷却收敛） ──> 中文 Alert
+```
+
+- **ingest**：采集层吐 `Observation`，规则层吃 `FlowRecord`，两者之间原本**没有任何
+  转换代码**（W1 → W2 断链）。方向按「源 IP 是否属于本地网段」判定，判不了时默认
+  `out`（家卫观测的主体是家庭设备）。DNS 观测没有字节数，`packet_size` 记 0 ——
+  这是事实缺失，不填假数字。
+- **behavior**：窗口长度与粒度都由规则自带（`window_seconds` / `scope`）。喂数据时
+  **按观测自带的时间戳裁剪**，不按挂钟时间 —— 否则离线回放历史日志会被立刻清空。
+- **alerting**：模板渲染 + 收敛。没有收敛层，心跳信标会以扫描频率持续命中，
+  UI 几分钟内就被同一件事刷满，真正严重的告警反倒没人看了。
+
+**告警的三条硬规矩**：① 不猜不吓人，`low` 置信度的规则文案必须自己声明是弱证据；
+② 必写后果（`side_effects`），让人在知情的前提下决定；③ 模板占位符必须可穷举
+（`TEMPLATE_KEYS`），由单测逐条校验。
+
 ---
 
 ## 三、知识库设计
@@ -151,6 +181,9 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
     "description": "设备每隔固定时间发送小包，疑似心跳信标，可能用于在线状态追踪或跨设备关联",
     "severity": "low",
     "category": "telemetry",
+    "confidence": "medium",
+    "scope": "destination",
+    "window_seconds": 1800,
     "pattern": {
       "interval": { "min": 30, "max": 60 },
       "packet_size": { "min": 40, "max": 100 },
@@ -158,21 +191,44 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
       "min_occurrences": 10
     },
     "action": "warn",
-    "explanation": "设备 {device_name} 每约 {interval} 秒发送一次小数据包到 {destination}。…",
-    "side_effects": "阻断可能导致设备离线状态，但本地控制不受影响"
+    "explanation": "设备 {device_name} 每约 {interval} 秒向 {destination} 发送一次小包…",
+    "side_effects": "阻断可能导致设备显示离线；本地控制不受影响"
   }
 }
 ```
 
-`pattern` 字段语义（判定实现见 `src/rule_engine/engine.py::BehaviorMatcher._matches`，
-两条最易踩错的写在那里）：
-- `interval`：相邻观测的**时间间隔**（秒），必须真的去算时间差，不能只看包大小
-- `duration_min`：观测窗口长度（**秒**），不是记录条数
+**失败关闭**（2026-09-24 修掉的一起真实事故，务必看懂再改）：`pattern` 里的键分三类 ——
+`direction` / `protocol` / `dst_port` 只是**过滤器**，其余（含 `min_occurrences`）才是
+**证据**。一条规则**至少要用到一个证据键**才参与匹配；用了引擎不认的键则被整条跳过，
+并通过 `BehaviorMatcher.unsupported()` 暴露（单测断言随库规则里一条都不许有）。
+
+早期实现漏掉了 5 条规则的证据键（`destination_pattern` / `dns_rate_min` /
+`periodicity_threshold` / `min_connections` / `interval_min`），判定函数看不懂就
+默默跳过、直接返回 True —— 结果**随便一条 60 字节的普通外联包都能命中
+「疑似 C2 通信」「固件后门」这类 critical 规则并建议隔离设备**。现在的设计宁可漏报，
+也绝不允许「因为看不懂所以命中」。
+
+`pattern` 字段语义（判定实现见 `src/rule_engine/engine.py::BehaviorMatcher._matches`）：
+- `interval`：相邻观测的时间间隔（秒），**全部**落在区间才算（心跳）
+- `interval_min` / `interval_max` / `periodicity_threshold`：落在区间的间隔**占比**达到阈值（周期性，允许抖动）
+- `duration_min`：观测跨度（**秒**），不是记录条数
 - `total_bytes_min`：窗口内累计字节数下限
 - `packet_size`：窗口内**平均**包大小范围
-- `min_occurrences`：最少出现次数，样本不够不下结论
+- `min_occurrences`：窗口内最少出现次数（窗口有界 ⇒ 这本身就是速率证据）
+- `min_connections`：窗口内**不同目的地**数量（IP+端口+域名去重）
+- `destination_keywords`：目标域名关键词，**必须落在标签边界上**
+  （`c2` 不会误伤 `abc2.example.com` —— 这条规则的建议动作是隔离设备，误报代价极高）
+- `destination_pattern`：目标域名正则，慎用
+- `subdomain_length_min` / `dns_rate_min`：DNS 隧道的两个特征（超长标签 / 高频查询）
+- `any_of`：子模式任一成立即可
 
-`explanation` 是中文模板，`{device_name}` / `{destination}` 等占位由告警层填充。
+规则级字段：`scope`（`device` 看整台设备 / `destination` 看设备到某个目的地）、
+`window_seconds`（判定窗口，由 `src/analysis/behavior.py` 负责切分）、
+`confidence`（`low` 的文案必须自己声明是弱证据）。
+
+`explanation` 是中文模板，占位符只能取自 `src/analysis/alerting.py` 的
+`TEMPLATE_KEYS` —— 单测会逐条文案校验，渲染不出的占位符会以「（键名：未知）」
+显式暴露，绝不静默丢掉。
 
 ### 3.3 在线更新
 

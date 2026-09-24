@@ -40,6 +40,8 @@ from ai.analyzer import AIAnalyzer, AnalysisRequest, AnalysisResult
 from knowledge_base.updater import KnowledgeBaseUpdater
 from inventory.device import DeviceRegistry
 from inventory.attribution import DomainAttribution
+from analysis.behavior import BehaviorDetector
+from analysis.alerting import AlertCenter
 
 
 class HomewardService:
@@ -74,6 +76,19 @@ class HomewardService:
 
         # 建议阻断队列（社区版只产出"建议"，从不产生已生效的阻断规则）
         self.suggested_rules: list[dict] = []
+
+        # W3：行为识别 + 中文告警
+        # 行为规则按自己声明的窗口/粒度跑，判定结果进告警中心做去重收敛。
+        self.behavior_detector = BehaviorDetector(self.behavior_matcher)
+        self.alert_center = AlertCenter(
+            cooldown_seconds=self.config.get("alert_cooldown", 1800),
+        )
+        self._rules_by_id = {
+            r["id"]: r for r in self.behavior_matcher.supported_rules
+        }
+        # 每喂进多少条观测跑一次行为扫描（行为判定是窗口级运算，没必要逐条跑）
+        self.behavior_scan_every = int(self.config.get("behavior_scan_every", 20))
+        self._flows_since_scan = 0
 
         # W2：设备台账 + 域名归属
         # 两者都可能在缺少本地数据源时"识别不出东西" —— 那是预期行为，
@@ -133,6 +148,13 @@ class HomewardService:
         # W2：把这条流量归到某台设备上，并解析域名归属
         self.device_registry.observe_flow(flow)
 
+        # W3：同一条观测也喂给行为窗口（与域名判定正交 —— 一个看"是谁"，一个看"在干什么"）
+        self.behavior_detector.feed(flow)
+        self._flows_since_scan += 1
+        if self._flows_since_scan >= self.behavior_scan_every:
+            self._flows_since_scan = 0
+            self.run_behavior_scan(now=flow.timestamp)
+
         decision = self.engine.evaluate(flow)
         self.stats["decisions_made"] += 1
 
@@ -165,6 +187,53 @@ class HomewardService:
         self.suggested_rules.append(rule)
         self.stats["suggestions_pending"] += 1
         logger.info(f"[SUGGEST] {rule['domain']} → {decision.reason}（等待用户确认）")
+
+    # ---------------------------------------------------------------- W3 行为与告警
+
+    def run_behavior_scan(self, now: Optional[float] = None) -> list:
+        """跑一轮行为识别，把命中的行为渲染成中文告警收进告警中心
+
+        返回本轮**新建**的告警（重复命中的只是更新，不占新条目）。
+        传入 ``now`` 是为了让离线回放 / 单测能按数据里的时间戳判定，而不是按挂钟时间。
+        """
+        findings = self.behavior_detector.scan(now=now)
+        new_alerts = self.alert_center.ingest(
+            findings,
+            device_view_of=self.get_device,
+            attribution_of=self.describe_domain,
+            rule_of=lambda rid: self._rules_by_id.get(rid, {}),
+            now=now,
+        )
+        for alert in new_alerts:
+            logger.info(
+                f"[ALERT][{alert.severity_label}] {alert.device_name} → "
+                f"{alert.destination}：{alert.title}"
+            )
+        return new_alerts
+
+    def get_alerts(self, include_dismissed: bool = False) -> list[dict]:
+        """给 UI / API 用的告警视图（已按严重度排序）"""
+        items = self.alert_center.all() if include_dismissed else self.alert_center.active()
+        return [a.to_dict() for a in items]
+
+    def dismiss_alert(self, alert_id: str) -> bool:
+        """忽略一条告警"""
+        return self.alert_center.dismiss(alert_id)
+
+    def get_alert_stats(self) -> dict:
+        """告警统计：数量、按严重度分布、模板渲染是否健康"""
+        missing = sorted({
+            k for a in self.alert_center.active() for k in a.missing_keys
+        })
+        return {
+            "active": len(self.alert_center.active()),
+            "by_severity": self.alert_center.counts_by_severity(),
+            "created": self.alert_center.stats["created"],
+            "updated": self.alert_center.stats["updated"],
+            "behaviors_supported": len(self.behavior_matcher.supported_rules),
+            "behaviors_unsupported": self.behavior_matcher.unsupported(),
+            "missing_template_keys": missing,  # 正常应为空；非空说明文案与渲染器脱节
+        }
 
     def request_ai_analysis(self, domain: str, behavior: dict) -> Optional[AnalysisResult]:
         """
@@ -281,6 +350,10 @@ class HomewardService:
             ),
             "vendor_lookup_enabled": self.device_registry.vendor_lookup_enabled,
             "attribution_queries": self.attribution.stats["queries"],
+            "alerts_active": len(self.alert_center.active()),
+            "alerts_by_severity": self.alert_center.counts_by_severity(),
+            "behaviors_supported": len(self.behavior_matcher.supported_rules),
+            "behaviors_unsupported": len(self.behavior_matcher.unsupported_rules),
         }
 
     def _load_suggestions(self):
@@ -350,6 +423,64 @@ if __name__ == "__main__":
 
     print(f"\n{'=' * 70}")
     print(f"统计: {json.dumps(service.get_stats(), ensure_ascii=False, indent=2)}")
+
+    # ------------------------------------------------------------ 行为识别演示
+    # 行为判定必须看「一段时间里的若干次观测」，单条记录判不出任何行为。
+    # 场景：一台卧室摄像头，同时干着三件事 —— 正常上报、定时心跳、偷偷上传。
+    print(f"\n{'=' * 70}")
+    print("行为识别演示：一台卧室摄像头的一小时")
+    print("=" * 70)
+
+    import time as _time
+
+    base = _time.time()
+    cam = "192.168.1.50"
+
+    # (1) 心跳信标：每 30 秒一个小包，共 12 次
+    for i in range(12):
+        service.process_flow(FlowRecord(
+            timestamp=base + i * 30, src_ip=cam, dst_ip="203.0.113.9",
+            dst_port=443, protocol="tcp", sni="track.tuya.com",
+            dns_query="track.tuya.com", packet_size=60, direction="out",
+        ))
+
+    # (2) 突发上传：14 分钟内累计 4.2MB
+    for i in range(14):
+        service.process_flow(FlowRecord(
+            timestamp=base + 100 + i * 60, src_ip=cam, dst_ip="203.0.113.7",
+            dst_port=443, protocol="tcp", sni="storage.ml-ops.samsung.com",
+            dns_query="storage.ml-ops.samsung.com", packet_size=300_000, direction="out",
+        ))
+
+    # (3) 完全正常的核心服务（应当不产生告警）
+    for i in range(6):
+        service.process_flow(FlowRecord(
+            timestamp=base + i * 300, src_ip=cam, dst_ip="203.0.113.8",
+            dst_port=443, protocol="tcp", sni="ot.io.mi.com",
+            dns_query="ot.io.mi.com", packet_size=200, direction="out",
+        ))
+
+    # (4) 客厅电视的 DNS 隧道特征：超长随机子域
+    long_label = "a" * 58
+    for i in range(8):
+        service.process_flow(FlowRecord(
+            timestamp=base + 850 + i * 0.2, src_ip="192.168.1.77", dst_ip="",
+            dst_port=53, protocol="udp", dns_query=f"{long_label}.exfil.example.net",
+            packet_size=0, direction="out",
+        ))
+
+    service.run_behavior_scan(now=base + 900)
+
+    alerts = service.get_alerts()
+    if not alerts:
+        print("  未产生告警")
+    for a in alerts:
+        target = a['domain'] or a['destination']
+        print(f"\n  [{a['severity_label']}] {a['title']} · 置信度 {a['confidence']}")
+        print(f"   对象: {a['device_name']} → {target}（归属：{a['organization']}）")
+        print(f"   说明: {a['summary']}")
+        print(f"   建议: {a['action_label']}")
+        print(f"   后果: {a['side_effects']}")
 
     print(f"\n{'=' * 70}")
     print("当前识别能力的盲区（UI 应如实展示）")

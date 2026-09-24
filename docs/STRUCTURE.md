@@ -31,6 +31,10 @@ homeward/
 │   ├── inventory/                   # W2：设备台账 + 域名归属
 │   │   ├── device.py                # IP → MAC → 厂商 / 品类；MAC 变 IP 仍是同一台
 │   │   └── attribution.py           # 域名 → 组织：精确 + 逐级向上，认输不猜
+│   ├── analysis/                    # W3：行为识别 + 中文告警
+│   │   ├── ingest.py                # Observation → FlowRecord（补上 W1→W2 断掉的一截）
+│   │   ├── behavior.py              # 时间窗 + 设备级/目的地级粒度 → BehaviorFinding（带证据）
+│   │   └── alerting.py              # 中文模板渲染 + 去重冷却收敛 → Alert
 │   ├── rule_engine/                 # 规则匹配引擎
 │   │   └── engine.py                # 知识库加载 + 行为匹配 + 决策（产出建议，不产出动作）
 │   ├── knowledge_base/              # 知识库（数据 CC BY 4.0，使用须署名）
@@ -45,6 +49,8 @@ homeward/
 ├── tests/                           # 标准库 unittest，无需装 pytest
 │   ├── test_collectors.py           # 采集层：解析 / 增量 / 能力位 / 降级链
 │   ├── test_behavior_matching.py    # 行为判定语义（duration 按秒 / interval 真算间隔）
+│   ├── test_behavior_rules.py       # W3：失败关闭 / 关键词边界 / 8 条规则各自能命中
+│   └── test_analysis.py             # W3：观测转换 / 窗口与粒度 / 告警渲染与收敛
 │   ├── test_inventory.py            # W2：设备识别 + 域名归属（含「不猜」红线断言）
 │   └── test_revert_contract.py      # 撤销契约端到端往返
 │

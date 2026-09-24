@@ -1,18 +1,24 @@
 {
+  "_schema_version": 2,
+  "_schema_note": "顶层下划线开头的键是元信息，不作为规则。pattern 可用键见 src/rule_engine/engine.py 的 FILTER_KEYS / EVIDENCE_KEYS / STRUCTURE_KEYS；scope=设备级(device)或目的地级(destination)；window_seconds=判定窗口长度。explanation 只允许使用告警渲染器能提供的占位符（见 src/analysis/alerting.py 的 TEMPLATE_KEYS）。",
+
   "heartbeat_beacon": {
     "name": "心跳信标",
     "description": "设备每隔固定时间发送小包，疑似心跳信标，可能用于在线状态追踪或跨设备关联",
     "severity": "low",
     "category": "telemetry",
+    "confidence": "medium",
+    "scope": "destination",
+    "window_seconds": 1800,
     "pattern": {
+      "direction": "out",
       "interval": { "min": 30, "max": 60 },
       "packet_size": { "min": 40, "max": 100 },
-      "direction": "out",
       "min_occurrences": 10
     },
     "action": "warn",
-    "explanation": "设备 {device_name} 每约 {interval} 秒发送一次小数据包到 {destination}。这是典型的心跳信标模式，可能用于：(1) 维持长连接在线状态；(2) 向服务器上报设备存活；(3) 跨设备关联追踪。建议观察一段时间确认是否影响功能。",
-    "side_effects": "阻断可能导致设备离线状态，但本地控制不受影响"
+    "explanation": "设备 {device_name} 每约 {interval} 秒向 {destination} 发送一次约 {avg_packet} 字节的小包，{occurrences} 次观测间隔高度一致。这是典型的心跳信标：设备用它维持长连接、上报存活状态，也可能被用于跨设备关联。它本身不传敏感内容，但持续在线意味着对方随时知道你在不在家。",
+    "side_effects": "阻断可能导致设备显示离线或失去远程控制；本地控制（局域网内）不受影响"
   },
 
   "bulk_upload": {
@@ -20,14 +26,17 @@
     "description": "短时间内持续上传大量数据，疑似视频/音频外传，存在隐私泄露风险",
     "severity": "high",
     "category": "data_exfiltration",
+    "confidence": "high",
+    "scope": "destination",
+    "window_seconds": 600,
     "pattern": {
+      "direction": "out",
       "duration_min": 60,
-      "total_bytes_min": 1048576,
-      "direction": "out"
+      "total_bytes_min": 1048576
     },
     "action": "block_medium",
-    "explanation": "设备 {device_name} 在 {start_time} 至 {end_time} 期间向 {destination} 持续上传了约 {total_mb}MB 数据。该行为模式与视频流上传高度吻合，但当前「云录像」设置为关闭状态，建议排查：(1) 固件是否存在漏洞；(2) 是否被恶意利用；(3) 是否误判（如设备正在上传日志）。",
-    "side_effects": "阻断后设备云功能失效，本地画面不受影响"
+    "explanation": "设备 {device_name} 在 {start_time} 至 {end_time} 的 {duration_min} 分钟内，向 {destination}（{organization}）持续上传了约 {total_mb}MB 数据，共 {occurrences} 次传输。对一台只需偶尔上报状态的设备来说，这个量级更接近音视频或录像上传。建议先核对设备的云存储/云录像开关是否真的关掉了。",
+    "side_effects": "阻断后该设备的云功能（云录像、远程查看）会失效；局域网本地画面不受影响"
   },
 
   "periodic_activity": {
@@ -35,30 +44,40 @@
     "description": "设备流量呈现明显的周期性变化，可能被用于推断用户在家/离家状态",
     "severity": "medium",
     "category": "behavior_inference",
+    "confidence": "medium",
+    "scope": "device",
+    "window_seconds": 21600,
     "pattern": {
       "direction": "out",
       "interval_min": 300,
       "interval_max": 3600,
-      "periodicity_threshold": 0.8
+      "periodicity_threshold": 0.8,
+      "min_occurrences": 8
     },
     "action": "warn",
-    "explanation": "设备 {device_name} 的外联流量呈现约 {period} 分钟的周期变化。研究表明，联网设备的流量周期性可被用来推断：(1) 用户是否在家；(2) 用户作息规律；(3) 家庭活动模式。建议考虑将该设备隔离到 IoT VLAN。",
-    "side_effects": "告警不阻断，建议用户评估后手动操作"
+    "explanation": "设备 {device_name} 的外联呈现约 {period} 分钟一次的规律节奏（{occurrences} 次观测里大多数间隔落在这个区间）。流量周期性本身不泄露内容，却能反推作息：什么时候在家、什么时候睡觉、家里有没有人。这类推断不需要读你的数据，只看发包的时间就够了。",
+    "side_effects": "仅告警不阻断；若在意该推断，可考虑把设备放进独立的 IoT 网段"
   },
 
   "dns_tunneling": {
     "name": "疑似 DNS 隧道",
-    "description": "DNS 查询出现异常长的子域名或高频 DNS 查询，疑似 DNS 隧道数据外传",
+    "description": "DNS 查询出现异常长的子域名或高频 DNS 查询，疑似利用 DNS 协议外传数据",
     "severity": "high",
     "category": "data_exfiltration",
+    "confidence": "medium",
+    "scope": "device",
+    "window_seconds": 60,
     "pattern": {
-      "subdomain_length_min": 50,
-      "dns_rate_min": 10,
-      "direction": "out"
+      "direction": "out",
+      "any_of": [
+        { "subdomain_length_min": 50 },
+        { "dns_rate_min": 10 }
+      ],
+      "min_occurrences": 5
     },
     "action": "block_hard",
-    "explanation": "检测到设备 {device_name} 存在疑似 DNS 隧道行为：子域名长度 {length} 字符，DNS 查询频率 {rate} 次/秒。DNS 隧道是一种将已知的数据泄露技术，攻击者利用 DNS 协议将窃取的数据编码到域名中进行外传。建议立即将该设备隔离。",
-    "side_effects": "设备将被移入 IoT VLAN，所有外网访问被阻断"
+    "explanation": "设备 {device_name} 的 DNS 行为异常：最长的一段域名标签有 {length} 个字符，查询速率约 {rate} 次/秒（窗口 {window_minutes} 分钟内共 {occurrences} 次查询）。正常设备不会去查这么长的随机子域，也不会这么密集地查 —— 这是把数据切碎塞进域名里往外带的典型手法。",
+    "side_effects": "隔离后该设备将无法访问外网；请优先排查固件，而不是直接丢弃设备"
   },
 
   "lateral_mdns_scan": {
@@ -66,57 +85,72 @@
     "description": "设备频繁发送 mDNS/SSDP 查询，可能在做局域网设备发现/指纹识别",
     "severity": "medium",
     "category": "lan_reconnaissance",
+    "confidence": "medium",
+    "scope": "device",
+    "window_seconds": 300,
     "pattern": {
-      "direction": "in",
+      "direction": "out",
       "protocol": "udp",
       "dst_port": 5353,
       "min_occurrences": 20
     },
     "action": "warn",
-    "explanation": "设备 {device_name} 在局域网内频繁发送 mDNS/SSDP 发现请求。研究显示，移动 App 和第三方 SDK 利用 UPnP/mDNS 进行：(1) 家庭网络指纹识别；(2) 跨设备追踪；(3) 设备类型探测。建议将该设备隔离到独立 VLAN。",
-    "side_effects": "告警不阻断，建议将设备移入 IoT VLAN"
+    "explanation": "设备 {device_name} 在 {window_minutes} 分钟内发送了 {occurrences} 次 mDNS/SSDP 发现请求。这些请求只在本局域网里打转，用来问「网上还有谁」。App 和第三方 SDK 常借此做家庭网络指纹识别、跨设备追踪和设备类型探测 —— 它扫到的是你家里有哪些设备，不是文件内容。",
+    "side_effects": "仅告警不阻断；若在意，可把该设备移入独立网段，mDNS 跨网段即失效"
   },
 
   "crypto_mining": {
     "name": "疑似加密货币挖矿",
-    "description": "设备持续建立大量连接到已知矿池域名，疑似被植入挖矿程序",
+    "description": "设备持续连接已知矿池服务，疑似被僵尸网络招募挖矿",
     "severity": "high",
     "category": "malware",
+    "confidence": "medium",
+    "scope": "device",
+    "window_seconds": 600,
     "pattern": {
-      "destination_pattern": ".*(pool|mining|crypto|stratum|xmr|monero).*",
       "direction": "out",
-      "min_connections": 50
+      "destination_keywords": ["pool", "mining", "stratum", "xmr", "monero", "nanopool", "f2pool", "ethermine", "nicehash"],
+      "min_connections": 3,
+      "min_occurrences": 20
     },
     "action": "block_hard",
-    "explanation": "设备 {device_name} 正在连接疑似矿池服务 {destination}。IoT 设备因算力低、安全防护薄弱，常被僵尸网络招募进行挖矿。建议：(1) 立即隔离设备；(2) 检查固件版本；(3) 考虑恢复出厂设置后重新配置。",
-    "side_effects": "设备将被移入 IoT VLAN，所有外网访问被阻断"
+    "explanation": "设备 {device_name} 在 {window_minutes} 分钟内连接了 {connections} 个疑似矿池地址（如 {destination}，归属 {organization}），累计 {occurrences} 次连接。IoT 设备算力低、防护弱，是僵尸网络招募挖矿的常见目标，典型症状还有设备发烫、变卡。",
+    "side_effects": "隔离后设备无法访问外网；建议同步检查固件版本，必要时恢复出厂设置重配"
   },
 
   "c2_beacon": {
     "name": "疑似 C2 通信",
-    "description": "设备与已知 C2 服务器建立连接，疑似被控僵尸网络",
+    "description": "设备与疑似 C2（命令控制）服务器通信，可能是被控僵尸网络",
     "severity": "critical",
     "category": "malware",
+    "confidence": "low",
+    "scope": "destination",
+    "window_seconds": 3600,
     "pattern": {
-      "destination_pattern": ".*(c2|command|botnet|zeus|mirai|mozi).*",
-      "direction": "out"
+      "direction": "out",
+      "destination_keywords": ["c2", "cnc", "botnet", "mirai", "mozi", "gafgyt", "qbot", "zeus"],
+      "min_occurrences": 3
     },
     "action": "block_hard",
-    "explanation": "设备 {device_name} 正在与疑似 C2 服务器 {destination} 通信。IoT 设备是僵尸网络的主要目标（Mirai、Mozi 等）。建议立即隔离设备并排查。",
-    "side_effects": "设备将被移入 IoT VLAN，所有外网访问被阻断"
+    "explanation": "设备 {device_name} 与 {destination}（归属 {organization}）通信了 {occurrences} 次，该域名含有常见的僵尸网络/C2 命名特征。注意：这条结论只建立在域名关键词上，属于**弱证据** —— 也可能是巧合命名或误标。建议先核实该域名真实用途，再决定是否隔离。",
+    "side_effects": "隔离后设备无法访问外网；误隔离会让设备失去全部联网功能，请确认后再动手"
   },
 
   "firmware_backdoor": {
-    "name": "疑似固件后门通信",
-    "description": "设备连接到已知存在后门的固件更新服务器",
+    "name": "疑似后门通信",
+    "description": "设备与带有后门/漏洞利用特征的域名通信，疑似固件被篡改",
     "severity": "critical",
     "category": "vulnerability",
+    "confidence": "low",
+    "scope": "destination",
+    "window_seconds": 3600,
     "pattern": {
-      "destination_pattern": ".*(backdoor|exploit|0day|poc).*",
-      "direction": "out"
+      "direction": "out",
+      "destination_keywords": ["backdoor", "exploit", "0day", "poc", "rce", "webshell"],
+      "min_occurrences": 3
     },
     "action": "block_hard",
-    "explanation": "设备 {device_name} 正在连接到疑似恶意服务器 {destination}。该行为可能表明设备固件存在后门或被恶意篡改。建议立即隔离并联系厂商。",
-    "side_effects": "设备将被移入 IoT VLAN，所有外网访问被阻断"
+    "explanation": "设备 {device_name} 与 {destination}（归属 {organization}）通信了 {occurrences} 次，该域名带有后门或漏洞利用相关的命名特征。同样属于**弱证据**：仅凭域名关键词不足以断定固件被篡改，但它足够值得你去查一次固件版本与更新来源。",
+    "side_effects": "隔离后设备无法访问外网；排查方向：固件版本、更新服务器是否来自厂商官方"
   }
 }
