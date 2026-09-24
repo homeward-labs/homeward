@@ -1,0 +1,49 @@
+#!/bin/sh
+# homeward pre-commit guard
+# 目的：防止标准版/专业版（闭源）代码被误提交到公开仓库。
+# 触发：每次 git commit 前自动运行（见 git config core.hooksPath）。
+set -e
+
+# 禁止发布的目录（与 .gitignore 中的闭源段保持一致）
+CLOSED_DIRS="src/enforcers src/editions/standard src/editions/pro"
+
+# 文件内容中的闭源标记：仅对 src/ 下的源码做内容扫描（文档与脚本可合法提及这些词）。
+SENTINELS="@closed-source @standard-only @pro-only"
+
+TMP=$(mktemp)
+git diff --cached --name-only --diff-filter=ACM > "$TMP" || true
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+
+  # 1) 目录级拦截（对所有文件生效）
+  for d in $CLOSED_DIRS; do
+    case "$f" in
+      "$d"/*)
+        echo "BLOCKED: '$f' 位于闭源目录 '$d'，禁止提交到公开仓库。"
+        echo "   请将其保留在本地/私有仓库，或用 git restore --staged '$f' 取消暂存。"
+        rm -f "$TMP"
+        exit 1
+        ;;
+    esac
+  done
+
+  # 2) 内容标记拦截（仅对 src/ 下源码生效，避免文档/脚本被误伤）
+  case "$f" in
+    src/*)
+      if [ -f "$f" ]; then
+        for s in $SENTINELS; do
+          if grep -q -- "$s" "$f" 2>/dev/null; then
+            echo "BLOCKED: '$f' 含有闭源标记 '$s'，禁止提交到公开仓库。"
+            echo "   如确需开源，请先移除该标记；否则取消暂存并放入 src/enforcers 或 src/editions/*。"
+            rm -f "$TMP"
+            exit 1
+          fi
+        done
+      fi
+      ;;
+  esac
+done < "$TMP"
+
+rm -f "$TMP"
+echo "OK: 未发现闭源代码泄露，提交放行。"

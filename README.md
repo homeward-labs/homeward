@@ -5,6 +5,7 @@
 **家卫是「设备外联流量治理」工具，不是摄像头、不是安防监控 App。** 我们不拍你、不装你的设备，只在网络层看清并管好"谁在给外面打电话"。
 
 - 中文文档：[docs/README.md](docs/README.md) · 阻断策略：[docs/BLOCKING.md](docs/BLOCKING.md) · 竞品分析：[docs/COMPETITORS.md](docs/COMPETITORS.md)
+- **开源边界（社区版开源 / 标准版·专业版闭源）**：[docs/EDITIONS.md](docs/EDITIONS.md)
 
 ---
 
