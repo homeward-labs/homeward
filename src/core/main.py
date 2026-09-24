@@ -298,6 +298,48 @@ class HomewardService:
             "vendor": dev.vendor_cn or dev.vendor,
             "device_type": dev.device_type,
             "type_source": dev.type_source,
+            "top_domains": dev.top_domains(10),
+        }
+
+    def get_devices(self) -> list[dict]:
+        """设备台账视图（按最近活跃排序）"""
+        return [d.to_dict() for d in self.device_registry.list_devices()]
+
+    def get_destinations(self) -> dict:
+        """去向地图：域名 → 组织 → 哪些设备在跟它说话
+
+        只报**真实观测到过**的边；归属查不到就如实标 unknown，不做相似域名猜测。
+        """
+        edges: dict[str, list[dict]] = {}
+        for dev in self.device_registry.devices.values():
+            for domain, count in dev.domains.items():
+                edges.setdefault(domain, []).append({
+                    "name": dev.display_name,
+                    "ip": next(iter(sorted(dev.ips)), ""),
+                    "count": count,
+                })
+
+        items = []
+        seen: set[str] = set()
+        for r in self.attribution.resolved_view():
+            seen.add(r["domain"])
+            items.append({**r, "devices": edges.get(r["domain"], [])})
+        # 缓存里没有、但设备确实访问过的域名（例如缓存被整体清空过）也要补上
+        for domain in sorted(set(edges) - seen):
+            items.append({**self.describe_domain(domain), "devices": edges[domain]})
+        # 判定为 unknown 的单次观测同样要露出来 —— 「不知道」也是一种结论
+        for domain in self.get_unknown_domains():
+            if domain in seen or domain in edges:
+                continue
+            items.append({**self.describe_domain(domain), "devices": []})
+
+        items.sort(key=lambda x: (-len(x["devices"]), x["domain"]))
+        known = sum(1 for x in items if x["known"])
+        return {
+            "items": items,
+            "total": len(items),
+            "known": known,
+            "hit_rate": (known / len(items)) if items else 0.0,
         }
 
     def describe_domain(self, domain: str) -> dict:
@@ -385,35 +427,27 @@ class HomewardService:
 # ==================== 演示 ====================
 
 if __name__ == "__main__":
-    service = HomewardService()
+    # 演示剧本抽到 src/core/demo.py —— 与 Web UI 的 --demo 共用同一份，
+    # 避免两处各写一套、日后各自漂移。
+    from core.demo import seed_demo
 
-    # 模拟流量
-    test_flows = [
-        FlowRecord(
-            timestamp=1705316400, src_ip="192.168.1.100", dst_ip="203.0.113.1",
-            dst_port=443, protocol="tcp", sni="api.ad.tuya.com",
-            dns_query="api.ad.tuya.com", packet_size=1500, direction="out",
-        ),
-        FlowRecord(
-            timestamp=1705316401, src_ip="192.168.1.101", dst_ip="203.0.113.2",
-            dst_port=443, protocol="tcp", sni="ot.io.mi.com",
-            dns_query="ot.io.mi.com", packet_size=200, direction="out",
-        ),
-        FlowRecord(
-            timestamp=1705316402, src_ip="192.168.1.102", dst_ip="203.0.113.3",
-            dst_port=443, protocol="tcp", sni="unknown-tracking-domain.xyz",
-            dns_query="unknown-tracking-domain.xyz", packet_size=64, direction="out",
-        ),
-    ]
+    service = HomewardService()
 
     print("=" * 70)
     print("家卫 — 核心服务演示")
     print("=" * 70)
 
-    for flow in test_flows:
-        decision = service.process_flow(flow)
-        dev = service.get_device(flow.src_ip)
-        attr = service.describe_domain(flow.sni)
+    demo = seed_demo(service)
+
+    print("\n演示设备（MAC 前缀从真实 OUI 表反查，表里没有该厂商就不编）：")
+    for hostname, ip, mac in demo["devices"]["devices"]:
+        print(f"  {hostname:16s} {ip:15s} {mac or '（OUI 表无此厂商 → 显示为裸 IP）'}")
+
+    for item in demo["intro"]:
+        flow = item["flow"]
+        dev = item["device"]
+        attr = item["attribution"]
+        decision = item["decision"]
         print(f"\n观测: {dev['name']} ({flow.src_ip}) → {attr['domain']}")
         print(f"   归属: {attr['organization'] or '未知'} "
               f"[{attr['category']} / 置信度 {attr['confidence']}]")
@@ -424,54 +458,15 @@ if __name__ == "__main__":
     print(f"\n{'=' * 70}")
     print(f"统计: {json.dumps(service.get_stats(), ensure_ascii=False, indent=2)}")
 
-    # ------------------------------------------------------------ 行为识别演示
-    # 行为判定必须看「一段时间里的若干次观测」，单条记录判不出任何行为。
-    # 场景：一台卧室摄像头，同时干着三件事 —— 正常上报、定时心跳、偷偷上传。
+    # ------------------------------------------------------------ 行为识别
+    # 演示剧本见 src/core/demo.py：一台卧室摄像头的一小时（心跳 / 突发上传 / 正常服务）
+    # + 一台客厅电视的 DNS 隧道特征。行为判定必须看「一段时间里的若干次观测」，
+    # 单条记录判不出任何行为，所以剧本构造的是序列而非单包。
     print(f"\n{'=' * 70}")
-    print("行为识别演示：一台卧室摄像头的一小时")
+    print("行为识别：一台卧室摄像头的一小时")
     print("=" * 70)
 
-    import time as _time
-
-    base = _time.time()
-    cam = "192.168.1.50"
-
-    # (1) 心跳信标：每 30 秒一个小包，共 12 次
-    for i in range(12):
-        service.process_flow(FlowRecord(
-            timestamp=base + i * 30, src_ip=cam, dst_ip="203.0.113.9",
-            dst_port=443, protocol="tcp", sni="track.tuya.com",
-            dns_query="track.tuya.com", packet_size=60, direction="out",
-        ))
-
-    # (2) 突发上传：14 分钟内累计 4.2MB
-    for i in range(14):
-        service.process_flow(FlowRecord(
-            timestamp=base + 100 + i * 60, src_ip=cam, dst_ip="203.0.113.7",
-            dst_port=443, protocol="tcp", sni="storage.ml-ops.samsung.com",
-            dns_query="storage.ml-ops.samsung.com", packet_size=300_000, direction="out",
-        ))
-
-    # (3) 完全正常的核心服务（应当不产生告警）
-    for i in range(6):
-        service.process_flow(FlowRecord(
-            timestamp=base + i * 300, src_ip=cam, dst_ip="203.0.113.8",
-            dst_port=443, protocol="tcp", sni="ot.io.mi.com",
-            dns_query="ot.io.mi.com", packet_size=200, direction="out",
-        ))
-
-    # (4) 客厅电视的 DNS 隧道特征：超长随机子域
-    long_label = "a" * 58
-    for i in range(8):
-        service.process_flow(FlowRecord(
-            timestamp=base + 850 + i * 0.2, src_ip="192.168.1.77", dst_ip="",
-            dst_port=53, protocol="udp", dns_query=f"{long_label}.exfil.example.net",
-            packet_size=0, direction="out",
-        ))
-
-    service.run_behavior_scan(now=base + 900)
-
-    alerts = service.get_alerts()
+    alerts = demo["alerts"]
     if not alerts:
         print("  未产生告警")
     for a in alerts:

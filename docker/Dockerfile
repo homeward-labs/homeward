@@ -25,5 +25,7 @@ ENV LOG_LEVEL=info
 # 暴露 Web UI 端口
 EXPOSE 9595
 
-# 启动命令（根据实际适配器选择）
-CMD ["python", "-m", "src.core.main"]
+# 启动 Web UI（只读，端口 9595）。
+# 监听地址与端口走 HOST / PORT 环境变量，由 src/ui/server.py 读取 ——
+# CMD 因此保持 exec 形式（不套 shell，信号能直接传到进程，优雅退出才成立）。
+CMD ["python", "-m", "src.ui.server"]

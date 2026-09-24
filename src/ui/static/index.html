@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>家卫 Homeward · 社区版</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<!-- 图标精灵：内联 SVG，不引任何外部图标库（隐私工具不请求第三方）。
+     禁止用 emoji 当功能图标 —— 各平台字形不一致，且读屏器读出来的是情绪词。 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-shield" viewBox="0 0 24 24">
+    <path d="M12 3l7 3v5.5c0 4.4-3 8.1-7 9.5-4-1.4-7-5.1-7-9.5V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M9 12l2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-overview" viewBox="0 0 24 24">
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="i-device" viewBox="0 0 24 24">
+    <rect x="2.5" y="5" width="19" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M8.5 20h7M12 16v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-route" viewBox="0 0 24 24">
+    <circle cx="5.5" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <circle cx="18.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M8 6h5.5a3.5 3.5 0 013.5 3.5V15.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24">
+    <path d="M12 4.5l8 14.5H4l8-14.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M12 10v4M12 16.6v.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-question" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M9.6 9.4a2.5 2.5 0 114.2 2.1c-.8.7-1.8 1.1-1.8 2.3v.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="16.6" r=".9" fill="currentColor"/>
+  </symbol>
+  <symbol id="i-suggest" viewBox="0 0 24 24">
+    <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M5.8 5.8l1.4 1.4M16.8 16.8l1.4 1.4M18.2 5.8l-1.4 1.4M7.2 16.8l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24">
+    <path d="M3 12s3.6-6 9-6 9 6 9 6-3.6 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M4.5 19.5L19.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24">
+    <path d="M19.5 12a7.5 7.5 0 11-2.2-5.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M19.8 4.5v4.2h-4.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" width="26" height="26" aria-hidden="true"><use href="#i-shield"/></svg>
+    <div class="brand-text">
+      <strong>家卫</strong>
+      <span>Homeward</span>
+    </div>
+    <span class="badge" id="edition-badge">社区版</span>
+  </div>
+  <div class="topbar-right">
+    <span class="muted small" id="updated-at">—</span>
+    <label class="switch">
+      <input type="checkbox" id="auto-refresh" checked>
+      <span>自动刷新</span>
+    </label>
+    <button class="btn" id="btn-refresh" type="button">
+      <svg width="15" height="15" aria-hidden="true"><use href="#i-refresh"/></svg>
+      刷新
+    </button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist">
+  <button class="tab is-active" data-view="overview" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-overview"/></svg>概览</button>
+  <button class="tab" data-view="devices" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-device"/></svg>设备</button>
+  <button class="tab" data-view="destinations" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-route"/></svg>去向</button>
+  <button class="tab" data-view="alerts" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-alert"/></svg>告警<span class="pill" id="alert-pill">0</span></button>
+  <button class="tab" data-view="unknown" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-question"/></svg>未知域名</button>
+  <button class="tab" data-view="suggestions" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-suggest"/></svg>建议</button>
+  <button class="tab" data-view="blind" role="tab">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-eye-off"/></svg>盲区</button>
+</nav>
+
+<main id="view" class="view"></main>
+
+<footer class="foot">
+  <span id="foot-meta">—</span>
+  <span class="muted">社区版只做「看见」；实际拦截属标准版能力。</span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
