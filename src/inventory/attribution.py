@@ -216,6 +216,26 @@ class DomainAttribution:
     def resolve_many(self, domains: Iterable[str]) -> dict[str, AttributionResult]:
         return {d: self.resolve(d) for d in domains}
 
+    def resolved_view(self) -> list[dict]:
+        """已解析过的域名快照（缓存内容），给 UI 的「去向」视图用
+
+        注意这是**查过的**域名，不是全部见过的域名：缓存有上限且满了会整体清空，
+        所以它只能用来展示「当前已知去向」，不能当作统计口径。
+        """
+        out = []
+        for domain, r in sorted(self._cache.items()):
+            out.append({
+                "domain": r.domain,
+                "organization": r.organization,
+                "category": r.category,
+                "confidence": r.confidence,
+                "known": r.known,
+                "matched_by": r.matched_by,
+                "side_effects": r.side_effects,
+                "explain": r.explain(),
+            })
+        return out
+
     def coverage(self, domains: Iterable[str]) -> CoverageReport:
         rep = CoverageReport()
         for d in domains:

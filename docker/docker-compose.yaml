@@ -25,4 +25,9 @@ services:
       - KNOWLEDGE_BASE_AUTO_UPDATE=false
       - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800  # 7 天
     ports:
-      - "9595:9595"
+      - "9595:9595"        # Web UI（社区版只读；当前版本没有鉴权，勿直接暴露到公网）
+    # 数据采集尚未接线到容器：当前镜像以「界面可跑通 + 演示数据自测」为主，
+    # 采集层接真机数据源是 W5 的工作（见 docs/ROADMAP.md）。
+    # 注意：compose 的 command 会**整体替换**镜像 CMD，不能只写参数。
+    # 演示数据用于界面自测；W5 接上真机数据源后删掉 --demo 即可。
+    command: ["python", "-m", "src.ui.server", "--demo"]

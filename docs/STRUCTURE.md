@@ -20,7 +20,8 @@ homeward/
 │
 ├── src/
 │   ├── core/                        # 核心服务
-│   │   └── main.py                  # 入口 HomewardService：编排采集/决策/建议队列
+│   │   ├── main.py                  # 入口 HomewardService：编排采集/决策/建议队列
+│   │   └── demo.py                  # 演示剧本（命令行演示与 UI --demo 共用，不在生产路径调用）
 │   ├── adapters/                    # 采集 / 执行 正交抽象层（本期只有接口）
 │   │   ├── base.py                  # Capabilities + Collector/Enforcer + 撤销契约
 │   │   └── capability.py            # CapabilitySet：can_show / can_enforce / blind_spots
@@ -43,11 +44,18 @@ homeward/
 │   │   ├── oui_prefixes.csv         # MAC 前缀 → 厂商（脚本生成，见 tools/build_oui_table.py）
 │   │   ├── updater.py               # 在线更新（默认关闭；无遥测回传）
 │   │   └── LICENSE                  # CC BY 4.0 许可与署名要求
+│   ├── ui/                          # W4：Web UI（端口 9595，社区版只读）
+│   │   ├── server.py                # 标准库 http.server + 十个 JSON 接口 + 静态文件
+│   │   └── static/                  # 页面本体：零外部资源，图标为内联 SVG（禁用 emoji）
+│   │       ├── index.html
+│   │       ├── app.css
+│   │       └── app.js
 │   └── ai/                          # AI 辅助层（默认关闭，手动触发）
 │       └── analyzer.py              # LLM 分析接口（ollama / openai 兼容）
 │
 ├── tests/                           # 标准库 unittest，无需装 pytest
 │   ├── test_collectors.py           # 采集层：解析 / 增量 / 能力位 / 降级链
+│   ├── test_ui.py                   # W4：真起 HTTP 服务打请求（路由/头/CSP/穿越/动词约束）
 │   ├── test_behavior_matching.py    # 行为判定语义（duration 按秒 / interval 真算间隔）
 │   ├── test_behavior_rules.py       # W3：失败关闭 / 关键词边界 / 8 条规则各自能命中
 │   └── test_analysis.py             # W3：观测转换 / 窗口与粒度 / 告警渲染与收敛

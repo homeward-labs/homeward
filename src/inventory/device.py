@@ -47,6 +47,10 @@ OUI_CSV = Path(__file__).resolve().parent.parent / "knowledge_base" / "oui_prefi
 
 _UNKNOWN_TYPE = "unknown"
 
+# 单台设备最多记多少个去向。家庭场景一台设备通常几十个域名足够，
+# 但 DNS 隧道 / 域名生成算法会瞬间刷出海量子域 —— 没有上限的话内存会被打爆。
+MAX_DOMAINS_PER_DEVICE = 200
+
 
 # ---------------------------------------------------------------- 数据结构
 
@@ -76,6 +80,9 @@ class Device:
     type_source: str = "unknown"        # hostname / vendor / none
     first_seen: float = 0.0
     last_seen: float = 0.0
+    # 域名 → 观测次数。UI 的「去向地图」画的就是「这台设备在跟谁说话」，
+    # 所以台账必须记住去向；上限见 MAX_DOMAINS_PER_DEVICE（低配设备内存要有界）。
+    domains: dict[str, int] = field(default_factory=dict)
 
     @property
     def display_name(self) -> str:
@@ -86,6 +93,42 @@ class Device:
             return self.vendor_cn or self.vendor
         ip = next(iter(sorted(self.ips)), None)
         return ip or self.key
+
+    def observe_domain(self, domain: str, count: int = 1) -> None:
+        """记一次去向。空域名（比如纯 IP 直连）直接跳过 —— 不编造域名。"""
+        if not domain:
+            return
+        self.domains[domain] = self.domains.get(domain, 0) + count
+        overflow = len(self.domains) - MAX_DOMAINS_PER_DEVICE
+        if overflow > 0:
+            # 超出上限就淘汰最早记录的几个。家庭场景几乎碰不到，
+            # 但常驻服务的内存必须有界 —— 宁可少记，不能无限涨。
+            for k in list(self.domains)[:overflow]:
+                self.domains.pop(k, None)
+
+    def top_domains(self, limit: int = 10) -> list[tuple[str, int]]:
+        """观测次数最多的若干去向（同次数按域名排序，保证输出稳定）"""
+        items = sorted(self.domains.items(), key=lambda kv: (-kv[1], kv[0]))
+        return items[:limit]
+
+    def to_dict(self, domain_limit: int = 10) -> dict:
+        """给 UI / API 用的视图"""
+        return {
+            "key": self.key,
+            "name": self.display_name,
+            "mac": self.mac,
+            "ips": sorted(self.ips),
+            "hostname": self.hostname,
+            "vendor": self.vendor_cn or self.vendor,
+            "device_type": self.device_type,
+            "type_source": self.type_source,
+            "first_seen": self.first_seen,
+            "last_seen": self.last_seen,
+            "domain_count": len(self.domains),
+            "top_domains": [
+                {"domain": d, "count": c} for d, c in self.top_domains(domain_limit)
+            ],
+        }
 
 
 # ---------------------------------------------------------------- 纯函数：MAC
@@ -393,8 +436,11 @@ class DeviceRegistry:
         return dev
 
     def observe_flow(self, flow) -> Device:
-        """从一条 FlowRecord 更新台账（只用 src_ip 与时间）"""
-        return self.observe_ip(flow.src_ip, getattr(flow, "timestamp", None))
+        """从一条 FlowRecord 更新台账：身份（src_ip）+ 去向（sni / dns_query）"""
+        dev = self.observe_ip(flow.src_ip, getattr(flow, "timestamp", None))
+        domain = getattr(flow, "sni", None) or getattr(flow, "dns_query", None)
+        dev.observe_domain(domain)
+        return dev
 
     def get_by_ip(self, ip: str) -> Optional[Device]:
         key = self._ip_index.get(ip)
