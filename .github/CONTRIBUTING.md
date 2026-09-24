@@ -34,7 +34,8 @@
 ### 推送前自查（维护者必做）
 
 ```bash
-sh tools/check_open_boundary.sh   # 全部 PASS 才推；退出码非 0 就别推
+sh tools/check_open_boundary.sh        # Linux / macOS / Git Bash
+python tools/check_open_boundary.py    # Windows PowerShell / cmd（与 sh 版等价）
 ```
 
 脚本会检查钩子是否启用、`.gitignore` 规则是否还在、忽略规则是否真的生效、
