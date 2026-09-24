@@ -42,6 +42,22 @@ python tools/check_open_boundary.py    # Windows PowerShell / cmd（与 sh 版�
 已跟踪文件与**全部提交历史**中有无闭源路径、`src/` 下有无闭源标记。
 推送时 `pre-push` 还会再查一遍；CI 是最后一道。详见 `docs/EDITIONS.md` 的「防误传机制」。
 
+### 日常推送流程
+
+上游跟踪分支建好之后（`git push -u origin main` 只需在**第一次**跑），日常就是三步：
+
+```bash
+git add -A
+git commit -m "..."   # pre-commit 自动运行，命中闭源即终止提交
+git push              # pre-push 自动运行，命中闭源即终止推送
+```
+
+- `-u origin main` 只在两种情况下需要：`main` 分支首次推送；换机器 / 重新 clone 后。
+  之后再带不会多一层保护 —— **它设置的是上游跟踪，与安全无关**。
+- 推送某个新分支时才需要显式指定：`git push -u origin feat/xxx`。
+- 不确定时（比如刚动过 `src/enforcers/` 或 `src/editions/` 附近的文件）先跑一遍
+  `python tools/check_open_boundary.py`，全 PASS 再 push。
+
 ## 三、许可与商标
 - 社区版代码以 **MIT** 许可发布；你提交的贡献默认以相同许可并入。
 - 商标「家卫 / Homeward」归项目所有；MIT 不授予商标使用权，商用请先联系维护者。
