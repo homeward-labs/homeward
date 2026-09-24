@@ -21,7 +21,13 @@ homeward/
 │   ├── adapters/                   # 采集 / 执行 正交抽象层
 │   │   ├── base.py                  # 接口骨架：Collector / Enforcer / Capabilities / EnforceAction
 │   │   ├── capability.py            # 协商助手：CapabilitySet（can_show / can_enforce / blind_spots）
-│   │   └── （具体平台实现 nftables/dnsmasq/pcap/ebpf/openwrt 本期未实现，见正文）
+│   │   └── （本期只放接口；采集实现见 src/collectors/，执行与深度抓包见 src/enforcers/）
+│   │
+│   ├── collectors/                 # 采集器具体实现（社区版开源）
+│   │   ├── dns.py                  # Tier 1：dnsmasq 查询日志采集
+│   │   └── conntrack.py            # Tier 2：连接元数据（字节数 / 直连 IP）
+│   │
+│   ├── enforcers/                  # 执行器实现（标准版闭源，gitignore + pre-commit 拦截）
 │   │
 │   ├── rule-engine/                # 规则匹配引擎
 │   │   ├── engine.py               # 核心判定逻辑
@@ -74,7 +80,14 @@ homeward/
 |---|---|---|
 | `base.py` | `Capabilities`(frozen dataclass) + `Collector` / `Enforcer` 两个抽象基类 + `EnforceAction` / `EnforceResult` / `Observation` / `ProbeResult` 数据模型 + **撤销契约**（`RevertPayload` 三子类 / `RevertResult` / `ActionRegistry`） | 接口骨架（本期） |
 | `capability.py` | `CapabilitySet`：`can_show()` / `can_enforce()` / `blind_spots()`，直接生成 D22「首页明示盲区」文案 | 协商助手（本期） |
-| `nftables.py` / `dnsmasq.py` / `pcap.py` / `ebpf.py` / `openwrt.py` | 具体平台实现（**标准版闭源**） | **本期未实现**（先做架构） |
+| `src/collectors/dns.py`、`src/collectors/conntrack.py` | **采集器实现（社区版开源）**：Tier 1 DNS / Tier 2 conntrack | ✅ 已实现（W1，含单测） |
+| `src/enforcers/*`（nftables / dnsmasq 黑洞 / VLAN）、深度抓包 DPI | **执行器与 Tier 3 实现（标准版闭源）**，不进公开仓库 | 本期未实现（先做架构） |
+
+> ⚠️ **开源边界修正（2026-09-24）**：采集与执行的开源属性**并不相同**——
+> 采集器（Tier 1 DNS / Tier 2 conntrack）属于**社区版开源**，落在 `src/collectors/`；
+> 执行器（真实阻断）与 Tier 3 深度抓包 / DPI 属于**标准版闭源**，落在 `src/enforcers/`（已 gitignore）。
+> 早期版本曾把「dnsmasq 等具体平台实现」一律标注为标准版闭源，现已按
+> 「接口开放、实现按采集 / 执行分别处理」修正。依据见 `docs/ROADMAP.md`「采集分层」。
 
 ### 能力协商层（Capabilities）
 
