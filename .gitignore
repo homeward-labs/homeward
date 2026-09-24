@@ -22,3 +22,12 @@ config.local.*
 # 产物
 *.png.bak
 screenshots_local/
+
+# ===== 闭源版本（标准版 / 专业版）—— 绝不上传公开仓库 =====
+# 以下目录只存在于本地/私有仓库，公开仓库（社区版）永不收录。
+src/enforcers/          # 具体阻断执行器（DNS 黑名单 / nft drop / VLAN 隔离 的真实实现）
+src/editions/standard/  # 标准版专属功能与集成
+src/editions/pro/       # 专业版（计划）专属功能与集成
+
+# 任何文件若带闭源标记（见 EDITIONS.md），即使不在上面目录也会被 pre-commit 拦截
+
