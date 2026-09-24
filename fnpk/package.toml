@@ -5,10 +5,10 @@
 name = "homeward"
 display_name = "家卫"
 version = "0.1.0"
-description = "家庭 IoT 隐私守护 — 帮你看懂家里的智能设备在跟谁说话，并能一键拦下可疑外联"
+description = "家庭联网设备隐私守护 — 帮你看懂家里每个联网设备（智能硬件 / 手机 / 电脑）在跟谁说话，并能一键拦下可疑外联"
 author = "Homeward Community"
 license = "MIT"
-homepage = "https://github.com/homeward/homeward"
+homepage = "https://github.com/homeward-labs/homeward"
 icon = "icon.png"
 
 [requirements]
@@ -31,10 +31,10 @@ privileged = true         # 需要配置 iptables / nftables
 volumes = ["./data", "./logs"]
 
 [ui]
-icon_url = "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/icon.png"
+icon_url = "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/icon.png"
 screenshot_urls = [
-    "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/screenshot1.png",
-    "https://raw.githubusercontent.com/homeward/homeward/main/fnpk/screenshot2.png"
+    "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot1.png",
+    "https://raw.githubusercontent.com/homeward-labs/homeward/main/fnpk/screenshot2.png"
 ]
 
 [category]

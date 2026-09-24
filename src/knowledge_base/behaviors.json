@@ -42,7 +42,7 @@
       "periodicity_threshold": 0.8
     },
     "action": "warn",
-    "explanation": "设备 {device_name} 的外联流量呈现约 {period} 分钟的周期变化。研究表明，智能家居设备的流量周期性可被用来推断：(1) 用户是否在家；(2) 用户作息规律；(3) 家庭活动模式。建议考虑将该设备隔离到 IoT VLAN。",
+    "explanation": "设备 {device_name} 的外联流量呈现约 {period} 分钟的周期变化。研究表明，联网设备的流量周期性可被用来推断：(1) 用户是否在家；(2) 用户作息规律；(3) 家庭活动模式。建议考虑将该设备隔离到 IoT VLAN。",
     "side_effects": "告警不阻断，建议用户评估后手动操作"
   },
 

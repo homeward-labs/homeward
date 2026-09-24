@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 LABEL maintainer="Homeward"
-LABEL description="家庭 IoT 隐私守护"
+LABEL description="家庭联网设备隐私守护"
 
 WORKDIR /app
 

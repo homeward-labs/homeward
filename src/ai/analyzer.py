@@ -74,7 +74,7 @@ class AIAnalyzer:
 
     def _build_prompt(self, request: AnalysisRequest) -> str:
         """构建分析提示词（结构化、确定性输出）"""
-        return f"""你是一个 IoT 设备流量分析专家。请分析以下域名，判断它属于什么类型的服务。
+        return f"""你是一个联网设备流量分析专家。请分析以下域名，判断它属于什么类型的服务。
 
 域名: {request.domain}
 ASN: {request.destination_asn or "未知"}
@@ -136,7 +136,7 @@ ASN: {request.destination_asn or "未知"}
         data = json.dumps({
             "model": "gpt-4o-mini",
             "messages": [
-                {"role": "system", "content": "你是 IoT 设备流量分析专家，只输出严格 JSON。"},
+                {"role": "system", "content": "你是联网设备流量分析专家，只输出严格 JSON。"},
                 {"role": "user", "content": prompt},
             ],
             "response_format": {"type": "json_object"},
