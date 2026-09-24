@@ -13,21 +13,33 @@
 **本公开仓库只承载社区版（可见 / 分析 / 抽象契约）。**
 
 ### 绝不上传本仓库的代码（红线）
-- 目录：`src/enforcers/`、`src/editions/standard/`、`src/editions/pro/`
+- 目录：**整个** `src/enforcers/` 与 `src/editions/`（含其下 `standard/`、`pro/` 等所有子路径）
 - 文件哨兵注释（任一即视为闭源）：`# @closed-source` / `@standard-only` / `@pro-only`
 
-仓库已内置两层自动防护，请勿尝试绕过：
+仓库已内置四层自动防护，请勿尝试绕过：
 1. `.gitignore` 忽略上述闭源目录；
-2. `hooks/pre-commit` 在提交前拦截闭源目录与哨兵注释（拦截即终止提交）。
+2. `hooks/pre-commit` 在提交前拦截闭源目录与哨兵注释（拦截即终止提交）；
+3. `hooks/pre-push` 在推送前扫描「整棵提交树 + 待推送提交的完整历史」，能拦住 `git add -f` 与 `--no-verify`；
+4. `.github/workflows/open-boundary.yml` 在 CI 侧重扫全历史，本地钩子失效时仍能报警。
 
 > 标准版 / 专业版的闭源实现在独立的私有仓库维护，不接受在本公开仓库提交。
 
 ## 二、如何贡献社区版
 1. Fork 本仓库，从 `main` 切出特性分支（`feat/xxx` 或 `fix/xxx`）。
 2. 仅在社区版范围内开发（可见性、分析、抽象契约 `Enforcer` / `RevertContract`）。
-3. 首次请启用钩子：`git config core.hooksPath hooks`，保证 `pre-commit` 通过。
+3. **clone 后第一件事**：`git config core.hooksPath hooks` —— 否则两道本地钩子都不会生效。
 4. 提交信息清晰，PR 描述说明动机与验收方式。
 5. 向 `homeward-labs/homeward` 的 `main` 发起 PR。
+
+### 推送前自查（维护者必做）
+
+```bash
+sh tools/check_open_boundary.sh   # 全部 PASS 才推；退出码非 0 就别推
+```
+
+脚本会检查钩子是否启用、`.gitignore` 规则是否还在、忽略规则是否真的生效、
+已跟踪文件与**全部提交历史**中有无闭源路径、`src/` 下有无闭源标记。
+推送时 `pre-push` 还会再查一遍；CI 是最后一道。详见 `docs/EDITIONS.md` 的「防误传机制」。
 
 ## 三、许可与商标
 - 社区版代码以 **MIT** 许可发布；你提交的贡献默认以相同许可并入。

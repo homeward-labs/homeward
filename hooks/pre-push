@@ -1,0 +1,98 @@
+#!/bin/sh
+# homeward pre-push guard
+# 目的：在 push 之前做最后一道闸，防止标准版/专业版（闭源）代码被推到公开仓库。
+#
+# 与 pre-commit 的区别（为什么需要两道）：
+#   pre-commit 只看「本次暂存的 diff」；
+#   pre-push 扫描的是「即将推送出去的整棵提交树 + 这些提交的完整历史文件名」，
+#   因此能拦住绕过 pre-commit 的情况：git add -f 强塞、--no-verify 提交、
+#   或者某个旧提交里早就夹带了闭源文件。
+#
+# 触发：每次 git push 自动运行（见 git config core.hooksPath）。
+# 兼容 Windows git bash：不使用 mktemp/touch/rm，只用 git/grep/sed/printf。
+# 所有子进程都加 </dev/null，避免吃掉 git 通过 stdin 传来的 ref 列表。
+
+ZERO="0000000000000000000000000000000000000000"
+# 闭源区是「整个目录」，不只是其下的 standard/ pro/ 子目录 ——
+# 否则直接放在 src/editions/ 下的文件会绕过拦截。
+CLOSED_DIRS="src/enforcers src/editions"
+SENTINEL_RE="@closed-source|@standard-only|@pro-only"
+
+rc=0
+checked=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # 删除分支（local_sha 全零）无需检查
+  [ "$local_sha" = "$ZERO" ] && continue
+  checked=$((checked + 1))
+
+  echo "[pre-push] 检查 $local_ref -> $remote_ref ($local_sha)"
+
+  # ============ 1) 目录级：扫描该提交的整棵树 ============
+  tree_files=$(git ls-tree -r --name-only "$local_sha" </dev/null 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "BLOCKED: 无法读取提交树 $local_sha —— git 命令失败，按 fail-closed 拒绝推送。"
+    echo "    $tree_files"
+    rc=1
+    continue
+  fi
+
+  for d in $CLOSED_DIRS; do
+    if printf '%s\n' "$tree_files" | grep -q "^$d/"; then
+      echo "BLOCKED: 提交 $local_sha 的树中**包含闭源目录** '$d/'："
+      printf '%s\n' "$tree_files" | grep "^$d/" | sed 's/^/    /'
+      rc=1
+    fi
+  done
+
+  # ============ 2) 哨兵级：树中 src/ 下的闭源标记 ============
+  bad=$(git grep -l -E "$SENTINEL_RE" "$local_sha" -- src/ </dev/null 2>/dev/null)
+  if [ -n "$bad" ]; then
+    echo "BLOCKED: 提交 $local_sha 中有文件带闭源标记（$SENTINEL_RE）："
+    printf '%s\n' "$bad" | sed 's/^/    /'
+    rc=1
+  fi
+
+  # ============ 3) 历史级：本次要推送的每个 commit 触碰过的文件名 ============
+  # 覆盖「先加了闭源文件、下一提交又删掉」的情况——GitHub 上历史仍可被翻出来。
+  if [ "$remote_sha" = "$ZERO" ]; then
+    range="$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+
+  hist=$(git log --pretty=format: --name-only "$range" </dev/null 2>/dev/null | sort -u)
+  for d in $CLOSED_DIRS; do
+    if printf '%s\n' "$hist" | grep -q "^$d/"; then
+      echo "BLOCKED: 待推送的提交**历史**中出现过闭源目录 '$d/'（文件已删除也会留在历史里）："
+      printf '%s\n' "$hist" | grep "^$d/" | sed 's/^/    /'
+      rc=1
+    fi
+  done
+
+  # ============ 4) 防线完整性：.gitignore 规则是否还在 ============
+  for d in $CLOSED_DIRS; do
+    if ! grep -qE "^$d/?\$" .gitignore </dev/null 2>/dev/null; then
+      echo "WARNING: .gitignore 中缺少规则 '$d' —— 第一道防线已失效，请立即补回。"
+    fi
+  done
+done
+
+if [ "$checked" -eq 0 ]; then
+  echo "[pre-push] 没有需要检查的引用，放行。"
+  exit 0
+fi
+
+if [ "$rc" -ne 0 ]; then
+  echo ""
+  echo "=============================================="
+  echo " 推送已终止：检测到闭源代码。"
+  echo " 请先把它移出提交历史，再重新 push。"
+  echo " 自查命令：sh tools/check_open_boundary.sh"
+  echo " （确需临时放行请用 --no-verify，但那等于拆掉最后一道闸，强烈不建议）"
+  echo "=============================================="
+  exit 1
+fi
+
+echo "OK: 未发现闭源代码泄露，推送放行。"
+exit 0

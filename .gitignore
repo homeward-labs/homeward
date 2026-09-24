@@ -24,9 +24,16 @@ config.local.*
 screenshots_local/
 
 # ===== 闭源版本（标准版 / 专业版）—— 绝不上传公开仓库 =====
-# 以下目录只存在于本地/私有仓库，公开仓库（社区版）永不收录。
-src/enforcers
-src/editions/standard
-src/editions/pro
+# 整个目录本体被忽略（不只是下面的子目录）。早期版本只忽略了 src/editions/standard
+# 与 src/editions/pro 两个子目录，导致直接放在 src/editions/ 下的文件会漏过第一道防线。
+#
+# 行尾不要写「行内中文注释」—— gitignore 会把它当成路径的一部分，规则会静默失效。
+# 注释一律另起一行。
+src/enforcers/
+src/editions/
+
+# 如将来确需在 editions/ 下开源社区版代码，用否定规则放行（当前不存在该目录）：
+# !src/editions/community/
+
 # 任何文件若带闭源标记（见 docs/EDITIONS.md），即使不在上面目录也会被 pre-commit 拦截
 
