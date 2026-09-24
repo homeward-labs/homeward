@@ -34,8 +34,9 @@
 ### 推送前自查（维护者必做）
 
 ```bash
-sh tools/check_open_boundary.sh        # Linux / macOS / Git Bash
-python tools/check_open_boundary.py    # Windows PowerShell / cmd（与 sh 版等价）
+powershell -ExecutionPolicy Bypass -File tools\check_open_boundary.ps1   # Windows（无依赖）
+python tools\check_open_boundary.py                                      # Windows（装了 Python）
+sh tools/check_open_boundary.sh                                          # Linux / macOS / Git Bash
 ```
 
 脚本会检查钩子是否启用、`.gitignore` 规则是否还在、忽略规则是否真的生效、
@@ -48,15 +49,18 @@ python tools/check_open_boundary.py    # Windows PowerShell / cmd（与 sh 版�
 
 ```bash
 git add -A
-git commit -m "..."   # pre-commit 自动运行，命中闭源即终止提交
-git push              # pre-push 自动运行，命中闭源即终止推送
+git commit -m "一句话说明这次改动"   # pre-commit 自动运行，命中闭源即终止提交
+git push                            # pre-push 自动运行，命中闭源即终止推送
 ```
+
+> 注意 `-m` 后面要换成**你自己的提交说明**，不要照抄引号里的内容。
+> 显示 "nothing to commit" 说明没有新改动，直接 `git push` 即可。
 
 - `-u origin main` 只在两种情况下需要：`main` 分支首次推送；换机器 / 重新 clone 后。
   之后再带不会多一层保护 —— **它设置的是上游跟踪，与安全无关**。
 - 推送某个新分支时才需要显式指定：`git push -u origin feat/xxx`。
 - 不确定时（比如刚动过 `src/enforcers/` 或 `src/editions/` 附近的文件）先跑一遍
-  `python tools/check_open_boundary.py`，全 PASS 再 push。
+  自检脚本（见上节，PowerShell 用 ps1 版），全 PASS 再 push。
 
 ## 三、许可与商标
 - 社区版代码以 **MIT** 许可发布；你提交的贡献默认以相同许可并入。
