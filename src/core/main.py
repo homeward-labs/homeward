@@ -40,8 +40,14 @@ from ai.analyzer import AIAnalyzer, AnalysisRequest, AnalysisResult
 from knowledge_base.updater import KnowledgeBaseUpdater
 
 
-class IoTSentinel:
-    """家卫 主服务"""
+class HomewardService:
+    """家卫 主服务
+
+    命名说明：早期叫 ``IoTSentinel``，两个词都不合适 ——
+      · ``IoT`` 前缀与「家庭联网设备」的定位不符（手机 / 电脑同样在观测范围内）；
+      · ``Sentinel``（哨兵）属于「守望者 / 执法者」隐喻族，与同类竞品命名撞车，
+        本项目刻意避开这一族语义（裁决 / 开合，而非守望）。
+    """
 
     def __init__(self, config: Optional[dict] = None):
         self.config = config or {}
@@ -59,20 +65,24 @@ class IoTSentinel:
         # 知识库更新器
         self.kb_updater = KnowledgeBaseUpdater(
             kb_dir=str(KB_DIR),
-            auto_update=self.config.get("kb_auto_update", True),
+            # 默认关闭：隐私工具默认不联网，知识库更新需用户显式开启
+            auto_update=self.config.get("kb_auto_update", False),
             interval=self.config.get("kb_update_interval", 604800),
         )
 
-        # 阻断规则存储
-        self.block_rules: list[dict] = []
+        # 建议阻断队列（社区版只产出"建议"，从不产生已生效的阻断规则）
+        self.suggested_rules: list[dict] = []
 
         # 统计
         self.stats = {
             "flows_processed": 0,
             "decisions_made": 0,
-            "blocks_active": 0,
+            "suggestions_pending": 0,
             "unknown_domains": set(),
         }
+
+        # 由信号处理器置位，由事件循环侧的关闭逻辑消费
+        self._shutdown_requested = False
 
         logger.info(f"家卫 initialized with {len(self.kb.domains)} domain rules")
 
@@ -83,8 +93,8 @@ class IoTSentinel:
         # 启动知识库更新
         self.kb_updater.start()
 
-        # 加载已有阻断规则
-        self._load_block_rules()
+        # 加载待确认的建议阻断队列
+        self._load_suggestions()
 
         # 注册信号处理
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -96,13 +106,16 @@ class IoTSentinel:
         """停止服务"""
         logger.info("Stopping 家卫...")
         self.kb_updater.stop()
-        self._save_block_rules()
+        self._save_suggestions()
         logger.info("家卫 stopped")
 
     def process_flow(self, flow: FlowRecord) -> Decision:
         """
         处理一条流量记录
         这是核心入口，被采集层调用
+
+        社区版**只产出建议，绝不自行下发阻断**：产品承诺「不默认自动阻断，一切以你
+        确认为准」。这里即使命中了阻断类规则，也只是把建议放进队列等用户确认。
         """
         self.stats["flows_processed"] += 1
 
@@ -112,16 +125,19 @@ class IoTSentinel:
         if decision.action == "unknown" and flow.sni:
             self.stats["unknown_domains"].add(flow.sni)
 
-        # 执行决策
+        # 命中阻断类规则 → 降级为「建议」，等待用户在 UI 上确认
         if decision.action.startswith("block"):
-            self._apply_block(flow, decision)
+            self._record_suggestion(flow, decision)
 
         return decision
 
-    def _apply_block(self, flow: FlowRecord, decision: Decision):
-        """执行阻断"""
-        # 实际实现中这里调用 nftables / iptables
-        # 这里只记录日志
+    def _record_suggestion(self, flow: FlowRecord, decision: Decision):
+        """把「建议阻断」写入待确认队列 —— 社区版到此为止，不碰任何网络配置
+
+        真实下发属于**标准版（闭源付费）**，经由 ``src/adapters/base.py`` 的
+        ``Enforcer.apply(action)`` + ``ActionRegistry`` 完成；本仓库不实现、也不调用
+        任何 nftables / dnsmasq 写入操作。此处若出现真实下发代码，即为开源边界事故。
+        """
         hit = decision.rule_hits[0] if decision.rule_hits else None
         rule = {
             "domain": flow.sni or flow.dns_query,
@@ -129,10 +145,12 @@ class IoTSentinel:
             "level": decision.action,
             "reason": decision.reason,
             "source": hit.rule_type if hit else "manual",
+            "side_effects": hit.side_effects if hit else "",
+            "status": "suggested",  # 等待用户确认；社区版不会把它变成 applied
         }
-        self.block_rules.append(rule)
-        self.stats["blocks_active"] += 1
-        logger.info(f"[BLOCK] {rule['domain']} → {decision.reason}")
+        self.suggested_rules.append(rule)
+        self.stats["suggestions_pending"] += 1
+        logger.info(f"[SUGGEST] {rule['domain']} → {decision.reason}（等待用户确认）")
 
     def request_ai_analysis(self, domain: str, behavior: dict) -> Optional[AnalysisResult]:
         """
@@ -195,31 +213,36 @@ class IoTSentinel:
             "unknown_domains": sorted(self.stats["unknown_domains"]),
         }
 
-    def _load_block_rules(self):
-        """加载已有阻断规则"""
-        rules_file = ROOT / "data" / "block_rules.json"
+    def _load_suggestions(self):
+        """加载待确认的「建议阻断」队列"""
+        rules_file = ROOT / "data" / "suggested_rules.json"
         if rules_file.exists():
             with open(rules_file, encoding="utf-8") as f:
-                self.block_rules = json.load(f)
-            self.stats["blocks_active"] = len(self.block_rules)
+                self.suggested_rules = json.load(f)
+            self.stats["suggestions_pending"] = len(self.suggested_rules)
 
-    def _save_block_rules(self):
-        """保存阻断规则"""
-        rules_file = ROOT / "data" / "block_rules.json"
+    def _save_suggestions(self):
+        """保存「建议阻断」队列"""
+        rules_file = ROOT / "data" / "suggested_rules.json"
         rules_file.parent.mkdir(exist_ok=True)
         with open(rules_file, "w", encoding="utf-8") as f:
-            json.dump(self.block_rules, f, ensure_ascii=False, indent=2)
+            json.dump(self.suggested_rules, f, ensure_ascii=False, indent=2)
 
     def _signal_handler(self, signum, frame):
-        """信号处理器"""
-        logger.info(f"Received signal {signum}, shutting down...")
-        asyncio.create_task(self.stop())
+        """信号处理器
+
+        信号处理运行在事件循环之外，此刻没有正在运行的 loop，直接
+        ``asyncio.create_task`` 会抛 RuntimeError（no running event loop）。
+        这里只置停止标志，真正的 stop() 由事件循环侧的关闭逻辑执行。
+        """
+        logger.info(f"Received signal {signum}, requesting shutdown...")
+        self._shutdown_requested = True
 
 
 # ==================== 演示 ====================
 
 if __name__ == "__main__":
-    sentinel = IoTSentinel()
+    service = HomewardService()
 
     # 模拟流量
     test_flows = [
@@ -245,21 +268,21 @@ if __name__ == "__main__":
     print("=" * 70)
 
     for flow in test_flows:
-        decision = sentinel.process_flow(flow)
-        print(f"\n📡 {flow.sni}")
+        decision = service.process_flow(flow)
+        print(f"\n观测: {flow.sni}")
         print(f"   决策: [{decision.action}] {decision.reason}")
         if decision.requires_user_input:
-            print(f"   💡 可点击「帮我分析」进行 AI 辅助分析")
+            print("   提示: 可点击「帮我分析」进行 AI 辅助分析")
 
     print(f"\n{'=' * 70}")
-    print(f"📊 统计: {json.dumps(sentinel.get_stats(), ensure_ascii=False, indent=2)}")
+    print(f"统计: {json.dumps(service.get_stats(), ensure_ascii=False, indent=2)}")
 
     # AI 分析演示（模拟）
     print(f"\n{'=' * 70}")
     print("AI 分析演示（需配置 backend）")
     print("=" * 70)
 
-    result = sentinel.request_ai_analysis(
+    result = service.request_ai_analysis(
         "unknown-tracking-domain.xyz",
         {
             "total_connections": 1440,

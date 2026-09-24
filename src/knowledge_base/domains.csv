@@ -1,205 +1,102 @@
 domain,organization,category,confidence,description,action,side_effects
 ot.io.mi.com,Xiaomi,cloud_storage,high,小米IoT设备指令与状态通道,allow,
 api.io.mi.com,Xiaomi,IoT_core,high,小米IoT核心API,allow,
-
 track.io.mi.com,Xiaomi,analytics,medium,小米数据统计上报,block_soft,远程控制正常;本地控制正常;数据统计停止
-
 ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告服务,block_soft,广告推送停止
-
 api.ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告归因,block_soft,广告推送停止
-
 data.mistat.xiaomi.com,Xiaomi,telemetry,medium,小米设备遥测数据上报,block_soft,数据统计停止;设备功能不受影响
-
 sdkconfig.ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告SDK配置,block_soft,广告推送停止
-
 a.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT核心服务,allow,
-
 a2.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT备用通道,allow,
-
 api.tuya.com,Tuya Smart,IoT_core,high,涂鸦API网关,allow,
-
 mq.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦MQTT消息通道,allow,
-
 a.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区网关,allow,
-
 apigw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区API,allow,
-
 api-ad.tuya.com,Tuya Smart,advertising_sdk,high,涂鸦广告归因,block_soft,广告推送停止
 api.ad.tuya.com,Tuya Smart,advertising_sdk,high,涂鸦广告归因(别名),block_soft,广告推送停止
-
 api-analytics.tuya.com,Tuya Smart,analytics,medium,涂鸦数据分析,block_soft,数据分析停止
-
 n-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云端服务,allow,
-
 wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云设备发现,allow,
-
 eu-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link欧洲区云,allow,
-
 tapocn.tplink.com,TP-Link,IoT_core,high,Tapo中国区服务,allow,
-
 kasa.tplinkcloud.com,TP-Link,IoT_core,high,Kasa云端服务,allow,
-
 conservation-client.cn-east-3.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT设备管理服务,allow,
-
 iot-mqtts.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT MQTT通道,allow,
-
 device-connector.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为设备连接服务,allow,
-
 agc-data.cn-north-4.myhuaweicloud.com,Huawei,analytics,medium,华为分析服务,block_soft,数据统计停止
-
 dueros.baidu.com,Baidu,IoT_core,high,小度语音交互服务,allow,
-
 xiaodu.baidu.com,Baidu,IoT_core,high,小度设备服务,allow,
-
 hm.baidu.com,Baidu,analytics,medium,百度统计(移动),block_soft,数据统计停止
-
 hmma.baidu.com,Baidu,analytics,medium,百度移动统计,block_soft,数据统计停止
-
 iot-as-mqtt.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT MQTT,allow,
-
 iot-auth.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT认证,allow,
-
 ali.genie.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵设备通道,allow,
-
 iotcloud-mqtt.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT MQTT,allow,
-
 iotcloud-ota.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT OTA升级,allow,
-
 api.ys7.com,Ezviz (Hikvision),cloud_storage,high,萤石云视频服务,allow,
-
 passport.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石账号认证,allow,
-
 ilink.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石设备连接,allow,
-
 open.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石开放平台,allow,
-
 admin.lechange.com,Dahua,cloud_storage,high,乐橙云视频服务,allow,
-
 passport.lechange.com,Dahua,IoT_core,high,乐橙账号认证,allow,
-
 appcloud.360.cn,Qihoo 360,cloud_storage,high,360智能设备云服务,allow,
-
 appcloud.api.360.cn,Qihoo 360,cloud_storage,high,360设备API,allow,
-
 mpush.midea.com,Midea,IoT_core,high,美的推送服务,allow,
-
 msmart.meizu.com,Midea,IoT_core,high,美居App设备通道,allow,
-
-haier.net,Hisense/Haier,IoT_core,high,海尔U+平台,allow,
-
-smart-home.api.haier.net,Hisense/Haier,IoT_core,high,海尔智慧家API,allow,
-
+haier.net,Haier,IoT_core,high,海尔U+平台,allow,
+smart-home.api.haier.net,Haier,IoT_core,high,海尔智慧家API,allow,
 api.broadlink.com.cn,Broadlink,IoT_core,high,Broadlink设备服务,allow,
-
 blz.cloudcmdb.broadlink.com.tw,Broadlink,IoT_core,high,Broadlink云服务,allow,
-
-dueros.baidu.com,Baidu,IoT_core,high,百度小度音箱语音服务,allow,
-
 awag.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵音箱,allow,
-
 lbs.netease.im,NetEase,IoT_core,medium,网易音箱服务,allow,
-
 xiaomi.speech.ai,Xiaomi,machine_learning,medium,小米语音AI处理,block_medium,语音助手可能受限
-
 umeng.com,Alibaba,analytics,high,友盟数据统计,block_soft,数据统计停止
-
 umengcloud.com,Alibaba,analytics,high,友盟云服务,block_soft,数据统计停止
-
 umeng.com.cn,Alibaba,analytics,high,友盟中国,block_soft,数据统计停止
-
 cnzz.com,Alibaba,analytics,medium,CNZZ统计(友盟旗下),block_soft,统计停止
-
-talkingdata.com,TalkingData,analytics,high, TalkingData移动统计,block_soft,数据统计停止
-
+talkingdata.com,TalkingData,analytics,high,TalkingData移动统计,block_soft,数据统计停止
 talkingdata.net,TalkingData,analytics,high,TalkingData网络,block_soft,数据统计停止
-
 mob.com,MobTech,analytics,high,MobTech分享/统计SDK,block_soft,分享功能可能受限;统计停止
-
 umengjs.com,Alibaba,analytics,medium,友盟JS统计,block_soft,统计停止
-
 jpush.cn,Jiguang,analytics,high,极光推送,block_soft,推送通知停止
-
 jpushapi.com,Jiguang,analytics,high,极光推送API,block_soft,推送通知停止
-
 getui.com,Getui,analytics,high,个推推送服务,block_soft,推送通知停止
-
 getui.com.cn,Getui,analytics,high,个推中国,block_soft,推送通知停止
-
 xiaomi.push.com,Xiaomi,analytics,high,小米推送,block_soft,推送通知停止
-
 oppo.push.com,OPPO,analytics,high,OPPO推送,block_soft,推送通知停止
-
 vivo.push.com,Vivo,analytics,high,Vivo推送,block_soft,推送通知停止
-
 hms.push.com,Huawei,analytics,high,华为推送,block_soft,推送通知停止
-
 mipush.xiaomi.com,Xiaomi,analytics,high,小米推送服务,block_soft,推送通知停止
-
 tracksdk.snssdk.com,ByteDance,advertising_sdk,high,字节跳动追踪SDK,block_soft,广告归因停止
-
 log-sdk.pangolin-sdk-toutiao.com,ByteDance,advertising_sdk,high,穿山甲广告SDK,block_soft,广告停止
-
 adservice.google.com,Google,advertising_sdk,high,Google广告服务,block_soft,广告停止
-
 googleads.g.doubleclick.net,Google,advertising_sdk,high,DoubleClick广告,block_soft,广告停止
-
 googletagmanager.com,Google,analytics,medium,Google标签管理器,block_soft,标签管理停止
-
 pagead2.googleadservices.com,Google,advertising_sdk,high,Google广告转化追踪,block_soft,广告追踪停止
-
 pixel.facebook.com,Meta,advertising_sdk,high,Facebook像素追踪,block_soft,追踪停止
-
 analytics.tiktok.com,ByteDance,analytics,high,TikTok分析,block_soft,分析停止
-
 data.flurry.com,Yahoo,analytics,high,Flurry移动分析,block_soft,分析停止
-
 api.umeng.com,Alibaba,analytics,high,友盟API,block_soft,分析停止
-
-collector.github.com,GitHub,unknown,low,GitHub采集器(可疑),warn,需进一步确认
-
 sentry.io,Sentry,analytics,medium,错误监控上报,block_soft,错误上报停止
-
 bugly.qq.com,Tencent,analytics,high,腾讯Bugly崩溃上报,block_soft,崩溃上报停止
-
 bugly.qq.com.cn,Tencent,analytics,high,Bugly中国,block_soft,崩溃上报停止
-
 datacollector.qq.com,Tencent,analytics,medium,腾讯数据收集,block_soft,数据收集停止
-
 datacollector.qq.com.cn,Tencent,analytics,medium,腾讯数据收集中国,block_soft,数据收集停止
-
 cdn.iot.qq.com,Tencent Cloud,cdn,high,腾讯云IoT CDN,allow,
-
 cdn.tuya.com,Tuya Smart,cdn,high,涂鸦CDN,allow,
-
 cdn.aliyun.com,Alibaba Cloud,cdn,high,阿里云CDN,allow,
-
 cdn.myqcloud.com,Tencent Cloud,cdn,high,腾讯云CDN,allow,
-
 cdn.bcebos.com,Baidu Cloud,cdn,high,百度云CDN,allow,
-
 cdn.jsdelivr.net,jsDelivr,cdn,high,开源CDN,allow,
-
 unpkg.com,Cloudflare,cdn,high,开源CDN,allow,
-
 cdnjs.cloudflare.com,Cloudflare,cdn,high,Cloudflare CDN,allow,
-
 ntp.aliyun.com,Alibaba Cloud,telemetry,low,阿里云NTP,allow,
-
 ntp.tencent.com,Tencent Cloud,telemetry,low,腾讯云NTP,allow,
-
 ntp.tuna.tsinghua.edu.cn,Tsinghua University,telemetry,low,清华TUNA NTP,allow,
-
 pool.ntp.org,Pool Project,telemetry,low,NTP公共池,allow,
-
 ota.tuya.com,Tuya Smart,IoT_core,medium,涂鸦OTA升级,allow,
-
 ota.mi.com,Xiaomi,IoT_core,medium,小米OTA升级,allow,
-
 firmware.ys7.com,Ezviz (Hikvision),IoT_core,medium,萤石固件升级,allow,
-
 upgrade.tplink.com,TP-Link,IoT_core,medium,TP-Link固件升级,allow,
-
 firmware.kasa.com,TP-Link,IoT_core,medium,Kasa固件升级,allow,
-
 api.upgrade.mi.com,Xiaomi,IoT_core,medium,小米升级API,allow,
-

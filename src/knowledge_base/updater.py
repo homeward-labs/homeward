@@ -3,22 +3,34 @@
 支持从社区仓库拉取最新域名归属数据
 """
 
-import csv
 import hashlib
-import json
 import os
+import re
 import shutil
 import tempfile
 import threading
-import time
 from pathlib import Path
-from urllib.request import urlopen, Request
+from urllib.request import urlopen
+
+
+def _version_key(version: str) -> tuple:
+    """把版本号解析成可比较的元组：'1.10.0' → (1, 10, 0)
+
+    早期直接对版本字符串做 ``<=`` 比较，而字符串世界里 ``'10.0.0' <= '9.0.0'`` 成立 ——
+    结果是知识库永远被判成「已是最新」，从此再也不更新。必须按数值逐段比。
+    非数字段（如 '1.2.0-beta'）取前导数字，缺失补 0。
+    """
+    parts: list[int] = []
+    for seg in str(version).strip().split("."):
+        m = re.match(r"\d+", seg)
+        parts.append(int(m.group()) if m else 0)
+    return tuple(parts) if parts else (0,)
 
 
 class KnowledgeBaseUpdater:
     """知识库在线更新器"""
 
-    DEFAULT_REPO = "https://raw.githubusercontent.com/homeward/knowledge-base/main"
+    DEFAULT_REPO = "https://raw.githubusercontent.com/homeward-labs/knowledge-base/main"
 
     def __init__(self, kb_dir: str, repo_url: str = None, auto_update: bool = True, interval: int = 604800):
         """
@@ -65,7 +77,7 @@ class KnowledgeBaseUpdater:
             return False
 
         local_version = self._read_local_version()
-        if remote_version <= local_version:
+        if _version_key(remote_version) <= _version_key(local_version):
             print(f"[KB Update] Already up to date (v{local_version})")
             return False
 
@@ -97,20 +109,47 @@ class KnowledgeBaseUpdater:
         """写入本地版本"""
         (self.kb_dir / "VERSION").write_text(version)
 
+    # 必需文件：缺任何一个就不允许替换（否则会出现「新域名库 + 旧行为库」的错配）
+    REQUIRED_FILES = ("domains.csv", "behaviors.json")
+    # 可选文件：下载失败只是少一份能力，不阻塞本次更新
+    OPTIONAL_FILES = ("asn.csv",)
+
     def _download_and_replace(self, version: str) -> bool:
-        """原子替换知识库文件"""
-        files = ["domains.csv", "behaviors.json", "asn.csv"]
+        """下载新版本并整体替换 —— **要么全换，要么一个都不换**
+
+        早期实现是「逐个下载，失败就 continue，最后把下到的都 move 过去」，网络抖一下
+        就会留下「新版 domains.csv + 旧版 behaviors.json」的错配状态，而知识库没有
+        版本号能表达这种半新半旧，排查极痛。故改为全或无。
+        """
+        files = self.REQUIRED_FILES + self.OPTIONAL_FILES
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
-            for fname in files:
-                url = f"{self.repo_url}/{fname}"
+
+            missing: list[str] = []
+            for fname in self.REQUIRED_FILES:
                 dst = tmpdir / fname
                 try:
-                    with urlopen(url, timeout=30) as resp:
+                    with urlopen(f"{self.repo_url}/{fname}", timeout=30) as resp:
                         dst.write_bytes(resp.read())
-                except Exception:
-                    continue
+                except Exception as e:
+                    print(f"[KB Update] 必需文件下载失败：{fname} ({e})")
+                    missing.append(fname)
+
+            if missing:
+                print(
+                    f"[KB Update] 必需文件缺失（{'、'.join(missing)}），"
+                    f"放弃本次更新，保持原知识库不变"
+                )
+                return False
+
+            for fname in self.OPTIONAL_FILES:
+                dst = tmpdir / fname
+                try:
+                    with urlopen(f"{self.repo_url}/{fname}", timeout=30) as resp:
+                        dst.write_bytes(resp.read())
+                except Exception as e:
+                    print(f"[KB Update] 可选文件下载失败，跳过：{fname} ({e})")
 
             # 校验（可选：比对 checksum）
             checksum_url = f"{self.repo_url}/CHECKSUM"
@@ -147,25 +186,11 @@ class KnowledgeBaseUpdater:
                 return False
         return True
 
-    def submit_anonymous_data(self, domain: str, behavior_summary: dict) -> bool:
-        """
-        匿名提交未知域名和观察到的行为摘要
-        供社区知识库贡献新样本
-        """
-        # 只提交域名 + 行为元数据，不提交任何 payload 或用户标识
-        payload = json.dumps({
-            "domain": domain,
-            "behavior": behavior_summary,
-            "submitted_at": int(time.time()),
-        }).encode()
-
-        try:
-            req = Request(
-                f"{self.repo_url.replace('/raw/', '/api/')}/submit",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            with urlopen(req, timeout=10) as resp:
-                return resp.status == 200
-        except Exception:
-            return False
+    # 这里**刻意不提供**任何"回传用户数据"的方法。
+    #
+    # 家卫是隐私工具，自身必须零遥测：默认不采集、不上报任何用户数据。
+    # 早期版本曾在这里放过一个 submit_anonymous_data() —— 它会把用户家里观察到的
+    # 域名与行为摘要发往远端，与产品定位根本冲突，且 URL 构造还是错的
+    # （raw.githubusercontent.com 里没有 /raw/ 可替换）。已移除。
+    # 若将来要做社区知识库共建，必须：默认关闭 + UI 显式开关 + 逐条用户确认 +
+    # 在 README 明示，而不是埋在更新器里静默上报。

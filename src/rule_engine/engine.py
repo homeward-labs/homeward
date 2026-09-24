@@ -112,19 +112,30 @@ class BehaviorMatcher:
 
     def __init__(self, behaviors_path: str = None):
         if behaviors_path is None:
-            behaviors_path = Path(__file__).parent.parent / "knowledge-base" / "behaviors.json"
+            # 目录名是**下划线** knowledge_base，不是连字符 knowledge-base。
+            # 早期这里写错过，结果是默认构造时行为库静默加载为空、所有行为类判定
+            # （心跳信标 / 突发上传 / DNS 隧道……）无声失效 —— 故改为显式报错。
+            behaviors_path = Path(__file__).parent.parent / "knowledge_base" / "behaviors.json"
         self.behaviors_path = Path(behaviors_path)
         self.rules: list[dict] = []
         self.load()
 
     def load(self):
-        if not self.behaviors_path.exists():
-            return
-        with open(self.behaviors_path, encoding="utf-8") as f:
+        """加载 behaviors.json
+
+        加载不到规则**必须显式失败**，不允许静默置空：行为库为空会让全部行为类判定
+        失效，且失败得毫无征兆（判不出告警和"没有异常"看起来一模一样）。
+        """
+        path = self.behaviors_path
+        if not path.exists():
+            raise FileNotFoundError(f"行为模式库不存在：{path}")
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         self.rules = [
             {"id": k, **v} for k, v in data.items()
         ]
+        if not self.rules:
+            raise ValueError(f"行为模式库为空：{path}")
 
     def match(self, flow_history: list[FlowRecord]) -> list[dict]:
         """
@@ -139,33 +150,61 @@ class BehaviorMatcher:
         return results
 
     def _matches(self, flows: list[FlowRecord], pattern: dict) -> bool:
-        """判断 flow 序列是否满足行为模式"""
+        """判断 flow 序列是否满足行为模式
+
+        两个早期踩过的语义坑，这里刻意写死，别再退化回去：
+
+        1. ``duration_min`` 的单位是**秒**（观测窗口长度），不是「记录条数」。
+           早期把它当条数比，等于拿时间阈值去卡样本量，判定含义完全跑偏。
+        2. ``interval`` 必须真的去算**相邻观测的时间差**。早期只比了平均包大小、
+           把 interval 读出来就丢掉，结果任何小包流量都会被判成心跳信标。
+        """
         direction = pattern.get("direction", "out")
-        relevant = [f for f in flows if f.direction == direction]
+        relevant = sorted(
+            (f for f in flows if f.direction == direction),
+            key=lambda f: f.timestamp,
+        )
 
         if not relevant:
             return False
 
-        # 突发大流量检测
+        # 样本量下限：出现次数不够，不敢下任何行为结论
+        min_occurrences = pattern.get("min_occurrences")
+        if min_occurrences and len(relevant) < min_occurrences:
+            return False
+
+        # 观测窗口长度（秒）—— 首尾观测的时间跨度，不是条数
+        duration_min = pattern.get("duration_min")
+        if duration_min is not None:
+            span = relevant[-1].timestamp - relevant[0].timestamp
+            if span < duration_min:
+                return False
+
+        # 突发流量：窗口内累计字节数
         if "total_bytes_min" in pattern:
             total = sum(f.packet_size for f in relevant)
             if total < pattern["total_bytes_min"]:
                 return False
 
-        if "duration_min" in pattern:
-            if len(relevant) < pattern["duration_min"]:
+        # 包大小范围：按窗口内平均包大小判定（逐包判定太脆，噪声一多就漏报）
+        packet_size = pattern.get("packet_size")
+        if packet_size:
+            avg_size = sum(f.packet_size for f in relevant) / len(relevant)
+            lo = packet_size.get("min", 0)
+            hi = packet_size.get("max", float("inf"))
+            if not (lo <= avg_size <= hi):
                 return False
 
-        # 心跳信标检测（固定间隔 + 小包）
-        if "interval" in pattern:
-            intervals = pattern["interval"]
-            # 简化：检查包大小是否在范围内
-            sizes = [f.packet_size for f in relevant]
-            avg_size = sum(sizes) / len(sizes) if sizes else 0
-            if "packet_size" in pattern:
-                ps = pattern["packet_size"]
-                if avg_size < ps.get("min", 0) or avg_size > ps.get("max", 99999):
-                    return False
+        # 心跳信标：相邻观测的时间间隔是否稳定落在 [min, max]
+        interval = pattern.get("interval")
+        if interval:
+            if len(relevant) < 2:
+                return False
+            lo = interval.get("min", 0)
+            hi = interval.get("max", float("inf"))
+            gaps = [b.timestamp - a.timestamp for a, b in zip(relevant, relevant[1:])]
+            if any(not (lo <= gap <= hi) for gap in gaps):
+                return False
 
         return True
 

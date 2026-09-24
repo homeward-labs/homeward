@@ -1,0 +1,42 @@
+# 知识库数据许可 — CC BY 4.0
+
+`src/knowledge_base/` 目录下的**数据**（`domains.csv`、`behaviors.json` 及后续新增的
+归属库文件）以 **Creative Commons 署名 4.0 国际（CC BY 4.0）** 许可发布。
+
+许可全文：https://creativecommons.org/licenses/by/4.0/deed.zh
+法律文本：https://creativecommons.org/licenses/by/4.0/legalcode.zh-Hans
+
+注意：本许可**只覆盖数据**，同目录下的 `.py` 代码（如 `updater.py`）仍适用仓库根目录
+的 MIT 许可。
+
+---
+
+## 你可以做什么
+
+· 自由复制、修改、合并、再分发这些数据，包括商业用途；
+· 无需事先取得许可。
+
+## 你唯一必须做的事：署名
+
+使用或再分发本数据时，必须**保留来源归属**，至少包含以下四项：
+
+1. **标题**：家卫 Homeward 联网设备外联归属知识库
+2. **作者**：homeward-labs 及贡献者
+3. **来源**：https://github.com/homeward-labs/homeward
+4. **许可**：CC BY 4.0
+
+推荐署名格式（可放在「关于」「数据来源」页面或 README 中）：
+
+```
+联网设备外联归属数据来自 家卫 Homeward（homeward-labs 及贡献者）
+https://github.com/homeward-labs/homeward ，以 CC BY 4.0 许可发布
+```
+
+若你对数据做了修改，请额外说明「已修改」。
+
+---
+
+## 贡献即授权
+
+向本目录提交数据即表示：你同意以 **CC BY 4.0** 许可你的贡献，并确认你有权如此授权
+（不要提交来自闭源数据库或有 license 限制的数据）。贡献者的署名通过 git 历史体现。

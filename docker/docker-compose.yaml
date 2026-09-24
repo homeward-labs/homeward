@@ -1,27 +1,28 @@
 version: "3.8"
 
+# 社区版部署形态：「看见」为主，不拦截、不抓包、不改防火墙。
+# 唯一的外界输入是 dnsmasq 的查询日志 —— 因此不需要 privileged、不需要 host 网络、
+# 不需要 NET_ADMIN / NET_RAW。容器被攻破时也不该拿到改家庭网络配置的权限。
+#
+# 若你的 dnsmasq 日志不在 /var/log/dnsmasq.log，请改下面 volumes 的只读挂载路径
+# （可用 `ps aux | grep dnsmasq` 找 log-facility，或在 dnsmasq 配置里加一行
+#  log-queries=extra + log-facility=/var/log/dnsmasq.log）。
+
 services:
   homeward:
     build: .
     container_name: homeward
     restart: unless-stopped
-    privileged: true  # 需要抓包和配置 iptables
-    network_mode: host  # 需要访问宿主机网络
     volumes:
-      - ./data:/app/data          # 数据持久化
-      - ./logs:/app/logs          # 日志
-      - /etc/hosts:/etc/hosts:ro  # 读取 hosts
+      - ./data:/app/data                                    # 建议阻断记录与统计
+      - ./logs:/app/logs                                    # 运行日志
+      - /var/log/dnsmasq.log:/var/log/dnsmasq.log:ro        # Tier 1 数据源（只读）
     environment:
       - HOST=0.0.0.0
       - PORT=9595
       - LOG_LEVEL=info
-      - KNOWLEDGE_BASE_AUTO_UPDATE=true
+      # 知识库在线更新默认关闭：隐私工具默认不联网，需要时由用户显式开启。
+      - KNOWLEDGE_BASE_AUTO_UPDATE=false
       - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800  # 7 天
     ports:
       - "9595:9595"
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - SYS_ADMIN
-    devices:
-      - /dev/null:/dev/null

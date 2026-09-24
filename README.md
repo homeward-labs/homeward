@@ -48,7 +48,7 @@ docker compose up -d
 
 ## 开源协议 · 竞品隔离声明
 
-- 代码 **MIT**；知识库数据 **CC BY 4.0**（鼓励众包贡献）。
+- 代码 **MIT**（见 [LICENSE](./LICENSE)）；知识库数据 **CC BY 4.0**（见 [src/knowledge_base/LICENSE](./src/knowledge_base/LICENSE)，**使用须署名**）。
 - **本项目不集成、不复制任何 AGPL 或其他强 Copyleft 协议的代码。** 任何竞品源码仅作产品调研参考、隔离在仓库之外，避免许可证传染。
 
 ---
