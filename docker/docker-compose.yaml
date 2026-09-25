@@ -1,34 +1,80 @@
-version: "3.8"
+version: "3.9"
 
 # 社区版部署形态：「看见」为主，不拦截、不抓包、不改防火墙。
 # 唯一的外界输入是 dnsmasq 的查询日志 —— 因此不需要 privileged、不需要 host 网络、
 # 不需要 NET_ADMIN / NET_RAW。容器被攻破时也不该拿到改家庭网络配置的权限。
 #
-# 若你的 dnsmasq 日志不在 /var/log/dnsmasq.log，请改下面 volumes 的只读挂载路径
-# （可用 `ps aux | grep dnsmasq` 找 log-facility，或在 dnsmasq 配置里加一行
-#  log-queries=extra + log-facility=/var/log/dnsmasq.log）。
+# 本文件已按「常年常驻在最低配 NAS / 软路由」的目标做加固：
+#   · 只读根文件系统（read_only）+ tmpfs /tmp —— 运行时无法改镜像内容；
+#   · 降权：cap_drop ALL + no-new-privileges —— 即便被攻破也拿不到特权；
+#   · 资源上限：内存 128M / 0.5 核，避免拖累宿主机（见「资源占用验证」）；
+#   · 健康检查：探 /api/health，异常自动重启；
+#   · 单用户口令鉴权（HOMEWARD_AUTH_TOKEN，建议放 .env 不入库）。
+#
+# 若你的 dnsmasq 日志不在 /var/log/dnsmasq.log，二选一：
+#   1) 改下面 volumes 的只读挂载路径（可用 `ps aux | grep dnsmasq` 找 log-facility）；
+#   2) 在 .env 里设 DNS_LOG_PATH=/你的/路径，它会自动传给 --dns-log。
+# 飞牛 OS 自带 DNS 解析不一定走 dnsmasq，详见 docs/DEPLOYMENT.md 的飞牛章节。
 
 services:
   homeward:
     build: .
     container_name: homeward
     restart: unless-stopped
+
+    # —— 资源占用验证（W5）：常年常驻在低配设备上的硬约束 ——
+    # 社区版纯 Python、无第三方依赖、无数据库常驻进程，128M 是充裕上限。
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 32M
+    pids_limit: 128
+
+    # —— 安全加固：一个隐私工具不该有任何多余权限 ——
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    # —— 健康检查：探只读的 /api/health（免鉴权），连续失败则 restart ——
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; s=urllib.request.urlopen('http://127.0.0.1:9595/api/health').status; sys.exit(0 if s==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
     volumes:
-      - ./data:/app/data                                    # 建议阻断记录与统计
-      - ./logs:/app/logs                                    # 运行日志
+      - ./data:/app/data                                    # 阻断记录 / SQLite 动作库（持久化）
+      - ./logs:/app/logs                                    # 预留运行日志目录
       - /var/log/dnsmasq.log:/var/log/dnsmasq.log:ro        # Tier 1 数据源（只读）
     environment:
       - HOST=0.0.0.0
       - PORT=9595
       - LOG_LEVEL=info
+      # 不写 .pyc 到只读根fs（配合 read_only: true）
+      - PYTHONDONTWRITEBYTECODE=1
       # 知识库在线更新默认关闭：隐私工具默认不联网，需要时由用户显式开启。
       - KNOWLEDGE_BASE_AUTO_UPDATE=false
       - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800  # 7 天
+      # 单用户登录口令：强烈建议放进 .env（已 gitignore）而不是写死在这里。
+      # 留空则服务自动生成随机口令并打印到启动日志（可信局域网可用，暴露公网务必显式设）。
+      - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
+      # 可选：显式指定 dnsmasq 日志路径（覆盖自动探测）；留空走自动探测。
+      - DNS_LOG_PATH=${DNS_LOG_PATH:-}
     ports:
-      - "9595:9595"        # Web UI（社区版只读；当前版本没有鉴权，勿直接暴露到公网）
+      - "9595:9595"        # Web UI（已启用口令鉴权；暴露到公网仍须用防火墙限制来源 IP）
     # 生产模式（已接真机数据源）：不传 --demo，服务启动即自动采集 DNS / conntrack
     # 并喂给决策层；界面显示的是真实家庭网络观测，而非演示剧本。
     # 采集可用性（哪个采集器在干活 / 哪个不可用）在界面「盲区」视图如实展示。
-    # 注意：compose 的 command 会**整体替换**镜像 CMD，不能只写参数。
+    # 注意：compose 的 command 会**整体替换**镜像 CMD，不能只写参数；
+    # 这里保持 exec 形式（不套 shell），信号能直接传到进程、优雅退出才成立。
     # 若本机没有 dnsmasq 日志，面板会为空并在盲区视图提示，属预期行为（非 bug）。
     command: ["python", "-m", "src.ui.server"]
