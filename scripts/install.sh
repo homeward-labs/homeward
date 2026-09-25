@@ -48,9 +48,22 @@ fi
 # 2) 构建并启动容器
 info "构建并启动容器（首次会拉取镜像，请稍候）"
 if docker compose version >/dev/null 2>&1; then
-  docker compose -f "$COMPOSE_FILE" up -d --build
+  COMPOSE_BIN=(docker compose)
 else
-  docker-compose -f "$COMPOSE_FILE" up -d --build
+  COMPOSE_BIN=(docker-compose)
+fi
+BUILD_LOG=/tmp/homeward_build.log
+if ! "${COMPOSE_BIN[@]}" -f "$COMPOSE_FILE" up -d --build >"$BUILD_LOG" 2>&1; then
+  if grep -qiE "401|Unauthorized|failed to resolve|docker\.fnnas|docker\.io/library" "$BUILD_LOG"; then
+    warn "构建失败：飞牛 Docker 拉不到 Docker Hub 基础镜像（镜像源 docker.fnnas.com 对官方镜像返回 401）。"
+    warn "请在飞牛配置 Docker Hub 镜像加速器后重试，例如："
+    echo "    cat > /etc/docker/daemon.json <<'EOF'"
+    echo "    { \"registry-mirrors\": [\"https://docker.m.daocloud.io\", \"https://hub-mirror.c.163.com\"] }"
+    echo "    EOF"
+    echo "    systemctl restart docker"
+    echo "    然后重新运行: bash scripts/install.sh"
+  fi
+  die "容器构建/启动失败，详见 $BUILD_LOG"
 fi
 
 # 3) 等待容器健康
