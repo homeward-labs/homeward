@@ -1,0 +1,16 @@
+# 构建上下文为项目根目录（见 docker/docker-compose.yaml 的 build.context: ..）
+# 这里只放行镜像真正需要的文件，避免把 .git / 测试 / 文档传进构建上下文。
+.git
+.github
+.workbuddy
+tests
+docs
+reports
+tools
+scripts
+fnpk
+hooks
+*.md
+LICENSE
+.gitignore
+.dockerignore
