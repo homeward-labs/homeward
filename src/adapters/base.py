@@ -174,6 +174,38 @@ class RevertPayload(ABC):
             data[f.name] = getattr(self, f.name)
         return data
 
+    # 子类注册表：kind -> 具体类，供 from_dict 反序列化时还原类型。
+    # 阻断实现（dnsmasq / nftables / OpenWrt 等）在标准版独立仓库，各自用
+    # @RevertPayload.register 装饰自己即可被本仓库的持久化层识别。
+    _registry: ClassVar[dict] = {}
+
+    @classmethod
+    def register(cls, subcls: "type[RevertPayload]") -> "type[RevertPayload]":
+        """子类装饰器：注册后 from_dict 才能把它还原出来"""
+        if subcls.kind:
+            cls._registry[subcls.kind] = subcls
+        return subcls
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RevertPayload":
+        """从 to_dict() 产出的字典还原具体子类实例
+
+        未知 / 未注册的 ``kind`` 抛 ValueError —— 由持久化层决定是兜底丢弃还是
+        用未知载荷载体保留原始信息，不直接崩。
+        """
+        if not isinstance(data, dict):
+            raise ValueError(f"revert_payload 数据不是 dict：{type(data).__name__}")
+        kind = data.get("kind")
+        sub = cls._registry.get(kind)
+        if sub is None:
+            raise ValueError(
+                f"未知 / 未注册的 revert_payload kind：{kind!r}（需对应 Enforcer 模块注册）"
+            )
+        # 只取该子类声明的字段，忽略遗留 / 无关键
+        field_names = {f.name for f in fields(sub)}
+        kwargs = {k: v for k, v in data.items() if k in field_names and k != "kind"}
+        return sub(**kwargs)
+
 
 @dataclass
 class DnsBlackholePayload(RevertPayload):
