@@ -107,6 +107,10 @@ class HomewardService:
             "unknown_domains": set(),
         }
 
+        # 采集可用性：由 CollectorRunner 写入，供 /api/overview 的盲区视图
+        # 如实展示「当前到底有几个采集器在干活、哪个不可用」（看不见要说清楚）
+        self.collection_status: list[dict] = []
+
         # 由信号处理器置位，由事件循环侧的关闭逻辑消费
         self._shutdown_requested = False
 
@@ -158,8 +162,13 @@ class HomewardService:
         decision = self.engine.evaluate(flow)
         self.stats["decisions_made"] += 1
 
-        if decision.action == "unknown" and flow.sni:
-            self.stats["unknown_domains"].add(flow.sni)
+        if decision.action == "unknown":
+            # 未知域名可能来自 SNI（Tier3）或 DNS 查询（Tier1）；真实 DNS 采集器
+            # 只填 dns_query、sni 为 None，所以两者都要认，否则生产环境 DNS 查出的
+            # 未知域名不会进「未知域名」视图（演示数据因同时填了 sni 才没暴露）
+            unknown = flow.sni or flow.dns_query
+            if unknown:
+                self.stats["unknown_domains"].add(unknown)
 
         # 命中阻断类规则 → 降级为「建议」，等待用户在 UI 上确认
         if decision.action.startswith("block"):
@@ -384,6 +393,7 @@ class HomewardService:
         """获取统计信息"""
         return {
             **self.stats,
+            "collection": self.collection_status,
             "unknown_domains_count": len(self.stats["unknown_domains"]),
             "unknown_domains": sorted(self.stats["unknown_domains"]),
             "devices_total": len(self.device_registry.devices),

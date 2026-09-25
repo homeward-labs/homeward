@@ -320,6 +320,8 @@ def main(argv=None) -> int:
                     help=f"监听端口（默认 {DEFAULT_PORT}）")
     ap.add_argument("--demo", action="store_true",
                     help="灌入演示数据（用于界面自测，生产路径请勿使用）")
+    ap.add_argument("--dns-log", default=None,
+                    help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测）")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -328,12 +330,25 @@ def main(argv=None) -> int:
     )
 
     service = HomewardService(config={"load_system_devices": not args.demo})
+    runner = None
     if args.demo:
         out = seed_demo(service)
         print(f"[演示数据] 设备 {len(out['devices']['devices'])} 台、"
               f"观测 {out['flows']} 条、告警 {len(out['alerts'])} 条")
+    else:
+        # 生产模式：启动采集泵，把真实 DNS / conntrack 数据持续喂给 service
+        from core.collector import CollectorRunner
+        runner = CollectorRunner(service, dns_log_path=args.dns_log, poll_interval=0.5)
+        status = runner.start()
+        active = [s["collector"] for s in status if s["active"]]
+        note = "、".join(active) if active else "无（请确认 dnsmasq 日志路径，详见界面「盲区」视图）"
+        print(f"[采集] 已启动：{note}")
 
-    run_server(service, host=args.host, port=args.port)
+    try:
+        run_server(service, host=args.host, port=args.port)
+    finally:
+        if runner is not None:
+            runner.stop()
     return 0
 
 
