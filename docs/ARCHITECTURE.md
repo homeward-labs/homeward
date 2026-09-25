@@ -113,8 +113,8 @@ def decide(record, rule_hits) -> Decision:
 | **SUGGEST_BLOCK_HARD** | 建议移入 IoT VLAN（默认禁止外网），并说明需交换机 / OpenWrt 配置权 | 同上 |
 | **UNKNOWN** | 展示在「未知域名」列表，等待用户操作 | 同左 |
 
-> 三级阻断的实现细节见 [BLOCKING.md](./BLOCKING.md)；撤销语义（30 分钟一键撤销、
-> `redeemable_until` / `auto_release_at`）与工程载体 `revert_payload` 同样在该文第四节。
+> 三级阻断的实现细节见 私有《阻断与撤销》文档；撤销语义（30 分钟一键撤销、
+> `redeemable_until` / `auto_release_at`）与工程载体 `revert_payload` 同样在私有《阻断与撤销》文档第四节。
 
 ### 2.6 行为识别与告警层（`src/analysis/`）
 
@@ -309,4 +309,4 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
 其余写方法一律 405；阻断类按钮在社区版渲染为禁用态并注明属标准版能力。
 
 **已知缺口**：当前版本没有鉴权。绑定非回环地址时启动日志会告警，
-正式修法见 `docs/ROADMAP.md` 的 P1-0（反代 / 防火墙 / 登录）。
+正式修法见私有《路线图》文档的 P1-0（反代 / 防火墙 / 登录）。
