@@ -248,18 +248,26 @@ class TestBootstrap(unittest.TestCase):
         self.assertEqual(ui_server.DEFAULT_HOST, "127.0.0.1")
 
     def test_warn_only_when_exposed(self, ):
-        """回环地址不该告警；绑 0.0.0.0 必须告警（当前版本无鉴权）"""
+        """回环地址不该告警；绑 0.0.0.0 必须告警，且按鉴权开关给出不同措辞"""
         import io
         import contextlib
+        from ui.auth import WebAuth
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            ui_server._warn_if_exposed("127.0.0.1")
+            ui_server._warn_if_exposed("127.0.0.1", auth=WebAuth(token="x"))
         self.assertEqual(buf.getvalue(), "")
 
+        # 未启用鉴权（--no-auth）：明确提示暴露风险
         buf2 = io.StringIO()
         with contextlib.redirect_stdout(buf2):
-            ui_server._warn_if_exposed("0.0.0.0")
-        self.assertIn("没有鉴权", buf2.getvalue())
+            ui_server._warn_if_exposed("0.0.0.0", auth=None)
+        self.assertIn("未启用鉴权", buf2.getvalue())
+
+        # 已启用鉴权：措辞转为「已启用口令鉴权」
+        buf3 = io.StringIO()
+        with contextlib.redirect_stdout(buf3):
+            ui_server._warn_if_exposed("0.0.0.0", auth=WebAuth(token="x"))
+        self.assertIn("已启用口令鉴权", buf3.getvalue())
 
     def test_make_server_binds(self):
         svc = HomewardService(config={"load_system_devices": False})

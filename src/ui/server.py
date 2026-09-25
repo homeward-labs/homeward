@@ -17,8 +17,10 @@ W4 —— Web UI 服务端（社区版开源范围）
 3. **不缓存**。`no-store` —— 家庭网络观测数据不该留在浏览器缓存里。
 4. **盲区要显示**。`blind_spots` / 覆盖率是接口的一等公民，不是调试信息。
 
-鉴权状态：**当前无鉴权**。绑定到非回环地址时启动日志会明确告警，
-这是一条已知缺口，不掩饰（见 docs/ROADMAP.md 的 P1 项）。
+鉴权状态：**单用户口令鉴权（见 ``src/ui/auth.py``）**。口令来自
+``HOMEWARD_AUTH_TOKEN`` / ``--auth-token``，未提供则自动生成随机口令并打印到启动日志；
+登录后以 ``HttpOnly`` + ``SameSite=Strict`` 的会话 cookie 维持。``--no-auth`` 仅用于可信
+局域网 / 纯本地自测。这是 P1 项，现已补上（见 docs/ROADMAP.md）。
 """
 
 import argparse
@@ -37,6 +39,7 @@ sys.path.insert(0, str(SRC_DIR))
 
 from core.demo import seed_demo                    # noqa: E402
 from core.main import HomewardService              # noqa: E402
+from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
 
 logger = logging.getLogger("homeward.ui")
 
@@ -69,7 +72,7 @@ SECURITY_HEADERS = [
      "connect-src 'self'; "
      "frame-ancestors 'none'; "
      "base-uri 'none'; "
-     "form-action 'none'"),
+     "form-action 'self'"),
 ]
 
 # 社区版能力边界 —— 前端据此把不可用的操作显示为禁用态，而不是灰掉不给理由
@@ -95,6 +98,7 @@ class HomewardHandler(BaseHTTPRequestHandler):
     server_version = "homeward/" + VERSION
     service: HomewardService = None
     start_time: float = 0.0
+    auth: "WebAuth | None" = None
 
     # ---- 基础 ----
 
@@ -114,9 +118,23 @@ class HomewardHandler(BaseHTTPRequestHandler):
     def _dispatch(self, method: str):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+        query = parse_qs(parsed.query)
         try:
+            # —— 鉴权门禁 ——
+            # 白名单（免登录）：登录页 / 登录登出接口 / 健康检查 / 登录页样式
+            if path in ("/login", "/api/login", "/api/logout", "/api/health",
+                        "/static/login.css"):
+                self._public(method, path, query)
+                return
+            if self.auth is not None and not self.auth.is_authenticated(self):
+                if path.startswith("/api/"):
+                    self._json(401, {"error": "unauthorized", "login": "/login"})
+                else:
+                    self._send_redirect("/login")
+                return
+            # —— 已登录：正常路由 ——
             if path.startswith("/api/"):
-                self._api(method, path, parse_qs(parsed.query))
+                self._api(method, path, query)
             elif method in ("GET", "HEAD"):
                 self._static(method, path)
             else:
@@ -125,13 +143,81 @@ class HomewardHandler(BaseHTTPRequestHandler):
             logger.exception("处理 %s %s 时出错", method, path)
             self._json(500, {"error": "internal_error", "detail": str(exc)})
 
+    # ---- 免鉴权路由（登录页 / 登录登出 / 健康 / 登录样式）----
+
+    def _public(self, method: str, path: str, query: dict):
+        if path == "/api/health":
+            self._api(method, path, query)
+        elif path == "/login":
+            self._serve_login()
+        elif path == "/api/login":
+            self._login(method)
+        elif path == "/api/logout":
+            self._logout(method)
+        elif path == "/static/login.css":
+            self._static(method, path)
+        else:
+            self._json(404, {"error": "not_found", "path": path})
+
+    def _serve_login(self):
+        if self.auth is None:
+            html = ("<html lang='zh-CN'><body style='font-family:sans-serif'>"
+                    "<h1>家卫</h1><p>当前以 <code>--no-auth</code> 启动，未启用鉴权。"
+                    "直接访问 <a href='/'>首页</a> 即可。</p></body></html>")
+        else:
+            html = self.auth.login_page_html()
+        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _login(self, method: str):
+        if method != "POST":
+            self._json(405, {"error": "method_not_allowed", "need": "POST"})
+            return
+        form = self._read_form()
+        token = (form.get("token") or [""])[0]
+        if self.auth is None or not self.auth.verify(token):
+            self._json(401, {"error": "invalid_token"})
+            return
+        # 种会话 cookie 并跳回首页
+        self._send_redirect("/",
+                            extra_headers=[("Set-Cookie", self.auth.session_cookie())])
+
+    def _logout(self, method: str):
+        if method != "POST":
+            self._json(405, {"error": "method_not_allowed", "need": "POST"})
+            return
+        cookie = self.auth.logout_cookie() if self.auth else f"{SESSION_COOKIE}=; Max-Age=0; Path=/"
+        self._send_json_with_headers(200, {"ok": True},
+                                     extra_headers=[("Set-Cookie", cookie)])
+
+    # ---- 输出辅助 ----
+
+    def _send_redirect(self, location: str, extra_headers=None):
+        self.send_response(302)
+        self.send_header("Location", location)
+        for k, v in SECURITY_HEADERS:
+            self.send_header(k, v)
+        for k, v in (extra_headers or []):
+            self.send_header(k, v)
+        self.end_headers()
+
+    def _send_json_with_headers(self, status: int, payload: dict, extra_headers=None):
+        body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        self._send(status, body, "application/json; charset=utf-8", extra_headers)
+
+    def _read_form(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        raw = self.rfile.read(length) if length > 0 else b""
+        return parse_qs(raw.decode("utf-8", "replace"))
+
     # ---- 输出 ----
 
-    def _send(self, status: int, body: bytes, content_type: str):
+    def _send(self, status: int, body: bytes, content_type: str, extra_headers=None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         for k, v in SECURITY_HEADERS:
+            self.send_header(k, v)
+        for k, v in (extra_headers or []):
             self.send_header(k, v)
         self.end_headers()
         if self.command != "HEAD":
@@ -265,25 +351,26 @@ class HomewardHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------- 启动
 
 def make_server(service: HomewardService, host: str = DEFAULT_HOST,
-                port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
+                port: int = DEFAULT_PORT, auth: "WebAuth | None" = None
+                ) -> ThreadingHTTPServer:
     """创建一个绑定好的服务实例（未启动 serve_forever）
 
-    用子类注入 service，避免全局变量 —— 单测里可以起多个互不干扰的实例。
+    用子类注入 service / auth，避免全局变量 —— 单测里可以起多个互不干扰的实例。
     """
     handler_cls = type(
         "HomewardHandler",
         (HomewardHandler,),
-        {"service": service, "start_time": time.time()},
+        {"service": service, "start_time": time.time(), "auth": auth},
     )
     ThreadingHTTPServer.allow_reuse_address = True
     return ThreadingHTTPServer((host, port), handler_cls)
 
 
 def run_server(service: HomewardService, host: str = DEFAULT_HOST,
-               port: int = DEFAULT_PORT) -> None:
+               port: int = DEFAULT_PORT, auth: "WebAuth | None" = None) -> None:
     """阻塞运行直到 Ctrl-C"""
-    httpd = make_server(service, host=host, port=port)
-    _warn_if_exposed(host)
+    httpd = make_server(service, host=host, port=port, auth=auth)
+    _warn_if_exposed(host, auth)
     logger.info("家卫 Web UI：http://%s:%d", host, port)
     try:
         httpd.serve_forever()
@@ -293,13 +380,16 @@ def run_server(service: HomewardService, host: str = DEFAULT_HOST,
         httpd.server_close()
 
 
-def _warn_if_exposed(host: str) -> None:
-    """绑定到非回环地址时明确告警：当前版本**没有鉴权**"""
+def _warn_if_exposed(host: str, auth: "WebAuth | None" = None) -> None:
+    """绑定到非回环地址时明确告警"""
     if host in ("127.0.0.1", "localhost", "::1"):
         return
-    msg = (f"Web UI 绑定到 {host}：当前版本没有鉴权，"
-           "同一网络内任何人都能看到家里的设备与外联情况。请确认你信任该网络，"
-           "或用防火墙限制来源。")
+    if auth is None:
+        msg = (f"Web UI 绑定到 {host} 且**未启用鉴权**（--no-auth）："
+               "同一网络内任何人都能看到家里的设备与外联情况。仅限可信局域网使用。")
+    else:
+        msg = (f"Web UI 绑定到 {host}：已启用口令鉴权，但仍请确保你信任该网络，"
+               "或用防火墙限制来源 IP。")
     logger.warning(msg)
     print("[警告] " + msg)
 
@@ -322,12 +412,22 @@ def main(argv=None) -> int:
                     help="灌入演示数据（用于界面自测，生产路径请勿使用）")
     ap.add_argument("--dns-log", default=None,
                     help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测）")
+    ap.add_argument("--auth-token", default=None,
+                    help="Web UI 登录口令（不填则用 HOMEWARD_AUTH_TOKEN，"
+                         "二者皆无则自动生成随机口令并打印到启动日志）")
+    ap.add_argument("--no-auth", action="store_true",
+                    help="关闭鉴权（仅可信局域网 / 纯本地自测；生产请勿用）")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+    # 鉴权：默认开启（缺口令则自动生成）。--no-auth 显式关闭（仅可信场景）。
+    auth = None if args.no_auth else WebAuth(token=args.auth_token)
+    if auth is not None and auth.auto_token:
+        print(f"[鉴权] 首次运行自动生成的登录口令（仅显示一次）：{auth.auto_token}")
 
     service = HomewardService(config={"load_system_devices": not args.demo})
     runner = None
@@ -345,7 +445,7 @@ def main(argv=None) -> int:
         print(f"[采集] 已启动：{note}")
 
     try:
-        run_server(service, host=args.host, port=args.port)
+        run_server(service, host=args.host, port=args.port, auth=auth)
     finally:
         if runner is not None:
             runner.stop()
