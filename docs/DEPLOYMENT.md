@@ -85,6 +85,8 @@ python -m src.core.main
 > 单臂 Docker 形态下只能看到 DNS 层面（设备往哪个域名打电话）；
 > 要看全量流量，请部署为网关位（软路由主路由 / 旁路由）或双网口网桥。
 
+不想手敲命令？直接用一键脚本（见 §五-B-5），自动克隆/更新 + 启动 + 探测 IP 并打印访问地址，全程不用手填 IP。
+
 ---
 
 ## 五-B、飞牛 OS（FnOS）部署与冒烟验收
@@ -140,6 +142,24 @@ docker stats homeward                                       # 看真实内存占
 
 > 本仓库的 Windows 开发机**装不了 Docker**，故镜像构建与 `docker stats` 实测必须在飞牛执行；
 > 但冒烟脚本本身已在本地用真实服务跑通（RC=0），逻辑正确性已验证。
+
+### 5) 一键安装脚本（最省事，推荐）
+
+仓库自带 `scripts/install.sh`，在飞牛终端跑一条命令即可完成「克隆/更新代码 → 构建启动 → 自动探测飞牛 IP → 打印访问地址」，**全程不用手填 IP、不用翻日志**：
+
+```bash
+git clone https://github.com/homeward-labs/homeward
+cd homeward
+bash scripts/install.sh
+# 脚本结束会直接打印类似：浏览器打开: http://192.168.1.50:9595
+```
+
+脚本行为：
+- 当前已在 `homeward/` 仓库内 → 自动 `git pull` 更新到最新（含零配置版）；
+- 不在仓库内 → 自动从 GitHub 克隆；
+- 启动后自动 `hostname -I` 探测飞牛局域网 IP 并打印，省去手动查 IP；
+- 默认零配置无鉴权，浏览器直开；仅当你在 `docker/.env` 设了 `HOMEWARD_AUTH_TOKEN` 时，
+  脚本才会从容器日志自动抓取随机口令并打印出来。
 
 ---
 
