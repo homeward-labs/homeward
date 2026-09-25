@@ -17,10 +17,10 @@ W4 —— Web UI 服务端（社区版开源范围）
 3. **不缓存**。`no-store` —— 家庭网络观测数据不该留在浏览器缓存里。
 4. **盲区要显示**。`blind_spots` / 覆盖率是接口的一等公民，不是调试信息。
 
-鉴权状态：**单用户口令鉴权（见 ``src/ui/auth.py``）**。口令来自
-``HOMEWARD_AUTH_TOKEN`` / ``--auth-token``，未提供则自动生成随机口令并打印到启动日志；
-登录后以 ``HttpOnly`` + ``SameSite=Strict`` 的会话 cookie 维持。``--no-auth`` 仅用于可信
-局域网 / 纯本地自测。这是 P1 项，现已补上（见 docs/ROADMAP.md）。
+鉴权状态：**默认零配置即无鉴权（开箱即用，浏览器直开）**；仅当显式提供口令
+（``HOMEWARD_AUTH_TOKEN`` / ``--auth-token``）时才启用单用户口令鉴权，登录后以
+``HttpOnly`` + ``SameSite=Strict`` 的会话 cookie 维持（见 ``src/ui/auth.py``）。
+``--no-auth`` 可强制关闭鉴权。暴露到不可信网络时务必设口令，并用防火墙限制来源 IP。
 """
 
 import argparse
@@ -416,10 +416,10 @@ def main(argv=None) -> int:
                     help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测，"
                          "或由环境变量 DNS_LOG_PATH 指定）")
     ap.add_argument("--auth-token", default=None,
-                    help="Web UI 登录口令（不填则用 HOMEWARD_AUTH_TOKEN，"
-                         "二者皆无则自动生成随机口令并打印到启动日志）")
+                    help="Web UI 登录口令；不填则默认无鉴权（浏览器直开）。"
+                         "也可由环境变量 HOMEWARD_AUTH_TOKEN 提供")
     ap.add_argument("--no-auth", action="store_true",
-                    help="关闭鉴权（仅可信局域网 / 纯本地自测；生产请勿用）")
+                    help="强制关闭鉴权（默认即无鉴权；此开关用于有口令时仍要关）")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -427,10 +427,14 @@ def main(argv=None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    # 鉴权：默认开启（缺口令则自动生成）。--no-auth 显式关闭（仅可信场景）。
-    auth = None if args.no_auth else WebAuth(token=args.auth_token)
-    if auth is not None and auth.auto_token:
-        print(f"[鉴权] 首次运行自动生成的登录口令（仅显示一次）：{auth.auto_token}")
+    # 鉴权：默认「零配置即无鉴权」，浏览器直开（开箱即用）。
+    # 仅当显式提供了口令（--auth-token 或 HOMEWARD_AUTH_TOKEN）才启用单用户鉴权；
+    # 暴露到不可信网络时务必设口令，并用防火墙限制来源 IP。--no-auth 可强制关闭。
+    auth = None
+    if not args.no_auth:
+        tok = args.auth_token or os.environ.get("HOMEWARD_AUTH_TOKEN")
+        if tok:
+            auth = WebAuth(token=tok)
 
     service = HomewardService(config={"load_system_devices": not args.demo})
     runner = None
