@@ -351,6 +351,63 @@ class TestAttributionWithRealKB(unittest.TestCase):
         self.assertEqual(rep.unknown, ["zzz-unknown-test.org"])
         self.assertIn("归属覆盖率", rep.summary())
 
+    def test_kb_expanded_domestic_brands(self):
+        """W5 扩量：国产设备厂商与常见嵌入式广告/统计 SDK 应可被归属"""
+        # 新增的主流国产设备厂商根域名（精确命中）
+        exact = {
+            "hisense.com": "Hisense (海信)",
+            "tcl.com": "TCL (TCL)",
+            "gree.com": "Gree (格力)",
+            "roborock.com": "Roborock (石头科技)",
+            "ecovacs.com": "Ecovacs (科沃斯)",
+            "dji.com": "DJI (大疆)",
+            "ninebot.com": "Ninebot (九号)",
+            "aqara.com": "Aqara (绿米)",
+            "yeelight.com": "Yeelight (易来)",
+            "viomi.com": "Viomi (云米)",
+            "orvibo.com": "Orvibo (欧瑞博)",
+            "jd.com": "JD (京东)",
+            "suning.com": "Suning (苏宁)",
+            "meizu.com": "Meizu (魅族)",
+            "iflytek.com": "iFlytek (科大讯飞)",
+            "mi.com": "Xiaomi",
+            "huawei.com": "Huawei",
+        }
+        for domain, org in exact.items():
+            r = self.attr.resolve(domain)
+            self.assertTrue(r.known, f"{domain} 应可归属")
+            self.assertEqual(r.matched_by, "exact", f"{domain} 应精确命中")
+            self.assertEqual(r.organization, org, f"{domain} 归属组织错误")
+
+        # 设备内嵌广告/联盟/统计 SDK（精确命中，建议 block_soft）
+        sdk = {
+            "gdt.qq.com": "Tencent (广点通)",
+            "cpro.baidu.com": "Baidu (百度联盟)",
+            "tanx.com": "Alibaba (阿里妈妈)",
+            "ad.360.cn": "Qihoo 360 (360广告)",
+            "kuaishou.com": "Kuaishou (快手)",
+            "pinduoduo.com": "Pinduoduo (拼多多)",
+        }
+        for domain, org in sdk.items():
+            r = self.attr.resolve(domain)
+            self.assertTrue(r.known, f"{domain} 应可归属")
+            self.assertEqual(r.organization, org)
+            self.assertIn(r.action, ("block_soft", "block_medium"))
+
+        # 修复项：msmart.meizu.com 曾被误归为 Midea，应为魅族
+        self.assertEqual(self.attr.resolve("msmart.meizu.com").organization, "Meizu (魅族)")
+
+        # 子域名向上匹配：根域名覆盖其下所有子域
+        self.assertEqual(self.attr.resolve("account.mi.com").organization, "Xiaomi")
+        self.assertEqual(self.attr.resolve("api.hisense.com").organization, "Hisense (海信)")
+
+        # 红线不被破坏：仍未知就不猜
+        self.assertFalse(self.attr.resolve("zzz-no-such-brand.example.org").known)
+
+    def test_kb_size_after_expansion(self):
+        """扩量后规则数应明显大于初始规模（初始约 100 条，扩量后 >140）"""
+        self.assertGreater(len(self.attr._rules), 140)
+
 
 class TestAttributionLoading(unittest.TestCase):
 
