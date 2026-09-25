@@ -9,7 +9,8 @@ version: "3.9"
 #   · 降权：cap_drop ALL + no-new-privileges —— 即便被攻破也拿不到特权；
 #   · 资源上限：内存 128M / 0.5 核，避免拖累宿主机（见「资源占用验证」）；
 #   · 健康检查：探 /api/health，异常自动重启；
-#   · 单用户口令鉴权（HOMEWARD_AUTH_TOKEN，建议放 .env 不入库）。
+#   · 默认零配置即「无鉴权」（浏览器直开，开箱即用）；仅在 .env 显式设
+#     HOMEWARD_AUTH_TOKEN 时才启用单用户口令鉴权（暴露公网务必开启）。
 #
 # 若你的 dnsmasq 日志不在 /var/log/dnsmasq.log，二选一：
 #   1) 改下面 volumes 的只读挂载路径（可用 `ps aux | grep dnsmasq` 找 log-facility）；
@@ -64,13 +65,13 @@ services:
       # 知识库在线更新默认关闭：隐私工具默认不联网，需要时由用户显式开启。
       - KNOWLEDGE_BASE_AUTO_UPDATE=false
       - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800  # 7 天
-      # 单用户登录口令：强烈建议放进 .env（已 gitignore）而不是写死在这里。
-      # 留空则服务自动生成随机口令并打印到启动日志（可信局域网可用，暴露公网务必显式设）。
+      # 单用户登录口令：放进 .env（已 gitignore）即可启用鉴权。
+      # 留空（默认）则服务无鉴权、浏览器直开（仅限可信局域网；暴露公网务必显式设）。
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 可选：显式指定 dnsmasq 日志路径（覆盖自动探测）；留空走自动探测。
       - DNS_LOG_PATH=${DNS_LOG_PATH:-}
     ports:
-      - "9595:9595"        # Web UI（已启用口令鉴权；暴露到公网仍须用防火墙限制来源 IP）
+      - "9595:9595"        # Web UI（默认无鉴权，仅限可信局域网；暴露公网请在 .env 设 HOMEWARD_AUTH_TOKEN 启用口令）
     # 生产模式（已接真机数据源）：不传 --demo，服务启动即自动采集 DNS / conntrack
     # 并喂给决策层；界面显示的是真实家庭网络观测，而非演示剧本。
     # 采集可用性（哪个采集器在干活 / 哪个不可用）在界面「盲区」视图如实展示。

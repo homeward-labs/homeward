@@ -93,29 +93,30 @@ python -m src.core.main
 在飞牛上的形态是「单臂 Docker / 只读日志」——即**只看到 DNS 层**（哪台设备问了哪个域名），
 看不到流量大小与时序。这是诚实的视野上限，不是 bug。
 
-### 1) 部署步骤
+### 1) 部署步骤（零配置，开箱即用）
 
 ```bash
-git clone https://github.com/homeward-labs/homeward
 cd homeward
-
-# 生成一个强口令（务必设置；不设置则用自动随机口令，只打印在日志里）
-openssl rand -hex 16          # 复制这串备用
-
-# 在 docker/ 目录下建 .env（已被 .gitignore 忽略，不会入库）：
-#   —— 注意：docker compose 只从「compose 文件所在目录」读 .env，必须放在 docker/.env
-cp docker/.env.example docker/.env
-# 编辑 docker/.env，把 HOMEWARD_AUTH_TOKEN= 填上上面那串
-
 docker compose -f docker/docker-compose.yaml up -d --build
-
-# 在飞牛的容器设置里确认宿主机端口 9595 已映射；浏览器开 http://<飞牛IP>:9595
+# 浏览器开 http://<飞牛IP>:9595 即可，无需任何口令
 ```
+
+就这么两步。默认即「无鉴权」模式：浏览器直接打开就能看家庭设备外联情况，
+不用填 token、不用翻日志。**仅在你要把它暴露到不可信网络时，才需要设口令**（见下）。
 
 compose 已按「常年常驻在低配 NAS」做了加固：`read_only` 根文件系统、`cap_drop ALL`、
 内存上限 128M / 0.5 核、健康检查探 `/api/health`。改动镜像内容或提权都做不到。
 
-### 2) 飞牛的 DNS 日志在哪
+### 2) 进阶：暴露公网时启用口令鉴权（可选）
+
+```bash
+cp docker/.env.example docker/.env
+# 编辑 docker/.env，把 HOMEWARD_AUTH_TOKEN= 填上：openssl rand -hex 16
+docker compose -f docker/docker-compose.yaml up -d
+# 之后浏览器打开会要求输入该口令
+```
+
+### 3) 飞牛的 DNS 日志在哪
 
 飞牛自带 DNS 不一定走 dnsmasq，所以「面板为空」在刚部署时是**预期**的。让它真正看到数据有两种办法：
 
@@ -126,22 +127,16 @@ compose 已按「常年常驻在低配 NAS」做了加固：`read_only` 根文�
 若暂时没有 DNS 日志，面板为空、并在「盲区」视图提示「DNS 采集器不可用」——属预期，
 不是故障。界面「采集激活」一栏会如实显示当前到底哪个采集器在干活。
 
-### 3) 冒烟验收（部署后必做）
+### 4) 可选验证（平时不用，想确认没问题再做）
 
 ```bash
-# 先校验 compose 配置合法（避免 YAML 手滑）
 docker compose -f docker/docker-compose.yaml config >/dev/null && echo "compose OK"
-
-# 跑冒烟脚本：验服务存活、鉴权门禁、各只读接口、采集激活情况
-python scripts/smoke.py --base http://<飞牛IP>:9595 --token <HOMEWARD_AUTH_TOKEN>
-
-# 资源占用（设计目标 < 100 MB / 近零 CPU）—— 这才是「资源占用验证」的实测
-docker stats homeward
+python scripts/smoke.py --base http://<飞牛IP>:9595          # 自动适配：无鉴权直探 / 有鉴权提示传 token
+docker stats homeward                                       # 看真实内存占用（应 < 100MB）
 ```
 
-冒烟脚本（`scripts/smoke.py`，纯标准库、跨平台）会输出：服务是否存活、未带口令访问
-受保护接口是否 401（门禁生效）、带口令后各接口是否可读、以及 `采集激活` 字段
-（DNS / conntrack 哪个在干活、哪个记为盲区）。
+冒烟脚本（`scripts/smoke.py`，纯标准库、跨平台）会输出：服务是否存活、各只读接口是否可读、
+以及 `采集激活` 字段（DNS / conntrack 哪个在干活、哪个记为盲区）。
 
 > 本仓库的 Windows 开发机**装不了 Docker**，故镜像构建与 `docker stats` 实测必须在飞牛执行；
 > 但冒烟脚本本身已在本地用真实服务跑通（RC=0），逻辑正确性已验证。

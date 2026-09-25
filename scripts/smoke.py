@@ -4,7 +4,8 @@
 在飞牛 / 任意 Linux 上 `docker compose up -d` 之后跑本脚本，验证整条链路是否真的活了：
 
   · 服务存活        —— /api/health（免鉴权）
-  · 鉴权门禁生效     —— 不带口令访问 /api/overview 必须 401
+  · 自动适配鉴权模式 —— 不带 --token 时：无鉴权则直接探全部只读接口；
+                       有鉴权则提示传入 --token
   · 带口令可读全部接口 —— overview / devices / destinations / alerts /
                         unknown-domains / suggestions / blind-spots
   · 采集激活情况与盲区 —— 来自 /api/overview 的 collection 字段（哪个采集器在干活）
@@ -12,10 +13,11 @@
 并提示用 `docker stats homeward` 看真实资源占用（设计目标 < 100 MB / 近零 CPU）。
 
 用法：
-  python scripts/smoke.py --base http://<设备IP>:9595 --token <HOMEWARD_AUTH_TOKEN>
-  python scripts/smoke.py                 # 默认 http://127.0.0.1:9595，无口令（只验健康 + 登录页 + 门禁）
+  python scripts/smoke.py --base http://<设备IP>:9595
+  python scripts/smoke.py --base http://<设备IP>:9595 --token <HOMEWARD_AUTH_TOKEN>   # 仅当启用了口令鉴权
 
-纯标准库，无需安装任何依赖；Windows / Linux / macOS 都能跑。
+默认「零配置即无鉴权」：不带 --token 时脚本会自动探测——若服务无鉴权则直接验证全部
+只读接口；若服务启用了鉴权则提示传入 --token。纯标准库，Windows / Linux / macOS 都能跑。
 """
 import argparse
 import http.client
@@ -78,61 +80,11 @@ def _ok(status: int) -> str:
     return "OK " if 200 <= status < 300 else "FAIL"
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description="家卫部署冒烟测试")
-    ap.add_argument("--base", default="http://127.0.0.1:9595",
-                    help="服务地址（默认 http://127.0.0.1:9595）")
-    ap.add_argument("--token", default=None,
-                    help="HOMEWARD_AUTH_TOKEN；不填则只验健康/登录页/门禁")
-    ap.add_argument("--timeout", type=float, default=10,
-                    help="单请求超时（秒，默认 10）")
-    args = ap.parse_args()
-
-    base = args.base
-    print(f"== 家卫冒烟测试：{base} ==")
-    print()
-
-    # 1) 健康
-    h_status, h_body = _get(base, "/api/health", timeout=args.timeout)
-    print(f"[{_ok(h_status)}] /api/health  -> {h_status}")
-    if h_status == 200:
-        try:
-            h = json.loads(h_body)
-            print(f"      版本 {h.get('version')} / 版次 {h.get('edition', {}).get('label')} "
-                  f"/ 知识库域名 {h.get('kb_domains')} 个")
-        except json.JSONDecodeError:
-            pass
-    else:
-        print("      ✗ 服务未存活，停止。请先 `docker compose logs homeward` 排查。")
-        return 1
-
-    if not args.token:
-        # 2) 无口令：门禁应拦 + 登录页应可达
-        print()
-        ov_status, _ = _get(base, "/api/overview", timeout=args.timeout)
-        gate_ok = ov_status == 401
-        print(f"[{'OK ' if gate_ok else 'FAIL'}] 未带口令 /api/overview -> {ov_status} "
-              f"（期望 401 = 鉴权门禁生效）")
-        lg_status, _ = _get(base, "/login", timeout=args.timeout)
-        login_ok = lg_status == 200
-        print(f"[{'OK ' if login_ok else 'FAIL'}] /login -> {lg_status}（登录页应可达）")
-        print()
-        print("提示：传入 --token 可继续验证全部受保护接口与采集激活情况。")
-        return 0 if gate_ok and login_ok else 1
-
-    # 2) 登录拿会话 cookie
-    print()
-    lg_status, cookie = _login(base, args.token, timeout=args.timeout)
-    lg_ok = lg_status in (200, 302) and bool(cookie)
-    print(f"[{'OK ' if lg_ok else 'FAIL'}] /api/login -> {lg_status}")
-    if not cookie:
-        print("      ✗ 登录失败（口令错误？）。请确认与 HOMEWARD_AUTH_TOKEN 一致。")
-        return 1
-
-    # 3) 各受保护接口
+def probe_protected(base: str, cookie: str = None, timeout: float = 10) -> int:
+    """遍历全部只读接口，返回异常数（0 = 全绿）"""
     failures = 0
     for path in PROTECTED:
-        st, body = _get(base, path, cookie=cookie, timeout=args.timeout)
+        st, body = _get(base, path, cookie=cookie, timeout=timeout)
         mark = _ok(st)
         if 200 <= st < 300:
             extra = ""
@@ -153,16 +105,79 @@ def main() -> int:
         else:
             print(f"[{mark}] {path} -> {st}")
             failures += 1
+    return failures
 
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="家卫部署冒烟测试")
+    ap.add_argument("--base", default="http://127.0.0.1:9595",
+                    help="服务地址（默认 http://127.0.0.1:9595）")
+    ap.add_argument("--token", default=None,
+                    help="HOMEWARD_AUTH_TOKEN；默认不填，脚本自动适配（无鉴权直探 / 有鉴权提示传 token）")
+    ap.add_argument("--timeout", type=float, default=10,
+                    help="单请求超时（秒，默认 10）")
+    args = ap.parse_args()
+
+    base = args.base
+    print(f"== 家卫冒烟测试：{base} ==")
+    print()
+
+    # 1) 健康（免鉴权）
+    h_status, h_body = _get(base, "/api/health", timeout=args.timeout)
+    print(f"[{_ok(h_status)}] /api/health  -> {h_status}")
+    if h_status == 200:
+        try:
+            h = json.loads(h_body)
+            print(f"      版本 {h.get('version')} / 版次 {h.get('edition', {}).get('label')} "
+                  f"/ 知识库域名 {h.get('kb_domains')} 个")
+        except json.JSONDecodeError:
+            pass
+    else:
+        print("      ✗ 服务未存活，停止。请先 `docker compose logs homeward` 排查。")
+        return 1
+
+    # 2) 不带 token：自动探测鉴权模式
+    if not args.token:
+        ov_status, _ = _get(base, "/api/overview", timeout=args.timeout)
+        if ov_status == 200:
+            print()
+            print("[] 服务为「无鉴权」模式（开箱即用）；直接验证全部只读接口：")
+            failures = probe_protected(base, cookie=None, timeout=args.timeout)
+        elif ov_status == 401:
+            lg_status, _ = _get(base, "/login", timeout=args.timeout)
+            login_ok = lg_status == 200
+            print(f"[{'OK ' if login_ok else 'FAIL'}] /login -> {lg_status}（登录页应可达）")
+            print()
+            print("提示：服务启用了鉴权，传入 --token <口令> 可继续验证全部受保护接口。")
+            print("\n资源占用（设计目标 < 100 MB）请另开终端执行：\n    docker stats homeward")
+            return 0 if login_ok else 1
+        else:
+            print(f"FAIL /api/overview -> {ov_status}（非预期状态码）")
+            return 1
+        print()
+        if failures == 0:
+            print("✓ 全部只读接口可读。")
+        else:
+            print(f"✗ {failures} 个接口异常，请查上面明细。")
+        print("\n资源占用（设计目标 < 100 MB / 近零 CPU）请另开终端执行：\n    docker stats homeward")
+        print("飞牛里若 dnsmasq 日志路径不同，在 .env 设 DNS_LOG_PATH 并重新 up。")
+        return 0 if failures == 0 else 1
+
+    # 3) 带 token：登录拿会话 cookie 后探
+    print()
+    lg_status, cookie = _login(base, args.token, timeout=args.timeout)
+    lg_ok = lg_status in (200, 302) and bool(cookie)
+    print(f"[{'OK ' if lg_ok else 'FAIL'}] /api/login -> {lg_status}")
+    if not cookie:
+        print("      ✗ 登录失败（口令错误？）。请确认与 HOMEWARD_AUTH_TOKEN 一致。")
+        return 1
+    failures = probe_protected(base, cookie=cookie, timeout=args.timeout)
     print()
     if failures == 0:
         print("✓ 全部受保护接口可读。")
     else:
         print(f"✗ {failures} 个接口异常，请查上面明细。")
-
-    print()
-    print("资源占用（设计目标 < 100 MB / 近零 CPU）请另开终端执行：")
-    print("    docker stats homeward")
+    print("\n资源占用（设计目标 < 100 MB / 近零 CPU）请另开终端执行：\n    docker stats homeward")
     print("飞牛里若 dnsmasq 日志路径不同，在 .env 设 DNS_LOG_PATH 并重新 up。")
     return 0 if failures == 0 else 1
 
