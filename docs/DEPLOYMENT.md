@@ -163,6 +163,21 @@ bash scripts/install.sh
 
 ---
 
+### 6) 飞牛 Docker 拉不到基础镜像（401 / docker.fnnas.com）
+
+若 `docker compose up --build` 报 `failed to resolve source metadata for docker.io/library/python:3.12-slim ... 401 Unauthorized`（请求被打到 `docker.fnnas.com`），说明飞牛 Docker 的镜像源不能代理 Docker Hub 官方镜像。解决：给飞牛 Docker 配置一个能访问 Docker Hub 的镜像加速器（中科大 / DaoCloud 等），再重启 docker：
+
+```bash
+cat > /etc/docker/daemon.json <<'EOF'
+{ "registry-mirrors": ["https://docker.m.daocloud.io", "https://hub-mirror.c.163.com"] }
+EOF
+systemctl restart docker
+```
+
+重启后回到仓库目录重新 `bash scripts/install.sh` 即可。`scripts/install.sh` 在构建失败且日志含 401/Unauthorized 时会自动打印上面这段指引。
+
+---
+
 ## 六、资源占用
 
 家卫的设计约束是「能常年常驻在最低配的那台设备上」：
