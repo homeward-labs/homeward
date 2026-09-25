@@ -42,6 +42,7 @@ from inventory.device import DeviceRegistry
 from inventory.attribution import DomainAttribution
 from analysis.behavior import BehaviorDetector
 from analysis.alerting import AlertCenter
+from adapters.sqlite_registry import SqliteActionRegistry
 
 
 class HomewardService:
@@ -110,6 +111,13 @@ class HomewardService:
         # 采集可用性：由 CollectorRunner 写入，供 /api/overview 的盲区视图
         # 如实展示「当前到底有几个采集器在干活、哪个不可用」（看不见要说清楚）
         self.collection_status: list[dict] = []
+
+        # 动作注册表（SQLite 持久化）：进程重启不丢动作记录，避免孤儿规则。
+        # 社区版只产出「建议」不产生已生效阻断，但标准版接同一服务时这条记录就关键了。
+        self.action_registry = SqliteActionRegistry(ROOT / "data" / "actions.db")
+        restored = self.action_registry.restore_all()
+        if restored:
+            logger.info(f"已从 SQLite 恢复 {len(restored)} 条动作记录")
 
         # 由信号处理器置位，由事件循环侧的关闭逻辑消费
         self._shutdown_requested = False
