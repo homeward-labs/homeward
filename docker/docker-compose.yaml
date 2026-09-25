@@ -1,5 +1,3 @@
-version: "3.9"
-
 # 社区版部署形态：「看见」为主，不拦截、不抓包、不改防火墙。
 # 唯一的外界输入是 dnsmasq 的查询日志 —— 因此不需要 privileged、不需要 host 网络、
 # 不需要 NET_ADMIN / NET_RAW。容器被攻破时也不该拿到改家庭网络配置的权限。
@@ -30,10 +28,10 @@ services:
         limits:
           cpus: "0.50"
           memory: 128M
+          pids: 128
         reservations:
           cpus: "0.10"
           memory: 32M
-    pids_limit: 128
 
     # —— 安全加固：一个隐私工具不该有任何多余权限 ——
     read_only: true
