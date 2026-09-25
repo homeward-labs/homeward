@@ -58,11 +58,12 @@
 | **源码直跑** | 开发机、Linux 主机 | ✅ 可用（开发用） | `python -m src.core.main`，零第三方依赖，用于开发与验证 |
 | **原生 Linux（systemd）** | Debian / Ubuntu / 任意 Linux 主机、旧电脑、物理机 | ⬜ **计划中** | 目标形态之一：一台旧电脑或迷你主机常驻，不走容器 |
 | **OpenWrt / iStoreOS 包** | 软路由 | ⬜ **计划中** | 最有价值的形态（网关位 = 全量视野），优先级高于 NAS 原生包 |
-| **飞牛 OS `.fpk`** | 飞牛 NAS 应用中心 | ⬜ **计划中，未实现** | `fnpk/` 仅含打包配置草稿，未提交审核、未上架 |
+| **飞牛 OS `.fpk`** | 飞牛 NAS 应用中心 | ⬜ **计划中，未实现** | `fnpk/` 仅含打包配置草稿，未提交审核、未上架。但**飞牛的 Docker 形态已可用**（见下节） |
 | **群晖 / 威联通 / 其他 NAS** | 走容器 | ⬜ **计划中** | 优先复用 Docker 形态，暂不做原生套件 |
 
 > ⚠️ 上表中「计划中」的三项**当前都不存在可用产物**。在它们落地前，请使用 Docker Compose 或源码直跑。
 > 不要用 README 里任何一句话推断出"飞牛一键装"已经可用 —— 它还没有。
+> 但飞牛能直接跑 Docker，所以**社区版的 Docker Compose 部署路径在飞牛上已可用**（见 §五-B）。
 
 ---
 
@@ -83,6 +84,67 @@ python -m src.core.main
 
 > 单臂 Docker 形态下只能看到 DNS 层面（设备往哪个域名打电话）；
 > 要看全量流量，请部署为网关位（软路由主路由 / 旁路由）或双网口网桥。
+
+---
+
+## 五-B、飞牛 OS（FnOS）部署与冒烟验收
+
+飞牛是 Debian 系的 NAS，自带 Docker，**社区版可直接以 Docker Compose 跑起来**。
+在飞牛上的形态是「单臂 Docker / 只读日志」——即**只看到 DNS 层**（哪台设备问了哪个域名），
+看不到流量大小与时序。这是诚实的视野上限，不是 bug。
+
+### 1) 部署步骤
+
+```bash
+git clone https://github.com/homeward-labs/homeward
+cd homeward
+
+# 生成一个强口令（务必设置；不设置则用自动随机口令，只打印在日志里）
+openssl rand -hex 16          # 复制这串备用
+
+# 在 docker/ 目录下建 .env（已被 .gitignore 忽略，不会入库）：
+#   —— 注意：docker compose 只从「compose 文件所在目录」读 .env，必须放在 docker/.env
+cp docker/.env.example docker/.env
+# 编辑 docker/.env，把 HOMEWARD_AUTH_TOKEN= 填上上面那串
+
+docker compose -f docker/docker-compose.yaml up -d --build
+
+# 在飞牛的容器设置里确认宿主机端口 9595 已映射；浏览器开 http://<飞牛IP>:9595
+```
+
+compose 已按「常年常驻在低配 NAS」做了加固：`read_only` 根文件系统、`cap_drop ALL`、
+内存上限 128M / 0.5 核、健康检查探 `/api/health`。改动镜像内容或提权都做不到。
+
+### 2) 飞牛的 DNS 日志在哪
+
+飞牛自带 DNS 不一定走 dnsmasq，所以「面板为空」在刚部署时是**预期**的。让它真正看到数据有两种办法：
+
+- 让飞牛的 DNS 走 dnsmasq，并配置 `log-queries=extra` + `log-facility=/var/log/dnsmasq.log`
+  （最常见的家庭 DNS 方案）；compose 已默认只读挂载该路径。
+- 或在 `docker/.env` 设 `DNS_LOG_PATH=/实际/路径`，它会自动传给服务的 `--dns-log`。
+
+若暂时没有 DNS 日志，面板为空、并在「盲区」视图提示「DNS 采集器不可用」——属预期，
+不是故障。界面「采集激活」一栏会如实显示当前到底哪个采集器在干活。
+
+### 3) 冒烟验收（部署后必做）
+
+```bash
+# 先校验 compose 配置合法（避免 YAML 手滑）
+docker compose -f docker/docker-compose.yaml config >/dev/null && echo "compose OK"
+
+# 跑冒烟脚本：验服务存活、鉴权门禁、各只读接口、采集激活情况
+python scripts/smoke.py --base http://<飞牛IP>:9595 --token <HOMEWARD_AUTH_TOKEN>
+
+# 资源占用（设计目标 < 100 MB / 近零 CPU）—— 这才是「资源占用验证」的实测
+docker stats homeward
+```
+
+冒烟脚本（`scripts/smoke.py`，纯标准库、跨平台）会输出：服务是否存活、未带口令访问
+受保护接口是否 401（门禁生效）、带口令后各接口是否可读、以及 `采集激活` 字段
+（DNS / conntrack 哪个在干活、哪个记为盲区）。
+
+> 本仓库的 Windows 开发机**装不了 Docker**，故镜像构建与 `docker stats` 实测必须在飞牛执行；
+> 但冒烟脚本本身已在本地用真实服务跑通（RC=0），逻辑正确性已验证。
 
 ---
 

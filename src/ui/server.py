@@ -395,13 +395,15 @@ def _warn_if_exposed(host: str, auth: "WebAuth | None" = None) -> None:
 
 
 def main(argv=None) -> int:
-    # 环境变量兜底：容器里用 HOST / PORT 配（docker-compose 与 Dockerfile 都这么设），
-    # 命令行参数优先。这样 CMD 可以保持 exec 形式，不必为了展开变量退化成 shell 形式。
+    # 环境变量兜底：容器里用 HOST / PORT / DNS_LOG_PATH 配（docker-compose 与
+    # Dockerfile 都这么设），命令行参数优先。这样 CMD 可以保持 exec 形式，
+    # 不必为了展开变量退化成 shell 形式（shell 形式会让信号传不到进程、优雅退出失效）。
     env_host = os.environ.get("HOST") or DEFAULT_HOST
     try:
         env_port = int(os.environ.get("PORT") or DEFAULT_PORT)
     except ValueError:
         env_port = DEFAULT_PORT
+    env_dns_log = os.environ.get("DNS_LOG_PATH") or None
 
     ap = argparse.ArgumentParser(description="家卫 Web UI（社区版：只读）")
     ap.add_argument("--host", default=env_host,
@@ -410,8 +412,9 @@ def main(argv=None) -> int:
                     help=f"监听端口（默认 {DEFAULT_PORT}）")
     ap.add_argument("--demo", action="store_true",
                     help="灌入演示数据（用于界面自测，生产路径请勿使用）")
-    ap.add_argument("--dns-log", default=None,
-                    help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测）")
+    ap.add_argument("--dns-log", default=env_dns_log,
+                    help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测，"
+                         "或由环境变量 DNS_LOG_PATH 指定）")
     ap.add_argument("--auth-token", default=None,
                     help="Web UI 登录口令（不填则用 HOMEWARD_AUTH_TOKEN，"
                          "二者皆无则自动生成随机口令并打印到启动日志）")
