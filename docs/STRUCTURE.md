@@ -12,11 +12,9 @@ homeward/
 │   ├── README.md                    # 项目总览
 │   ├── STRUCTURE.md                 # 本文档
 │   ├── ARCHITECTURE.md              # 架构设计
-│   ├── BLOCKING.md                  # 阻断策略（标准版）+ 撤销契约语义
-│   ├── COMPETITORS.md               # 竞品分析
 │   ├── DEPLOYMENT.md                # 部署形态与安装方式（接入方式/平台/装法 三维度）
-│   ├── EDITIONS.md                  # 版本矩阵与开源边界（唯一权威）
-│   └── ROADMAP.md                   # 路线图与社区版 MVP 计划
+│   └── （商业/策略文档：版本矩阵、竞品分析、阻断策略、路线图、进度、同步约定
+│       已迁出本公开仓库，存于维护者私有目录，不随仓库发布）
 │
 ├── src/
 │   ├── core/                        # 核心服务
@@ -78,8 +76,6 @@ homeward/
 │   └── workflows/
 │       └── open-boundary.yml        # CI 兜底：重扫全历史 + 跑社区版单测
 │
-├── reports/                         # 阶段性报告
-│   └── 03-revert-contract-2026-09-24.md
 │
 ├── tools/
 │   ├── asn_hit_test.py              # ASN 命中率测试脚本
@@ -115,7 +111,7 @@ homeward/
 
 > **开源边界**：采集与执行的开源属性**并不相同** —— 采集器属于社区版开源，落在
 > `src/collectors/`；执行器与 Tier 3 深度抓包属于标准版闭源，落在 `src/enforcers/`（已 gitignore）。
-> 依据见 `docs/EDITIONS.md` 与 `docs/ROADMAP.md`「采集分层」。
+> 依据见 私有《版本与能力归属》《路线图》文档的「采集分层」章节。
 
 ### 能力协商层（Capabilities）
 
@@ -135,7 +131,7 @@ from abc import ABC, abstractmethod
 # 「30 分钟内可一键撤销」的两个时间字段，语义**互不推导**：
 #   redeemable_until —— 撤销按钮/API 的截止时间（到期不解除规则）
 #   auto_release_at  —— 规则自动解除时间（None = 持久生效，直到显式撤销）
-# （旧字段 expires_at 已废弃并移除，见 docs/BLOCKING.md 第四节）
+# （旧字段 expires_at 已废弃并移除，见私有《阻断与撤销》文档第四节）
 
 @dataclass(frozen=True)
 class Capabilities:
