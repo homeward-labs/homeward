@@ -17,7 +17,11 @@
 
 services:
   homeward:
-    build: .
+    # 构建上下文必须是「项目根目录」（requirements.txt / src/ 都在那里），
+    # 而非 compose 文件所在的 docker/ 目录；Dockerfile 用 dockerfile 字段显式指定。
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: homeward
     restart: unless-stopped
 
