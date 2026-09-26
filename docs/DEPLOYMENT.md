@@ -272,6 +272,28 @@ dnsmasq 开 `log-queries=extra` + `log-facility=/var/log/dnsmasq.log`（容器�
 若要做网关位抓包（连接五元组 / 字节数），用 nftables / NFLOG 适配器（见 §三 网关位行）。
 社区版只"看见"，不拦截；拦截是标准版能力。
 
+### 2.5) 一条命令两种形态（现在就能用）
+
+家卫在 iStoreOS 上的"一条命令"分两种，**区别在于宿主机有没有现成的 dnsmasq**：
+
+| 形态 | 适用 | 命令 | 说明 |
+|---|---|---|---|
+| **单容器·iStoreOS 专属** | iStoreOS / OpenWrt（系统已有 dnsmasq，占着 53 端口） | `docker compose -f docker/docker-compose.istoreos.yml up -d` | 只起家卫，只读挂载系统 `/tmp/dnsmasq.log`。**iStoreOS 用这个** |
+| **双容器·通用** | 裸 Linux / 云主机 / 某些 NAS（宿主机没有 dnsmasq） | `docker compose -f docker/docker-compose.full.yml up -d --build` | 同一条命令把 `dnsmasq` + `homeward` 两个容器一起拉起并配好，日志经命名卷共享给家卫只读 |
+
+> ⚠️ **为什么 iStoreOS 不能"把 dnsmasq 也加进容器"**：iStoreOS 本身就是路由器，系统 dnsmasq 已经占着 53 端口。
+> 再起一个 dnsmasq 容器必抢端口冲突。所以 iStoreOS 用单容器读系统日志；双容器版只给"宿主机没 dnsmasq"的场景。
+
+**iStoreOS 前置（一次性，开启系统 dnsmasq 日志到文件）**：
+- 图形：iStoreOS 管理页 → 网络 → DHCP/DNS → 常规设置 →「日志设施」填 `/tmp/dnsmasq.log` → 保存应用；
+- 或终端：`uci set dhcp.@dnsmasq[0].logfacility='/tmp/dnsmasq.log' && uci commit dhcp && /etc/init.d/dnsmasq restart`；
+- 验证：`cat /tmp/dnsmasq.log` 能看到 `query[A] ... from <IP>` 行即成功。
+- 若你的 iStoreOS 把日志写到别处，把 `docker-compose.istoreos.yml` 里 volumes 的源路径与 `DNS_LOG_PATH` 一起改成实际位置。
+  （即便不改，家卫代码也已把 `/tmp/dnsmasq.log` 纳入默认探测路径，自动兜底。）
+
+**双容器 dnsmasq 的安全提醒**：它把 53 端口暴露到宿主机，等于这台机器成了局域网 DNS 服务器。
+仅限可信内网；暴露公网务必用防火墙限制来源，避免成为开放解析器被滥用。
+
 ### 3) 路线：iStoreOS 商店一键包（最高优先级）
 
 相比 NAS 原生包，iStoreOS 商店包是**最高优先级**的待办：做成商店里一键安装的应用，

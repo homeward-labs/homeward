@@ -1,0 +1,70 @@
+# iStoreOS / OpenWrt 专属单容器形态 —— 一条命令挂系统 dnsmasq 日志（不自带 dnsmasq）
+#
+# 为什么是单容器：iStoreOS 本身就是路由器，系统 dnsmasq 已占着 53 端口在跑。
+#   家卫只需要**只读挂载 iStoreOS 那个 dnsmasq 的日志**即可，再起一个 dnsmasq 容器会抢 53 端口冲突。
+#   本 compose 只起家卫一个容器，挂载 iStoreOS 的 /tmp/dnsmasq.log（OpenWrt 默认 log-facility 落点）。
+#
+# 用法（一条命令）：
+#   docker compose -f docker/docker-compose.istoreos.yml up -d
+#   # 浏览器开 http://<iStoreOS IP>:9595
+#
+# 前置（一次性，在 iStoreOS 上开启 dnsmasq 日志到文件）：
+#   方式 A（图形）：iStoreOS 管理页 → 网络 → DHCP/DNS → 常规设置 → 把「日志设施」填为 /tmp/dnsmasq.log → 保存应用
+#   方式 B（命令行）：在 iStoreOS 终端执行
+#     uci set dhcp.@dnsmasq[0].logfacility='/tmp/dnsmasq.log'
+#     uci commit dhcp && /etc/init.d/dnsmasq restart
+#   确认产生日志：logread -e dnsmasq 或 cat /tmp/dnsmasq.log 能看到 query[...] 行即可。
+#   若你的 iStoreOS 把日志写到了别处，把下面 volumes 的源路径和 DNS_LOG_PATH 一起改成实际位置。
+
+services:
+  homeward:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: homeward
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+          pids: 128
+        reservations:
+          cpus: "0.10"
+          memory: 32M
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; s=urllib.request.urlopen('http://127.0.0.1:9595/api/health').status; sys.exit(0 if s==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # iStoreOS / OpenWrt 系统 dnsmasq 日志（只读）。默认 /tmp/dnsmasq.log；
+      # 若你改过 logfacility，把这里的源路径一并改掉。
+      - /tmp/dnsmasq.log:/tmp/dnsmasq.log:ro
+    environment:
+      - HOST=0.0.0.0
+      - PORT=9595
+      - LOG_LEVEL=info
+      - PYTHONDONTWRITEBYTECODE=1
+      - KNOWLEDGE_BASE_AUTO_UPDATE=false
+      - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800
+      - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
+      # 显式指向 iStoreOS 的日志落点（也可靠代码自动探测，这里写死最稳）
+      - DNS_LOG_PATH=/tmp/dnsmasq.log
+    ports:
+      - "9595:9595"
+    command: ["python", "-m", "src.ui.server"]

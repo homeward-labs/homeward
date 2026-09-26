@@ -1,0 +1,96 @@
+# 双容器形态（dnsmasq + 家卫）—— 一条命令把两个镜像都拉起来并配好
+#
+# 适用：宿主机本身没有 dnsmasq 的环境（裸 Linux 主机 / 云主机 / 某些 NAS）。
+#       iStoreOS / OpenWrt / 飞牛 等已有系统 dnsmasq 的环境，请用 docker-compose.istoreos.yml
+#       或 docker-compose.yaml（单容器），直接挂系统日志，不要再起一个 dnsmasq 抢 53 端口。
+#
+# 用法（一条命令）：
+#   docker compose -f docker/docker-compose.full.yml up -d --build
+#   # 浏览器开 http://<本机IP>:9595
+#
+# 原理：dnsmasq 容器把查询日志写到命名卷 dnsmasq-log 的 /var/log/dnsmasq.log，
+#       家卫容器以只读方式挂载同一卷的该文件 —— 两个容器通过卷共享日志，家卫不碰 53 端口。
+#
+# 安全提醒：dnsmasq 容器把 53 端口暴露到了宿主机，等于这台机器成了局域网的 DNS 服务器。
+#           仅限可信内网使用；若暴露到公网，请务必用防火墙限制来源，避免成为开放解析器被滥用。
+
+services:
+  dnsmasq:
+    build:
+      context: ./dnsmasq
+      dockerfile: Dockerfile
+    container_name: homeward-dnsmasq
+    restart: unless-stopped
+    # 绑定 53 需要基础网络能力；不给其它权限（日志只写卷，不碰宿主机网络配置）。
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - ./dnsmasq/dnsmasq.homeward.conf:/etc/dnsmasq.conf:ro
+      - dnsmasq-log:/var/log
+    healthcheck:
+      # dnsmasq 起来后本地解析自询应能成功（用 alpine 自带 drill 较稳，失败降级为 true 不阻断）
+      test: ["CMD-SHELL", "drill soa . @127.0.0.1 >/dev/null 2>&1 || nslookup -type=soa . 127.0.0.1 >/dev/null 2>&1 || exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  homeward:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: homeward
+    restart: unless-stopped
+    depends_on:
+      dnsmasq:
+        condition: service_healthy
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+          pids: 128
+        reservations:
+          cpus: "0.10"
+          memory: 32M
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; s=urllib.request.urlopen('http://127.0.0.1:9595/api/health').status; sys.exit(0 if s==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # 只读共享 dnsmasq 的查询日志（关键）：家卫的唯一数据源
+      - dnsmasq-log:/var/log/dnsmasq.log:ro
+    environment:
+      - HOST=0.0.0.0
+      - PORT=9595
+      - LOG_LEVEL=info
+      - PYTHONDONTWRITEBYTECODE=1
+      - KNOWLEDGE_BASE_AUTO_UPDATE=false
+      - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800
+      - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
+      # 双容器里日志就在 /var/log/dnsmasq.log（dnsmasq 容器写、家卫读同一卷）
+      - DNS_LOG_PATH=/var/log/dnsmasq.log
+    ports:
+      - "9595:9595"
+    command: ["python", "-m", "src.ui.server"]
+
+volumes:
+  dnsmasq-log:

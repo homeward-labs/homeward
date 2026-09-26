@@ -130,6 +130,8 @@ class DnsLogCollector(Collector):
     DEFAULT_LOG_PATHS = (
         "/var/log/dnsmasq.log",
         "/var/log/dnsmasq/dnsmasq.log",
+        # OpenWrt / iStoreOS 的 dnsmasq 默认 log-facility 落点（/var/log 在 OpenWrt 上多为 tmpfs 软链）
+        "/tmp/dnsmasq.log",
     )
 
     def __init__(
