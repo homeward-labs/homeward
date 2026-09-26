@@ -33,6 +33,38 @@
 
 ---
 
+## 二-B、目录组织原则与平台速查表
+
+### 1) 为什么**不**按品牌建目录（飞牛/群晖/威联通/iStoreOS/爱快/RouterOS/Ubuntu 各一个）
+
+家卫的部署差异本质只有「**数据源类型**」，不是品牌。所有平台收敛为 3 类接入形态：
+
+1. 系统**已有 dnsmasq**，日志在 `/var/log/dnsmasq.log`（Debian 系 NAS / 主机）
+2. 系统**已有 dnsmasq**，日志在 `/tmp/dnsmasq.log`（OpenWrt / iStoreOS）
+3. 系统**没有 dnsmasq**（裸 Linux / 云主机）→ 用自带 dnsmasq 容器的双容器形态
+
+品牌差异只是「**日志路径 / 如何把日志开到文件**」，沉淀到本文档各平台章节（§五-B 飞牛、§五-C iStoreOS），**不另开目录**。这是 GitHub 上 Docker 项目的正规做法：
+
+- 单一 `docker/` 目录，按「接入形态」命名多个 compose 变体（`docker-compose.yaml` / `docker-compose.istoreos.yml` / `docker-compose.full.yml`）；
+- 某形态专属的构建资源就近放进子目录（如 `docker/dnsmasq/` 放双容器用的 dnsmasq 镜像与配置）；
+- 品牌/固件的开启步骤写在文档章节，而非代码目录。
+
+> 另：iStoreOS 商店 ipk、飞牛 `.fpk`、群晖 `.spk` 这类**原生商店包**属于独立维度（打包形态，非 Docker 形态），应放 `packages/` 或独立仓库，不混进 `docker/`。
+
+### 2) 平台 → 形态速查表
+
+| 平台 | dnsmasq 日志落点 | 选用 compose | 文档章节 |
+|---|---|---|---|
+| 飞牛 FNOS | 自装 dnsmasq，默认 `/var/log/dnsmasq.log` | `docker-compose.yaml` | §五-B |
+| 群晖 Synology | `/var/log/dnsmasq.log`（需先装 dnsmasq） | `docker-compose.yaml` | （同 Debian 系） |
+| 威联通 QNAP | 视容器 / DNS 配置 | `docker-compose.yaml` 或 `.full.yml` | — |
+| iStoreOS / OpenWrt | `/tmp/dnsmasq.log` | `docker-compose.istoreos.yml` | §五-C |
+| 爱快 iKuai | 无 dnsmasq，走自身 DNS + syslog 导出 | 社区版暂不支持（待标准版 syslog 接入） | — |
+| RouterOS (MikroTik) | 无 dnsmasq，用 container + 自身 DNS | 社区版暂不支持 | — |
+| 裸 Linux / 云主机 | 无 | `docker-compose.full.yml` | §2.5 |
+
+> 社区版的核心约束：**只认 dnsmasq 查询日志这一种数据源**。凡系统不以 dnsmasq 为解析点（爱快 / RouterOS / 某些 NAS）或无 dnsmasq 日志可挂的，社区版先不覆盖；这些走标准版的 syslog / 流量接入。
+
 ## 三、接入方式对照表（决定能看到多少）
 
 | 接入方式 | 典型拓扑 | 能看见 | 看不见（盲区） | 适用设备 |
