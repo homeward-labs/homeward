@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import signal
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -38,11 +39,75 @@ from rule_engine.engine import (
 )
 from ai.analyzer import AIAnalyzer, AnalysisRequest, AnalysisResult
 from knowledge_base.updater import KnowledgeBaseUpdater
-from inventory.device import DeviceRegistry
-from inventory.attribution import DomainAttribution
+from inventory.device import Device, DeviceRegistry
+from inventory.attribution import AttributionResult, DomainAttribution
 from analysis.behavior import BehaviorDetector
-from analysis.alerting import AlertCenter
-from adapters.sqlite_registry import SqliteActionRegistry
+from analysis.alerting import Alert, AlertCenter
+from adapters.sqlite_registry import SqliteActionRegistry, SqliteObservationStore
+
+
+# ---------------------------------------------------------------- 观测状态序列化
+
+# 设备 / 归属结果 / 告警 在「内存对象 ↔ 可持久化字典」之间互转的纯函数。
+# 集中放在这里，便于快照持久化与报告导出共用，也方便做版本迁移。
+
+def _device_to_state(dev: "Device") -> dict:
+    return {
+        "key": dev.key,
+        "mac": dev.mac,
+        "ips": sorted(dev.ips),
+        "hostname": dev.hostname,
+        "vendor": dev.vendor,
+        "vendor_cn": dev.vendor_cn,
+        "device_type": dev.device_type,
+        "type_source": dev.type_source,
+        "first_seen": dev.first_seen,
+        "last_seen": dev.last_seen,
+        "domains": dict(dev.domains),
+    }
+
+
+def _state_to_device(st: dict) -> "Device":
+    dev = Device(key=st.get("key", ""))
+    dev.mac = st.get("mac")
+    dev.ips = set(st.get("ips") or [])
+    dev.hostname = st.get("hostname")
+    dev.vendor = st.get("vendor")
+    dev.vendor_cn = st.get("vendor_cn")
+    dev.device_type = st.get("device_type", "unknown")
+    dev.type_source = st.get("type_source", "none")
+    dev.first_seen = st.get("first_seen", 0.0) or 0.0
+    dev.last_seen = st.get("last_seen", 0.0) or 0.0
+    dev.domains = dict(st.get("domains") or {})
+    return dev
+
+
+def _attr_result_to_state(r: "AttributionResult") -> dict:
+    return {
+        "domain": r.domain,
+        "organization": r.organization,
+        "category": r.category,
+        "confidence": r.confidence,
+        "description": r.description,
+        "action": r.action,
+        "side_effects": list(r.side_effects),
+        "matched_domain": r.matched_domain,
+        "matched_by": r.matched_by,
+    }
+
+
+def _state_to_attr_result(st: dict) -> "AttributionResult":
+    return AttributionResult(
+        domain=st.get("domain", ""),
+        organization=st.get("organization"),
+        category=st.get("category", "unknown"),
+        confidence=st.get("confidence", "none"),
+        description=st.get("description", ""),
+        action=st.get("action", "allow"),
+        side_effects=list(st.get("side_effects") or []),
+        matched_domain=st.get("matched_domain"),
+        matched_by=st.get("matched_by", "none"),
+    )
 
 
 class HomewardService:
@@ -414,6 +479,87 @@ class HomewardService:
             "alerts_by_severity": self.alert_center.counts_by_severity(),
             "behaviors_supported": len(self.behavior_matcher.supported_rules),
             "behaviors_unsupported": len(self.behavior_matcher.unsupported_rules),
+        }
+
+    # ---------------------------------------------------------------- 观测状态持久化
+
+    def snapshot_observations(self) -> dict:
+        """导出当前观测状态（仅用户自己的遥测），供持久化 / 报告复用。
+
+        不含知识库：这里只用到了「用户观测到的域名 + 其在本地查到的归属结论」
+        （即 :class:`AttributionResult` 里的组织名），不导出知识库本体。
+        """
+        reg = self.device_registry
+        attr_cache = [_attr_result_to_state(r) for r in self.attribution._cache.values()]
+        return {
+            "version": 1,
+            "saved_at": time.time(),
+            "devices": {k: _device_to_state(d) for k, d in reg.devices.items()},
+            "attribution_cache": attr_cache,
+            "unknown_domains": sorted(self.stats["unknown_domains"]),
+            "alerts": [a.to_dict() for a in self.alert_center.active()],
+        }
+
+    def restore_observations(self, state: dict) -> int:
+        """从快照恢复观测状态（合并式：不覆盖系统刚加载的设备 / 租约）。
+
+        返回恢复的设备 + 告警数量（用于日志）。知识库本体不参与还原。
+        """
+        if not state:
+            return 0
+        reg = self.device_registry
+        restored_devices = 0
+        for k, st in (state.get("devices") or {}).items():
+            if k in reg.devices:
+                continue  # 系统已加载的设备（如当前 DHCP 租约）优先，避免覆盖
+            reg.devices[k] = _state_to_device(st)
+            restored_devices += 1
+        reg.reindex()
+
+        # 归属缓存：合并（已存在的覆盖）
+        for st in (state.get("attribution_cache") or []):
+            r = _state_to_attr_result(st)
+            self.attribution._cache[r.domain] = r
+
+        # 未知域名：取并集
+        self.stats["unknown_domains"] |= set(state.get("unknown_domains") or [])
+
+        # 告警：合并（已存在的跳过）
+        restored_alerts = 0
+        for d in (state.get("alerts") or []):
+            aid = d.get("alert_id")
+            if not aid or aid in self.alert_center._alerts:
+                continue
+            try:
+                self.alert_center._alerts[aid] = Alert(**d)
+                restored_alerts += 1
+            except (TypeError, KeyError):
+                logger.warning("跳过一条无法还原的告警快照：%s", aid)
+        logger.info("已恢复观测快照：设备 %d 台、告警 %d 条",
+                    restored_devices, restored_alerts)
+        return restored_devices + restored_alerts
+
+    def export_report(self) -> dict:
+        """导出一份「观测报告」结构化数据 —— 只含用户自己的观测遥测。
+
+        安全边界（见 open-core 约定）：**绝不 Dump 知识库**（不输出 ``domains.csv`` /
+        ``behaviors.json`` / ``oui`` 全表），也不提供「浏览全部已知域名」接口。
+        报告里出现的归属结论（组织名 / 类别）只是用户自己观测到的域名经本地查询后返回的
+        标签，不构成知识库导出。
+        """
+        return {
+            "report": {
+                "generated_at": time.time(),
+                "edition": "community",
+                "scope": "用户自己的观测遥测（不含知识库）",
+            },
+            "stats": self.get_stats(),
+            "coverage": self.attribution_coverage(),
+            "devices": self.get_devices(),
+            "destinations": self.get_destinations(),
+            "unknown_domains": self.get_unknown_domains(),
+            "alerts": self.get_alerts(),
+            "blind_spots": self.get_blind_spots(),
         }
 
     def _load_suggestions(self):

@@ -451,6 +451,17 @@ class DeviceRegistry:
     def list_devices(self) -> list[Device]:
         return sorted(self.devices.values(), key=lambda d: d.last_seen, reverse=True)
 
+    def reindex(self) -> None:
+        """从 ``devices`` 重建 IP → 设备主键 的索引。
+
+        设备经快照恢复（重启持久化）后 ``_ip_index`` 是空的，必须重算一次，
+        否则 ``get_by_ip`` / ``observe_ip`` 会把同一台设备当成新 IP 重复建档。
+        """
+        self._ip_index.clear()
+        for dev in self.devices.values():
+            for ip in dev.ips:
+                self._ip_index[ip] = dev.key
+
     def blind_spots(self) -> list[str]:
         """
         当前识别能力的盲区清单 —— 直接给 UI 用。

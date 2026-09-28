@@ -328,6 +328,41 @@ function renderBlind() {
   </div>`;
 }
 
+function renderImport() {
+  return `
+    <div class="section">
+      <h2>离线日志导入</h2>
+      <div class="note">把一段 dnsmasq 查询日志或 conntrack 快照（或两者混合）粘贴 / 上传进来，
+        家卫会离线回放成观测，走与实时采集完全相同的分析链路。无需把家卫串进网络、也无需给读日志权限，
+        就能先体验「看见」能力。日志只在你本机分析，不会上传。</div>
+      <div class="card" style="margin-top:12px">
+        <div class="row" style="margin-bottom:10px">
+          <input class="field" id="import-file" type="file"
+            accept=".log,.txt,text/plain" style="flex:1;min-width:240px">
+        </div>
+        <textarea class="field" id="import-log" rows="8"
+          placeholder="在此粘贴 dnsmasq 查询日志（如：Jun 1 12:00:01 dnsmasq[123]: query[A] example.com from 192.168.1.50）或 conntrack 快照行，或两者混合"></textarea>
+        <div class="item-foot" style="margin-top:10px">
+          <button class="btn" type="button" data-import-run>开始分析</button>
+          <span class="small muted" id="import-result"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>导出观测报告</h2>
+      <div class="note">导出的报告只含你自己的观测遥测（设备、去向、未知域名、告警、盲区）。
+        知识库在服务器端，客户端不会导出或抓取，也不提供「浏览全部已知域名」功能。</div>
+      <div class="card" style="margin-top:12px">
+        <div class="row">
+          <button class="btn" type="button" data-report="markdown">导出观测报告（Markdown）</button>
+          <button class="btn" type="button" data-report="json">导出观测报告（JSON）</button>
+        </div>
+        <div class="small muted" style="margin-top:8px">下载的文件保存在你本地，可离线查看或转发。</div>
+      </div>
+    </div>`;
+}
+
 function renderUpgrade() {
   const lic = state.data.license || {};
   const status = lic.license || {};
@@ -443,6 +478,7 @@ const RENDERERS = {
   unknown: renderUnknown,
   suggestions: renderSuggestions,
   blind: renderBlind,
+  import: renderImport,
   upgrade: renderUpgrade,
 };
 
@@ -553,6 +589,72 @@ document.getElementById("view").addEventListener("click", async (e) => {
       alert("清除失败：" + (err.message || err));
     }
     return;
+  }
+
+  // —— 导入 / 导出 ——
+  const importRun = e.target.closest("[data-import-run]");
+  if (importRun) {
+    const ta = document.getElementById("import-log");
+    const log = (ta && ta.value || "").trim();
+    const result = document.getElementById("import-result");
+    if (!log) { result.textContent = "请先粘贴或上传日志"; return; }
+    importRun.disabled = true;
+    result.textContent = "分析中…";
+    try {
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: log,
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "导入失败");
+      const s = d.stats || {};
+      result.textContent =
+        `完成：解析 ${esc(s.parsed)} 行 → 观测 ${esc(s.flows)} 条，`
+        + `新增设备 ${esc(s.new_devices)} 台、新增告警 ${esc(s.new_alerts)} 条`
+        + (s.truncated ? `（已截断 ${esc(s.truncated)} 行）` : "");
+      await loadAll();
+    } catch (err) {
+      result.textContent = "导入失败：" + (err.message || err);
+    } finally {
+      importRun.disabled = false;
+    }
+    return;
+  }
+
+  const reportBtn = e.target.closest("[data-report]");
+  if (reportBtn) {
+    const fmt = reportBtn.dataset.report;
+    try {
+      const res = await fetch("/api/report?format=" + encodeURIComponent(fmt));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fmt === "json" ? "homeward-report.json" : "homeward-report.md";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("导出失败：" + (err.message || err));
+    }
+    return;
+  }
+});
+
+// 文件选择：把上传的日志读进文本框（不自动上传）
+document.getElementById("view").addEventListener("change", (e) => {
+  const fileInput = e.target.closest("#import-file");
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const ta = document.getElementById("import-log");
+      if (ta) ta.value = reader.result;
+    };
+    reader.readAsText(file);
   }
 });
 
