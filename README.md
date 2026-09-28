@@ -43,6 +43,23 @@
 
 完整对照（接入方式 / 运行平台 / 安装方式三个维度）见 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**。
 
+### ① 先免安装体验：离线日志导入（推荐第一步）
+
+**不用装家卫、不用改网络、不用给任何权限。** 从你现有的路由器 / 软路由上取一段 DNS 查询日志，粘进浏览器就能立刻看到设备外联画像与告警。
+
+```bash
+# 在软路由 / OpenWrt / iStoreOS 上执行（路径二选一，看你的系统把日志写到哪）
+cat /tmp/dnsmasq.log        # OpenWrt / iStoreOS 常见落点
+cat /var/log/dnsmasq.log    # Debian 系常见落点
+```
+
+把输出粘进界面 **导入/导出 → 离线日志分析**，即可看到设备画像与告警，还能导出 Markdown / JSON 观测报告带走。
+离线导入走的是**与实时采集完全相同**的判定链路 —— 看到的就是真实效果，不是演示数据。
+
+> 手头还没有日志？`python -m src.ui.server --demo` 会灌入演示剧本（界面自测用，非真实数据）。
+
+### ② 正式部署：跑在设备上持续观测
+
 ```bash
 # Docker（当前唯一可实际跑起来的方式）
 git clone https://github.com/homeward-labs/homeward
@@ -51,20 +68,16 @@ docker compose up -d
 # 打开 http://<设备IP>:9595
 ```
 
-**其他平台的原生包（`.fpk` / `.ipk` / systemd 单元）目前都是「计划中、未实现」** —— 例如 `fnpk/` 仅含飞牛打包配置草稿，尚未提交审核、也未上架应用中心。在这些产物落地前，请使用上面的 Docker 方式，或直接跑：
+其它平台的原生包（飞牛 `.fpk` / iStoreOS 商店 `.ipk` / systemd 单元）**目前都是「计划中、未实现」** —— `fnpk/` 仅含飞牛打包配置草稿，尚未提交审核、也未上架应用中心。在这些产物落地前请使用 Docker，或直接源码跑：
 
 ```bash
-# 界面自测（灌入演示数据，端口 9595）
-python -m src.ui.server --demo
-# 只跑核心服务演示（命令行输出，不起界面）
-python -m src.core.main
+python -m src.ui.server        # 起界面服务（自动探测本机 dnsmasq 日志）
+python -m src.core.main        # 只跑核心服务（命令行输出，不起界面）
 ```
 
-> 当前版本 **没有鉴权**：把 9595 暴露到不受信任的网络前请先加反代或防火墙限制，
-> 非回环地址启动时会打印告警。采集层接真机数据源是 W5 的工作，
-> 现在界面上的数据来自演示剧本（`--demo`）。
+> **鉴权**：默认无口令（零配置）。把 9595 暴露到不受信任的网络前，请设 `HOMEWARD_AUTH_TOKEN` 开启口令鉴权，或用反代 / 防火墙限制来源；绑非回环地址启动时会打印告警。详见 `docs/DEPLOYMENT.md` §六-B。
 
-> 单网口 Docker 形态下只能看到 DNS 层面（设备往哪个域名打电话）；要看全量流量，请部署为网关位（主路由 / 旁路由）或双网口网桥。
+> **视野取决于接入方式**：单网口 Docker 形态只能看到 DNS 层（设备往哪个域名打电话）；要看全量流量（流量大小 / 时序 / 五元组），请部署为网关位（主路由 / 旁路由）或双网口网桥。看不到的一律在界面「盲区」里如实列出。
 
 ---
 
@@ -72,6 +85,17 @@ python -m src.core.main
 
 - 代码 **MIT**（见 [LICENSE](./LICENSE)）；知识库数据 **CC BY 4.0**（见 [src/knowledge_base/LICENSE](./src/knowledge_base/LICENSE)，**使用须署名**）。
 - **本项目不集成、不复制任何 AGPL 或其他强 Copyleft 协议的代码。** 任何竞品源码仅作产品调研参考、隔离在仓库之外，避免许可证传染。
+
+---
+
+## 参与共建
+
+**最有价值的贡献是补域名归属知识库** —— 家卫「读懂」的能力直接取决于它的覆盖率：
+
+- 发现某个域名被标成「未知」？提一个 [域名归属贡献](.github/ISSUE_TEMPLATE/domain-attribution.yml)，或直接改 `src/knowledge_base/domains.csv` 发 PR。
+- 知识库数据以 **CC BY 4.0** 发布（使用须署名），众包共建、人人可用。
+- 提缺陷 / 建议：见 [Issue 模板](.github/ISSUE_TEMPLATE)；开发约定见 [CONTRIBUTING](.github/CONTRIBUTING.md)。
+- **安全问题请不要开公开 Issue**，按 [SECURITY.md](./SECURITY.md) 私下报告。
 
 ---
 
