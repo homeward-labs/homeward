@@ -1,0 +1,60 @@
+name: tests
+
+# 为什么要单独跑 pytest：
+# test_qr.py 用第三方库 segno 做**矩阵级**正确性比对、用 opencv 做解码校验，
+# 二者都是开发期可选依赖（见 requirements-dev.txt）。若 CI 只装运行时依赖，
+# 这些用例会静默 skip —— 看起来全绿，实则 QR 编码正确性根本没被验证过。
+# 本 workflow 明确装齐开发依赖，把「静默跳过」变成「真的跑了」。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  pytest:
+    name: 单测（含 QR 矩阵比对）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装开发期依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: 运行 pytest
+        run: |
+          python -m pytest tests -q
+
+      - name: 断言 QR 矩阵比对没有被跳过
+        # 关键防线：如果 segno / cv2 没装上，test_qr 会 skip 掉而不是报错，
+        # CI 依然是绿的。这里显式检查跳过数量，为 0 才算通过。
+        run: |
+          python -m pytest tests/test_qr.py -q -rs > /tmp/qr.log 2>&1 || true
+          cat /tmp/qr.log
+          if grep -qE "skipped" /tmp/qr.log; then
+            echo "::error::test_qr.py 出现 skipped —— 开发期依赖未装齐，QR 正确性未验证"
+            exit 1
+          fi
+          echo "OK: QR 矩阵比对用例全部实际执行"
+
+  unittest:
+    name: 单测（stdlib unittest，无第三方依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 不装任何依赖：验证社区版在「只有标准库」的环境下依然可测
+      - name: 运行 unittest
+        run: |
+          python -m unittest discover -s tests -v

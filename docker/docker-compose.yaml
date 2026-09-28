@@ -75,6 +75,13 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 可选：显式指定 dnsmasq 日志路径（覆盖自动探测）；留空走自动探测。
       - DNS_LOG_PATH=${DNS_LOG_PATH:-}
+      # 许可令牌 / 设备标识落盘目录。**必须持久**：容器重建时若丢失，
+      # 设备指纹会漂移 → 已激活的许可显示「设备不符」，用户被迫重新激活。
+      # 这里指向已挂载的 ./data 卷内，随宿主机目录一起持久化。
+      - HOMEWARD_DATA_DIR=/app/data/homeward
+      # 正式许可公钥（构建/发布期注入；留空则用仓库内嵌的开发公钥，仅本地联调可用）。
+      # 对外发布的镜像务必注入，详见 docs/DEPLOYMENT.md §六-B。
+      - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
     ports:
       - "9595:9595"        # Web UI（默认无鉴权，仅限可信局域网；暴露公网请在 .env 设 HOMEWARD_AUTH_TOKEN 启用口令）
     # 生产模式（已接真机数据源）：不传 --demo，服务启动即自动采集 DNS / conntrack

@@ -166,15 +166,18 @@ class ServiceWiresSqliteRegistryTest(unittest.TestCase):
     """HomewardService 默认接线 SQLite 注册表 + 启动恢复"""
 
     def test_service_uses_sqlite_registry(self):
-        svc = HomewardService(config={"load_system_devices": False})
+        # 用临时目录里的 db：既不污染仓库的 data/，也不必在收尾时删仓库里的文件
+        # （HomewardService 支持 actions_db_path 覆盖默认落点）
+        tmp = Path(tempfile.mkdtemp(prefix="homeward_svc_"))
+        self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
+        svc = HomewardService(config={
+            "load_system_devices": False,
+            "actions_db_path": tmp / "actions.db",
+        })
         self.assertIsInstance(svc.action_registry, SqliteActionRegistry)
         # 启动恢复返回列表（可能为空，但类型正确、不崩）
         self.assertIsInstance(svc.action_registry.restore_all(), list)
         svc.action_registry.close()
-        # 清理本次在仓库 data/ 下创建的运行时 db
-        db = Path(__file__).resolve().parent.parent / "data" / "actions.db"
-        if db.exists():
-            db.unlink()
 
 
 if __name__ == "__main__":

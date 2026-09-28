@@ -42,7 +42,7 @@ from core.demo import seed_demo                    # noqa: E402
 from core.import_log import import_log_text        # noqa: E402
 from core.main import HomewardService, ROOT        # noqa: E402
 from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
-from ui.qr import qr_svg                          # noqa: E402
+from ui.qr import qr_svg, max_capacity_bytes      # noqa: E402
 from adapters.sqlite_registry import SqliteObservationStore  # noqa: E402
 from license.store import (                        # noqa: E402
     device_fingerprint,
@@ -50,6 +50,7 @@ from license.store import (                        # noqa: E402
     save_token,
     clear_token,
 )
+from license.verify import assert_production_key   # noqa: E402
 
 logger = logging.getLogger("homeward.ui")
 
@@ -507,11 +508,18 @@ class HomewardHandler(BaseHTTPRequestHandler):
             if not text:
                 self._json(400, {"error": "missing_text"})
                 return
-            if len(text.encode("utf-8")) > 271:   # 字节模式 v10-L 容量上限
-                self._json(400, {"error": "too_long", "max_bytes": 271})
+            # 容量随纠错等级变化（v10：L=271 字节 / M=213 字节）。预检必须按**实际
+            # 使用的等级**算，否则长 URL 会通过检查却在编码时抛 ValueError → 500。
+            ec_level = (query.get("ec") or ["M"])[0].upper()
+            if ec_level not in ("L", "M"):
+                ec_level = "M"
+            limit = max_capacity_bytes(ec_level)
+            if len(text.encode("utf-8")) > limit:
+                self._json(400, {"error": "too_long", "max_bytes": limit,
+                                 "ec_level": ec_level})
                 return
             try:
-                svg = qr_svg(text, ec_level="M")
+                svg = qr_svg(text, ec_level=ec_level)
             except Exception as exc:
                 self._json(400, {"error": "qr_encode_failed", "detail": str(exc)})
                 return
@@ -716,6 +724,15 @@ def main(argv=None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # 许可公钥门禁：仍在使用开发公钥时告警（设 HOMEWARD_REQUIRE_PROD_KEY=1 则拒绝启动）。
+    # 放在鉴权判断之前——这是「付费墙有没有用」的问题，与界面鉴权无关。
+    try:
+        assert_production_key()
+    except RuntimeError as exc:
+        logger.error("%s", exc)
+        print("[错误] " + str(exc))
+        return 2
+
     # 鉴权：默认「零配置即无鉴权」，浏览器直开（开箱即用）。
     # 仅当显式提供了口令（--auth-token 或 HOMEWARD_AUTH_TOKEN）才启用单用户鉴权；
     # 暴露到不可信网络时务必设口令，并用防火墙限制来源 IP。--no-auth 可强制关闭。
@@ -725,7 +742,11 @@ def main(argv=None) -> int:
         if tok:
             auth = WebAuth(token=tok)
 
-    service = HomewardService(config={"load_system_devices": not args.demo})
+    # 演示模式：不加载系统设备，也不落盘（actions.db 同样不写，避免污染生产数据）
+    service = HomewardService(config={
+        "load_system_devices": not args.demo,
+        "actions_db_path": None if args.demo else (ROOT / "data" / "actions.db"),
+    })
 
     # 观测状态持久化：生产模式默认开启（重启不丢设备/告警），演示模式默认关闭
     # （避免把演示数据落进真实数据库）。--no-persist 可强制关闭。

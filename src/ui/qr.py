@@ -117,6 +117,23 @@ def _choose_version(data: bytes, ec_level: str) -> int:
     raise ValueError("数据过长，超出版本 1–10 容量（请缩短内容或改用更短 URL）")
 
 
+def max_capacity_bytes(ec_level: str = "L") -> int:
+    """版本 1–10 在给定纠错等级下能容纳的**最大 UTF-8 字节数**。
+
+    调用方（如 Web API）应拿它做长度预检。注意容量随纠错等级变化很大：
+    v10 在 L 级能装 271 字节，M 级只有 213 字节。若预检用 L 的容量、
+    编码却用 M 级，就会出现「通过了长度检查、编码时抛 ValueError」的 500。
+    """
+    best = 0
+    for (version, level), (_, blocks) in EC_TABLE.items():
+        if level != ec_level:
+            continue
+        # 扣掉 4 位模式指示 + 字符计数位（v≤9 为 8 位，v10 为 16 位）
+        cap = (sum(blocks) * 8 - 4 - _count_bits(version)) // 8
+        best = max(best, cap)
+    return max(best, 0)
+
+
 def _build_codewords(data: bytes, version: int, ec_level: str) -> list:
     """构造完整码字序列（含 RS 纠错 + 交织 + 填充）。"""
     ec_per_block, blocks = EC_TABLE[(version, ec_level)]

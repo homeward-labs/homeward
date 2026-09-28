@@ -15,17 +15,52 @@ segno / cv2 均为开发期可选依赖：未在环境中安装时对应用例�
 import os
 import sys
 
-import pytest
-
 # 让测试能直接 import 位于 src/ui 的 qr.py（纯标准库模块）
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "src", "ui"))
 
 import qr as qr  # noqa: E402
 
-segno = pytest.importorskip("segno")
-cv2 = pytest.importorskip("cv2")
-np = pytest.importorskip("numpy")
+# pytest 是开发期依赖：CI 里「只装标准库」的那个 job 没有它，
+# 此时用 unittest 的跳过机制，避免整个模块因 ImportError 变成硬失败。
+try:
+    import pytest
+
+    def _skip(msg):
+        pytest.skip(msg)
+
+    def _require(mod):
+        return pytest.importorskip(mod)
+except ImportError:  # 仅标准库环境（CI 的 unittest job）
+    import importlib
+    import unittest
+
+    def _skip(msg):
+        raise unittest.SkipTest(msg)
+
+    def _require(mod):
+        try:
+            return importlib.import_module(mod)
+        except ImportError:
+            raise unittest.SkipTest(
+                f"未安装开发期依赖 {mod}（见 requirements-dev.txt）")
+
+# segno 是矩阵级比对的权威基准：缺它则矩阵校验无从谈起，按模块级跳过。
+segno = _require("segno")
+
+
+def _decode_deps():
+    """取解码级校验依赖（opencv / numpy）。
+
+    刻意**不在模块级** importorskip：否则只要漏装 cv2，连 152 例矩阵级比对
+    也会被一起跳过 —— 而矩阵比对才是 QR 正确性的主防线，不能因解码依赖缺失而失去。
+    """
+    try:
+        import cv2
+        import numpy
+        return cv2, numpy
+    except ImportError as exc:
+        _skip(f"缺少解码校验依赖（opencv / numpy）: {exc}")
 
 
 # ───────────────────────── 版本信息 BCH 权威值 ─────────────────────────
@@ -80,7 +115,7 @@ def test_matrix_matches_segno_bit_exact():
 
 
 # ───────────────────────── 解码级校验（健全性） ─────────────────────────
-def _render_png(mat, scale=24, border=6):
+def _render_png(mat, np, scale=24, border=6):
     n = len(mat)
     sz = (n + 2 * border) * scale
     img = np.full((sz, sz), 255, np.uint8)
@@ -95,6 +130,7 @@ def _render_png(mat, scale=24, border=6):
 
 def test_decode_roundtrip_auto_version():
     """自动选型 + 自动掩码：渲染后必须可被 opencv 反解为原文。"""
+    cv2, np = _decode_deps()
     det = cv2.QRCodeDetector()
     urls = [
         "https://h.dev/a",
@@ -104,13 +140,14 @@ def test_decode_roundtrip_auto_version():
     ]
     for u in urls:
         mat = qr.qr_matrix(u)  # 自动版本 + 自动掩码
-        img = _render_png(mat)
+        img = _render_png(mat, np)
         res, _, _ = det.detectAndDecode(img)
         assert res == u, f"解码失败: 期望 {u!r} 实得 {res!r}"
 
 
 def test_decode_roundtrip_forced_version_mask():
     """强制版本/掩码（含 v10-L 奇数前置填充字节的边界）：必须可解。"""
+    cv2, np = _decode_deps()
     det = cv2.QRCodeDetector()
     u = "https://h.dev/a"
     for version in (1, 3, 5, 7, 10):
@@ -119,9 +156,37 @@ def test_decode_roundtrip_forced_version_mask():
                 mat = qr.qr_matrix(u, ec_level=ec, version=version, mask=3)
             except ValueError:
                 continue  # 容量不足，跳过
-            img = _render_png(mat)
+            img = _render_png(mat, np)
             res, _, _ = det.detectAndDecode(img)
             assert res == u, f"v{version} {ec} mask3 解码失败: {res!r}"
+
+
+# ───────────────────────── 容量口径（API 预检用） ─────────────────────────
+def test_max_capacity_bytes_matches_versions():
+    """容量随纠错等级变化：v10 在 L 级 271 字节、M 级 213 字节。
+
+    /api/qr 曾按 L 的容量（271）做预检、却用 M 级编码 —— 长支付 URL 会通过
+    预检然后在编码阶段抛 ValueError，表现为 500。这里把两个等级的容量钉死。
+    """
+    assert qr.max_capacity_bytes("L") == 271
+    assert qr.max_capacity_bytes("M") == 213
+    assert qr.max_capacity_bytes("L") > qr.max_capacity_bytes("M")
+
+
+def test_capacity_limit_is_really_encodable():
+    """取「刚好等于容量上限」的文本，必须真能编码出矩阵（不能差一个字节）。"""
+    for ec in ("L", "M"):
+        cap = qr.max_capacity_bytes(ec)
+        text = "A" * cap
+        mat = qr.qr_matrix(text, ec_level=ec)
+        assert len(mat) == len(qr.qr_matrix("A", ec_level="L")) or len(mat) > 0
+        # 超一个字节必须失败（说明容量口径没有虚高）
+        try:
+            qr.qr_matrix("A" * (cap + 1), ec_level=ec)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{ec} 级容量上限 {cap} 偏保守，与实际不符")
 
 
 def test_module_is_stdlib_only():
