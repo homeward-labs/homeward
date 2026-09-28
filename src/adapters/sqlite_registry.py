@@ -24,6 +24,7 @@ import time
 import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from adapters.base import ActionRegistry, EnforceAction, RevertPayload
 

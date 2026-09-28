@@ -1,0 +1,96 @@
+name: publish
+
+# 多架构镜像发布到 GHCR（ghcr.io/homeward-labs/homeward）。
+#
+# 为什么必须多架构：家卫的目标设备是软路由与 NAS —— x86 小主机是 amd64，
+# 大量 ARM 开发板与 ARM NAS 是 arm64，部分老 NAS 是 armv7。只发 amd64 镜像，
+# 等于把一大半目标设备挡在门外（只能本地 build，对普通用户等于不可用）。
+#
+# 触发：打 v* tag 发布；也支持手动 workflow_dispatch。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write        # 推送到 GHCR 必需
+
+jobs:
+  image:
+    name: 构建并推送多架构镜像
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备 QEMU（跨架构构建）
+        uses: docker/setup-qemu-action@v3
+
+      - name: 准备 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 推导镜像标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # ── 发布门禁 ──
+          # 仓库内嵌的是**开发公钥**，开发私钥存在于本地联调环境：任何人拿到它
+          # 都能签出「验签通过」的许可令牌，付费升级形同虚设。
+          # 因此对外发布的镜像必须注入正式公钥（对应维护者私有目录下的签发私钥）。
+          # 未配置该 secret 时这里传空值 → 镜像仍停留在开发公钥状态，
+          # 服务启动会打印告警；发布前请务必在仓库 Settings → Secrets 配好。
+          build-args: |
+            HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
+
+  verify:
+    name: 校验已发布镜像（amd64）
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 拉取并跑一遍冒烟
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
+          echo "验证镜像：$IMAGE"
+          docker run -d --name homeward-verify -p 9595:9595 \
+            -e HOMEWARD_DATA_DIR=/tmp/homeward "$IMAGE"
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:9595/api/health > /dev/null && break
+            sleep 2
+          done
+          python3 scripts/smoke.py --base http://127.0.0.1:9595 --write
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: 收尾
+        if: always()
+        run: |
+          docker logs homeward-verify || true
+          docker rm -f homeward-verify || true
