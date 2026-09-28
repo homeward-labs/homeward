@@ -6,8 +6,10 @@
 """
 
 import json
+import os
 import re
 import sys
+import tempfile
 import threading
 import unittest
 import urllib.error
@@ -277,6 +279,81 @@ class TestBootstrap(unittest.TestCase):
             self.assertGreater(httpd.server_address[1], 0)
         finally:
             httpd.server_close()
+
+
+# ---------------------------------------------------------------- 升级 / 许可接口（Task #12）
+
+class TestUpgradeApi(ServerTestCase):
+    """升级面板接口：/api/license/status、/api/qr、/api/activate、/api/license/deactivate。
+
+    许可文件写入临时目录（HOMEWARD_DATA_DIR），不污染用户主目录；用例结束即清理。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._prev_data_dir = os.environ.get("HOMEWARD_DATA_DIR")
+        cls._tmp = tempfile.mkdtemp(prefix="homeward-lic-")
+        os.environ["HOMEWARD_DATA_DIR"] = cls._tmp
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._prev_data_dir is None:
+            os.environ.pop("HOMEWARD_DATA_DIR", None)
+        else:
+            os.environ["HOMEWARD_DATA_DIR"] = cls._prev_data_dir
+        import shutil
+        shutil.rmtree(cls._tmp, ignore_errors=True)
+        super().tearDownClass()
+
+    def test_license_status_shape(self):
+        d = self.get_json("/api/license/status")
+        self.assertEqual(d["edition"]["edition"], "community")
+        self.assertIn("license", d)
+        self.assertIn("order_url", d)
+        self.assertFalse(d["license"]["valid"])
+        self.assertEqual(d["license"]["reason"], "none")
+
+    def test_qr_returns_svg(self):
+        text = "https://pay.homeward.dev/order?o=WX20260928"
+        status, headers, body = self.get("/api/qr?text=" + urllib.parse.quote(text))
+        self.assertEqual(status, 200)
+        self.assertIn("image/svg+xml", headers.get("Content-Type", ""))
+        self.assertIn(b"<svg", body)
+        self.assertIn(b"</svg>", body)
+
+    def test_qr_too_long(self):
+        big = "x" * 300
+        req = urllib.request.Request(self.base + "/api/qr?text=" + urllib.parse.quote(big))
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=10)
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_qr_missing_text(self):
+        self.assertEqual(self.status_of("/api/qr"), 400)
+
+    def test_activate_garbage_token(self):
+        # 无效令牌仍会被保存（便于离线查看），但 status 标记为无效；端点本身返回 200。
+        data = urllib.parse.urlencode({"token": "not-a-valid-token.xyz"}).encode()
+        req = urllib.request.Request(self.base + "/api/activate", data=data, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        self.assertTrue(d["saved"])
+        self.assertFalse(d["status"]["valid"])
+
+    def test_write_method_constraints(self):
+        """只读接口 POST 必须 405；仅写接口 GET 必须 405。"""
+        self.assertEqual(self.status_of("/api/license/status", method="POST"), 405)
+        self.assertEqual(self.status_of("/api/qr", method="POST"), 405)
+        self.assertEqual(self.status_of("/api/activate", method="GET"), 405)
+        self.assertEqual(self.status_of("/api/license/deactivate", method="GET"), 405)
+
+    def test_deactivate_clears(self):
+        req = urllib.request.Request(self.base + "/api/license/deactivate",
+                                     data=b"", method="POST")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        self.assertTrue(d["cleared"])
 
 
 if __name__ == "__main__":

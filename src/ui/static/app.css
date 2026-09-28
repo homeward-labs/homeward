@@ -276,6 +276,45 @@ td.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-
 /* 表格在窄屏下横向滚动，避免把卡片挤成一列 */
 .scroll-x { overflow-x: auto; }
 
+/* ---------------------------------------------------------- 表单（升级面板） */
+
+.field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--text);
+  resize: vertical;
+}
+.field:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+
+.tier {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  text-align: center;
+}
+.tier-name { font-weight: 600; font-size: 15px; }
+.tier-dur { color: var(--brand); font-weight: 600; margin-top: 2px; }
+.tier-note { margin-top: 4px; }
+
+/* 付款二维码：纯白底，便于手机识别 */
+.qr-box {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 40px;
+}
+.qr-img { width: 220px; height: 220px; image-rendering: pixelated; }
+
 @media (max-width: 640px) {
   .topbar { flex-wrap: wrap; }
   .stat .v { font-size: 20px; }

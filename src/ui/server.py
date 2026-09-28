@@ -40,6 +40,13 @@ sys.path.insert(0, str(SRC_DIR))
 from core.demo import seed_demo                    # noqa: E402
 from core.main import HomewardService              # noqa: E402
 from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
+from ui.qr import qr_svg                          # noqa: E402
+from license.store import (                        # noqa: E402
+    device_fingerprint,
+    status as license_status,
+    save_token,
+    clear_token,
+)
 
 logger = logging.getLogger("homeward.ui")
 
@@ -259,7 +266,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
         # 这里把只读性做成接口契约，而不是靠前端自觉。
         if path in ("/api/health", "/api/overview", "/api/devices", "/api/destinations",
                     "/api/alerts", "/api/suggestions", "/api/unknown-domains",
-                    "/api/blind-spots", "/api/domain") and method not in ("GET", "HEAD"):
+                    "/api/blind-spots", "/api/domain", "/api/license/status", "/api/qr"
+                    ) and method not in ("GET", "HEAD"):
             self._json(405, {"error": "method_not_allowed", "need": "GET"})
             return
 
@@ -343,6 +351,64 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 return
             new = svc.run_behavior_scan()
             self._json(200, {"new_alerts": len(new), "alerts": svc.get_alerts()})
+            return
+
+        # —— 升级 / 许可（Task #12）——
+        # 社区版只做"看见 + 升级闸门骨架"：展示状态、出付款二维码、导入并本地校验许可。
+        # 真正的签名私钥在服务端（闭源），客户端仅用内嵌公钥验签（纯标准库）。
+        if path == "/api/license/status":
+            fp = device_fingerprint()
+            self._json(200, {
+                "edition": EDITION_INFO,
+                "license": license_status(expected_device_fp=fp),
+                # 付款/订单页 URL 由服务端下发（可经 HOMEWARD_ORDER_URL 配置），
+                # 前端不硬编码任何外部 URL，便于私有化部署改写。
+                "order_url": os.environ.get(
+                    "HOMEWARD_ORDER_URL", "https://pay.homeward.dev/order"),
+            })
+            return
+
+        if path == "/api/qr":
+            text = (query.get("text") or [""])[0]
+            if not text:
+                self._json(400, {"error": "missing_text"})
+                return
+            if len(text.encode("utf-8")) > 271:   # 字节模式 v10-L 容量上限
+                self._json(400, {"error": "too_long", "max_bytes": 271})
+                return
+            try:
+                svg = qr_svg(text, ec_level="M")
+            except Exception as exc:
+                self._json(400, {"error": "qr_encode_failed", "detail": str(exc)})
+                return
+            self._send(200, svg.encode("utf-8"), "image/svg+xml")
+            return
+
+        if path == "/api/activate":
+            # 导入许可令牌：本地验签 + 持久化。是社区版唯一允许的"写"动作之一
+            # （另一个是忽略告警），不触碰任何网络配置。
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed", "need": "POST"})
+                return
+            form = self._read_form()
+            token = (form.get("token") or [""])[0].strip()
+            if not token:
+                self._json(400, {"error": "missing_token"})
+                return
+            if not save_token(token):
+                self._json(500, {"error": "save_failed"})
+                return
+            fp = device_fingerprint()
+            self._json(200, {"saved": True,
+                             "status": license_status(expected_device_fp=fp)})
+            return
+
+        if path == "/api/license/deactivate":
+            # 移除本地许可令牌（清回社区版）。仅删本地文件，不联网。
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed", "need": "POST"})
+                return
+            self._json(200, {"cleared": clear_token()})
             return
 
         self._json(404, {"error": "not_found", "path": path})

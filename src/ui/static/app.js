@@ -13,6 +13,7 @@ const state = {
   data: {},
   error: null,
   timer: null,
+  flash: null,   // 升级面板的一次性提示（导入/清除后反馈），渲染后清空
 };
 
 // ------------------------------------------------------------------ 工具
@@ -66,6 +67,13 @@ async function api(path, options) {
 // ------------------------------------------------------------------ 载入
 
 async function loadAll() {
+  // 许可状态单独拉取：即便主面板接口异常，升级面板也能独立工作；反之亦然。
+  let lic = state.data.license || {};
+  try {
+    lic = await api("/api/license/status");
+  } catch (err) {
+    lic = { error: err.message || String(err) };
+  }
   try {
     const [overview, devices, destinations, alerts, unknown, suggestions, blind] =
       await Promise.all([
@@ -77,10 +85,11 @@ async function loadAll() {
         api("/api/suggestions"),
         api("/api/blind-spots"),
       ]);
-    state.data = { overview, devices, destinations, alerts, unknown, suggestions, blind };
+    state.data = { overview, devices, destinations, alerts, unknown, suggestions, blind, license: lic };
     state.error = null;
   } catch (err) {
     state.error = err.message || String(err);
+    state.data.license = lic;
   }
   render();
 }
@@ -319,6 +328,113 @@ function renderBlind() {
   </div>`;
 }
 
+function renderUpgrade() {
+  const lic = state.data.license || {};
+  const status = lic.license || {};
+  // 订单 URL 由服务端下发（HOMEWARD_ORDER_URL），前端不硬编码任何外部链接。
+  // 此处不给外部链接字面量兜底，避免破坏「界面零外部资源」约束；若缺失则输入框留空由用户填写。
+  const orderUrl = lic.order_url || "";
+  const valid = !!status.valid;
+  const reason = status.reason || "none";
+
+  const planRows = [
+    ["单月", "30 天", "入门 / 体验"],
+    ["3 个月", "90 天", ""],
+    ["6 个月", "180 天", ""],
+    ["1 年", "365 天", "通常单价最低 · 主推"],
+  ];
+  const tiers = planRows.map(([name, dur, note]) =>
+    `<div class="tier">
+      <div class="tier-name">${esc(name)}</div>
+      <div class="tier-dur">${esc(dur)}</div>
+      <div class="tier-note small muted">${esc(note)}</div>
+    </div>`).join("");
+
+  let statusCard;
+  if (valid) {
+    const until = fmtTime(status.valid_until);
+    const days = status.days_remaining;
+    const warn = days <= 7
+      ? `<div class="note">订阅将在 ${days} 天后到期，记得续费。</div>` : "";
+    statusCard = `<div class="card">
+      <div class="item-head">
+        <span class="sev" style="background:var(--ok)">已激活</span>
+        <span class="item-title">${esc(status.edition === "pro" ? "专业版" : "标准版")}</span>
+        <span class="small muted">订单 ${esc(status.order_id || "—")}</span>
+      </div>
+      <div class="kv" style="margin-top:8px"><span class="k">有效期至</span>
+        <span>${esc(until)}（剩余 ${esc(days)} 天）</span></div>
+      <div class="kv"><span class="k">功能</span>
+        <span>${(status.features || []).map(esc).join("、") || "—"}</span></div>
+      ${warn}
+      <div class="item-foot">
+        <button class="btn btn-sm" type="button" data-deactivate>清除本地许可（回到社区版）</button>
+        <button class="btn btn-sm" type="button" disabled
+          title="标准版许可服务上线后启用；本期仅预埋占位与接口契约（见防伪设计 §4.7）">备份许可</button>
+      </div>
+    </div>`;
+  } else {
+    const reasonText = {
+      none: "当前为社区版：只做「看见」，实际拦截属标准版能力。",
+      expired: "许可已过期，请续费后重新导入新令牌。",
+      invalid: "本地许可无效（可能被篡改或签发密钥不匹配）。",
+      revoked: "该许可已被吊销（如已退款）。如有疑问请联系支持。",
+    }[reason] || "当前为社区版。";
+    statusCard = `<div class="card">
+      <div class="item-head">
+        <span class="sev sev-low">社区版</span>
+        <span class="item-title">未激活付费版本</span>
+      </div>
+      <div class="item-body small muted">${esc(reasonText)}</div>
+      <div class="item-foot">
+        <button class="btn btn-sm" type="button" disabled
+          title="标准版许可服务上线后启用；本期仅预埋占位与接口契约（见防伪设计 §4.7）">备份许可</button>
+      </div>
+    </div>`;
+  }
+
+  const flash = state.flash
+    ? `<div class="note" style="border-color:var(--ok);background:#eafaf1">${esc(state.flash)}</div>` : "";
+
+  return `
+    ${flash}
+    <div class="section">
+      <h2>当前状态</h2>
+      ${statusCard}
+    </div>
+
+    <div class="section">
+      <h2>升级到标准版 / 专业版</h2>
+      <div class="note">家卫本体 100% 客户端、可离线使用；仅「激活」需联网一次。扫码付款后，把服务端返回的许可令牌粘贴到下方即可解锁。</div>
+      <div class="grid" style="margin-top:12px">${tiers}</div>
+    </div>
+
+    <div class="section">
+      <h2>第一步 · 扫码付款</h2>
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <input class="field" id="order-url" type="text" value="${esc(orderUrl)}" style="flex:1;min-width:240px">
+          <button class="btn" type="button" data-qr-gen>生成付款二维码</button>
+        </div>
+        <div id="qr-box" class="qr-box"></div>
+        <div class="small muted" style="margin-top:8px">用手机扫描上方二维码打开付款页，完成支付。订单 URL 由服务端下发，私有化部署可自行改写。</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>第二步 · 导入许可令牌</h2>
+      <div class="card">
+        <textarea class="field" id="token-input" rows="3"
+          placeholder="粘贴服务端返回的许可令牌（形如 base64payload.base64signature）"></textarea>
+        <div class="item-foot">
+          <button class="btn" type="button" data-activate>导入许可</button>
+          <span class="small muted">令牌仅保存在本机，不会上传任何家庭数据。</span>
+        </div>
+        <div id="activate-result" class="small" style="margin-top:8px"></div>
+      </div>
+    </div>`;
+}
+
 const RENDERERS = {
   overview: renderOverview,
   devices: renderDevices,
@@ -327,6 +443,7 @@ const RENDERERS = {
   unknown: renderUnknown,
   suggestions: renderSuggestions,
   blind: renderBlind,
+  upgrade: renderUpgrade,
 };
 
 // ------------------------------------------------------------------ 渲染
@@ -345,6 +462,7 @@ function render() {
 
   const body = state.error ? "" : (RENDERERS[state.view] || renderOverview)();
   view.innerHTML = err + body;
+  state.flash = null;   // 一次性提示已渲染，清掉避免下次重复
 
   document.getElementById("updated-at").textContent = "更新于 " + fmtTime(Date.now() / 1000);
 
@@ -367,16 +485,74 @@ document.getElementById("tabs").addEventListener("click", (e) => {
 });
 
 document.getElementById("view").addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-dismiss]");
-  if (!btn) return;
-  const id = btn.dataset.dismiss;
-  btn.disabled = true;
-  try {
-    await fetch(`/api/alerts/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
-    await loadAll();
-  } catch (err) {
-    btn.disabled = false;
-    alert("忽略失败：" + (err.message || err));
+  const dismiss = e.target.closest("[data-dismiss]");
+  if (dismiss) {
+    const id = dismiss.dataset.dismiss;
+    dismiss.disabled = true;
+    try {
+      await fetch(`/api/alerts/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
+      await loadAll();
+    } catch (err) {
+      dismiss.disabled = false;
+      alert("忽略失败：" + (err.message || err));
+    }
+    return;
+  }
+
+  // —— 升级面板 ——
+  const qrBtn = e.target.closest("[data-qr-gen]");
+  if (qrBtn) {
+    const url = (document.getElementById("order-url").value || "").trim();
+    const box = document.getElementById("qr-box");
+    box.innerHTML = "";
+    if (!url) return;
+    // 用 <img> 而非 innerHTML 注入 SVG：qr_svg 由服务端生成，走同源 img-src，杜绝 SVG 携带脚本的风险。
+    const img = document.createElement("img");
+    img.className = "qr-img";
+    img.alt = "付款二维码";
+    img.src = "/api/qr?text=" + encodeURIComponent(url);
+    box.appendChild(img);
+    return;
+  }
+
+  const actBtn = e.target.closest("[data-activate]");
+  if (actBtn) {
+    const token = (document.getElementById("token-input").value || "").trim();
+    const result = document.getElementById("activate-result");
+    if (!token) { result.textContent = "请先粘贴许可令牌"; return; }
+    actBtn.disabled = true;
+    try {
+      const res = await fetch("/api/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "token=" + encodeURIComponent(token),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.saved) throw new Error(d.error || "导入失败");
+      const s = d.status || {};
+      state.flash = s.valid
+        ? `许可已导入：${s.edition === "pro" ? "专业版" : "标准版"}（剩余 ${s.days_remaining} 天）`
+        : "令牌已保存但校验未通过，请确认是否过期或被吊销。";
+      await loadAll();
+    } catch (err) {
+      result.textContent = "导入失败：" + (err.message || err);
+    } finally {
+      actBtn.disabled = false;
+    }
+    return;
+  }
+
+  const deactBtn = e.target.closest("[data-deactivate]");
+  if (deactBtn) {
+    if (!confirm("确定清除本地许可、回到社区版？")) return;
+    try {
+      await fetch("/api/license/deactivate", { method: "POST" });
+      state.flash = "已清除本地许可，回到社区版。";
+      await loadAll();
+    } catch (err) {
+      alert("清除失败：" + (err.message || err));
+    }
+    return;
   }
 });
 
