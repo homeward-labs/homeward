@@ -1,0 +1,73 @@
+name: build-smoke
+
+# 为什么要单独跑「构建 + 部署冒烟」：
+# 单测只证明代码逻辑对，证明不了「这个镜像还能被 docker compose 起来、接口还活着」。
+# 之前 Dockerfile 的构建上下文、compose 的字段写法都出过问题，而单测全绿照样放行。
+# 本 workflow 真的把镜像 build 出来、真的起容器、真的用 smoke.py 打一遍接口，
+# 把「可部署性」变成 CI 的硬指标。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  docker:
+    name: 镜像构建 + 部署冒烟
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建社区版镜像
+        # 构建上下文在 Dockerfile 里指向项目根，compose 的 context: .. 已处理；
+        # 这里只验证「能不能构建成功」。
+        run: docker compose -f docker/docker-compose.yaml build
+
+      - name: 启动容器
+        run: docker compose -f docker/docker-compose.yaml up -d
+
+      - name: 等待服务就绪（/api/health）
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:9595/api/health > /dev/null; then
+              echo "服务已就绪（第 ${i} 次探测）"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::服务在 60s 内未就绪"
+          docker compose -f docker/docker-compose.yaml logs
+          exit 1
+
+      - name: 冒烟测试（含写操作；这是 CI 里的一次性容器）
+        # --write 会灌入样例观测并写入/清除一个无效许可令牌，验证写链路不崩。
+        # CI 容器用完即弃，可以放心跑；用户侧对生产实例请只用默认的只读检查。
+        run: python3 scripts/smoke.py --base http://127.0.0.1:9595 --write
+
+      - name: 资源占用（设计目标 < 100 MB / 近零 CPU）
+        run: docker stats --no-stream homeward
+
+      - name: 收尾：打日志并清理
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yaml logs || true
+          docker compose -f docker/docker-compose.yaml down -v || true
+
+  lint:
+    name: 静态检查（语法 / 未定义名）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 ruff
+        run: pip install ruff
+
+      # 刻意只开「一定会是真 bug」的规则：语法错误、未定义名、明显的逻辑陷阱。
+      # 不上全量风格规则 —— 那会在早期项目里制造大量与正确性无关的噪音。
+      - name: ruff（E9 / F63 / F7 / F82）
+        run: ruff check --select=E9,F63,F7,F82 --output-format=github src scripts tests

@@ -86,7 +86,8 @@
 
 | 安装方式 | 适用平台 | 状态 | 说明 |
 |---|---|---|---|
-| **Docker Compose** | 任何能跑 Docker 的 Linux / NAS | ✅ 骨架可用 | `docker compose up -d`，端口 `9595`。当前唯一可实际跑起来的方式 |
+| **预构建镜像（GHCR · 多架构）** | amd64 / arm64 / armv7 的软路由与 NAS | 🔜 **工作流已就位，首个 `v*` tag 发布后可用** | `ghcr.io/homeward-labs/homeward`，一次构建出 `linux/amd64` + `linux/arm64` + `linux/arm/v7`。**不用本地 build**，低配软路由 / ARM NAS 尤其省事；发布流程见 `.github/workflows/publish.yml`。在此之前请用下面的源码 build |
+| **Docker Compose（本地 build）** | 任何能跑 Docker 的 Linux / NAS | ✅ 骨架可用 | `docker compose up -d`，端口 `9595`。首个 tag 发布前，这是最通用的路径 |
 | **源码直跑** | 开发机、Linux 主机 | ✅ 可用（开发用） | `python -m src.core.main`，零第三方依赖，用于开发与验证 |
 | **原生 Linux（systemd）** | Debian / Ubuntu / 任意 Linux 主机、旧电脑、物理机 | ⬜ **计划中** | 目标形态之一：一台旧电脑或迷你主机常驻，不走容器 |
 | **iStoreOS 包（主力）** | 软路由 | 🔜 **最高优先级** | 最有价值的形态：坐网关位 = 全量视野（DNS + 五元组 + 流量大小/时序）。iStoreOS 自带商店与 Docker，今天即可用 Docker 形态跑，原生商店一键包为最高优先级待办 |
@@ -99,7 +100,30 @@
 
 ---
 
-## 五、快速开始（当前唯一可跑的路径）
+## 五、快速开始
+
+### 方式 A：直接用预构建镜像（最省事，Release 发布后可用）
+
+不用 clone、不用本地 build —— 对算力有限的软路由 / ARM NAS 尤其合适。
+
+```bash
+mkdir -p ~/homeward-data
+docker run -d --name homeward --restart unless-stopped \
+  -p 9595:9595 \
+  -v "$HOME/homeward-data:/app/data" \
+  -v /var/log/dnsmasq.log:/var/log/dnsmasq.log:ro \
+  -e HOMEWARD_DATA_DIR=/app/data/homeward \
+  ghcr.io/homeward-labs/homeward:latest
+# 打开 http://<设备IP>:9595
+```
+
+> `-v` 第二段是 DNS 日志：Debian 系 / 飞牛 / 群晖一般 `/var/log/dnsmasq.log`，
+> **iStoreOS / OpenWrt 改成 `/tmp/dnsmasq.log`**。
+> `~/homeward-data` 必须持久化：许可令牌与设备标识存在里面，丢了会导致已激活的许可
+> 因指纹漂移显示「设备不符」。
+> 架构会自动匹配（amd64 / arm64 / armv7 三档）。
+
+### 方式 B：从源码构建（当前最通用）
 
 ```bash
 git clone https://github.com/homeward-labs/homeward
