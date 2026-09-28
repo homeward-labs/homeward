@@ -12,6 +12,12 @@ venv/
 # 测试缓存
 .pytest_cache/
 
+# lint 缓存
+.ruff_cache/
+
+# 系统产生的快捷方式等杂物（误放在仓库根目录，不入库）
+*.lnk
+
 # 编辑器 / 系统
 .vscode/
 .idea/

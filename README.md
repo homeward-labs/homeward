@@ -4,7 +4,7 @@
 
 **家卫是「设备外联流量治理」工具，不是摄像头、不是安防监控 App。** 我们不拍你、不装你的设备，只在网络层**看清**谁在给外面打电话；真正**拦下**外联是标准版能力。
 
-- 中文文档：[docs/README.md](docs/README.md) · **部署形态：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** · 阻断策略与竞品分析：见私有《阻断与撤销》《竞品分析》文档（不随本仓库发布）
+- 中文文档：[docs/README.md](docs/README.md) · **部署形态：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** · **服务端内容源：[docs/CONTENT-SOURCE.md](docs/CONTENT-SOURCE.md)** · 阻断策略与竞品分析：见私有《阻断与撤销》《竞品分析》文档（不随本仓库发布）
 - **开源边界（社区版开源 / 标准版·专业版闭源）**：见私有《版本与能力归属》文档
 
 ---
@@ -94,6 +94,7 @@ python -m src.core.main        # 只跑核心服务（命令行输出，不起�
 
 - 发现某个域名被标成「未知」？提一个 [域名归属贡献](.github/ISSUE_TEMPLATE/domain-attribution.yml)，或直接改 `src/knowledge_base/domains.csv` 发 PR。
 - 知识库数据以 **CC BY 4.0** 发布（使用须署名），众包共建、人人可用。
+- 知识库在线更新的内容源与降级语义见 [docs/CONTENT-SOURCE.md](docs/CONTENT-SOURCE.md)：**服务端只是静态内容源与信任根，零遥测，永不接收你的观测数据。**
 - 提缺陷 / 建议：见 [Issue 模板](.github/ISSUE_TEMPLATE)；开发约定见 [CONTRIBUTING](.github/CONTRIBUTING.md)。
 - **安全问题请不要开公开 Issue**，按 [SECURITY.md](./SECURITY.md) 私下报告。
 
