@@ -20,6 +20,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -166,5 +167,83 @@ class SqliteActionRegistry(ActionRegistry):
 
     def close(self) -> None:
         """关闭底层连接（测试 / 重启切换时用）"""
+        with self._lock:
+            self._conn.close()
+
+
+class SqliteObservationStore:
+    """观测状态（用户自己的遥测）快照持久化。
+
+    把「看见了什么」存到 SQLite（默认 ``data/observations.db``，已被 .gitignore 忽略，
+    含用户隐私，绝不入库），重启后恢复，避免每次重启都从零开始、丢失历史观测与告警。
+
+    设计选择
+    --------
+    - **全量快照**，而非逐条 UPSERT。社区版观测对象（设备 / 归属缓存 / 未知域名 /
+      告警）结构会随版本演进，全量 JSON 快照更好维护、更易做版本迁移；体量在家庭场景
+      完全可控（设备几十台、域名几千个）。
+    - **只存用户自己的观测遥测，绝不存知识库本体**（domains.csv / behaviors.json / oui）。
+      知识库是服务器端商业机密，客户端不得导出或抓取（见 open-core 边界约定）。
+    """
+
+    SCHEMA_VERSION = 1
+    SLOT = "current"
+
+    def __init__(self, db_path: "str | Path") -> None:
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        weakref.finalize(self, self._conn.close)
+        self._lock = threading.Lock()
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS observation_state ("
+            " slot TEXT PRIMARY KEY,"
+            " version INTEGER NOT NULL,"
+            " updated_at REAL NOT NULL,"
+            " data TEXT NOT NULL"
+            ")"
+        )
+        self._conn.commit()
+
+    def save(self, state: dict) -> None:
+        """写入一份全量观测快照（覆盖式）"""
+        blob = json.dumps(state, ensure_ascii=False)
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO observation_state (slot, version, updated_at, data)"
+                " VALUES (?,?,?,?)"
+                " ON CONFLICT(slot) DO UPDATE SET"
+                " version=excluded.version, updated_at=excluded.updated_at,"
+                " data=excluded.data",
+                (self.SLOT, self.SCHEMA_VERSION, time.time(), blob),
+            )
+            self._conn.commit()
+
+    def load(self) -> "Optional[dict]":
+        """读回最近一份快照；版本不匹配或 JSON 损坏则视为无快照，返回 None"""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT version, data FROM observation_state WHERE slot=?",
+                (self.SLOT,),
+            ).fetchone()
+        if row is None:
+            return None
+        version, blob = row
+        if version != self.SCHEMA_VERSION:
+            logger.warning("观测快照版本不匹配（%s vs %s），忽略旧快照", version, self.SCHEMA_VERSION)
+            return None
+        try:
+            return json.loads(blob)
+        except json.JSONDecodeError:
+            logger.warning("观测快照 JSON 损坏，忽略")
+            return None
+
+    def clear(self) -> None:
+        """清空快照（重置观测状态时用）"""
+        with self._lock:
+            self._conn.execute("DELETE FROM observation_state WHERE slot=?", (self.SLOT,))
+            self._conn.commit()
+
+    def close(self) -> None:
         with self._lock:
             self._conn.close()
