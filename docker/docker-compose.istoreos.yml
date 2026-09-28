@@ -65,6 +65,9 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 显式指向 iStoreOS 的日志落点（也可靠代码自动探测，这里写死最稳）
       - DNS_LOG_PATH=/tmp/dnsmasq.log
+      # 许可令牌 / 设备标识落盘目录（随 ./data 卷持久化，容器重建不丢指纹）
+      - HOMEWARD_DATA_DIR=/app/data/homeward
+      - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
     ports:
       - "9595:9595"
     command: ["python", "-m", "src.ui.server"]

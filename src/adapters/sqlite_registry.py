@@ -230,13 +230,46 @@ class SqliteObservationStore:
             return None
         version, blob = row
         if version != self.SCHEMA_VERSION:
-            logger.warning("观测快照版本不匹配（%s vs %s），忽略旧快照", version, self.SCHEMA_VERSION)
+            # 版本不符时不静默丢弃：先归档到另一个 slot，等迁移脚本 / 人工兜底。
+            # 否则用户一升级就「历史观测全没了」，而那份数据其实还在库里。
+            self._archive(version, blob)
+            logger.warning("观测快照版本不匹配（%s vs %s），已归档为 %s 并忽略旧快照",
+                           version, self.SCHEMA_VERSION, self._legacy_slot(version))
             return None
         try:
             return json.loads(blob)
         except json.JSONDecodeError:
             logger.warning("观测快照 JSON 损坏，忽略")
             return None
+
+    @staticmethod
+    def _legacy_slot(version: int) -> str:
+        return f"legacy_v{version}"
+
+    def _archive(self, version: int, blob: str) -> None:
+        """把版本不匹配的旧快照另存一份，避免「升级即丢历史」。"""
+        slot = self._legacy_slot(version)
+        try:
+            with self._lock:
+                self._conn.execute(
+                    "INSERT INTO observation_state (slot, version, updated_at, data)"
+                    " VALUES (?,?,?,?)"
+                    " ON CONFLICT(slot) DO UPDATE SET"
+                    " version=excluded.version, updated_at=excluded.updated_at,"
+                    " data=excluded.data",
+                    (slot, version, time.time(), blob),
+                )
+                self._conn.commit()
+        except Exception:
+            logger.exception("归档旧版本观测快照失败（旧快照可能丢失）")
+
+    def archived_versions(self) -> list:
+        """列出已归档的旧版本快照版本号（供迁移 / 排查用）。"""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT version FROM observation_state WHERE slot LIKE 'legacy_v%'"
+            ).fetchall()
+        return sorted({int(r[0]) for r in rows})
 
     def clear(self) -> None:
         """清空快照（重置观测状态时用）"""

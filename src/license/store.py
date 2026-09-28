@@ -21,6 +21,30 @@ from pathlib import Path
 from license.verify import status_summary, verify_token, PUBLIC_KEY
 
 
+def _stable_id() -> "str | None":
+    """持久化的本机稳定标识，用于对抗「机器标识漂移」。
+
+    为什么需要：Docker 镜像更新 / 容器重建后 ``/etc/machine-id`` 可能重新生成，
+    指纹随之漂移 → 已激活的许可突然变成「设备不符」，用户被迫重新激活。
+    这里在数据目录（可用 ``HOMEWARD_DATA_DIR`` 指定，生产部署应挂到持久卷）
+    落一个随机标识并复用，使指纹跨重建保持稳定。
+
+    只在**确实能写入**数据目录时启用：写不了（只读根文件系统 / tmpfs）就返回 None，
+    退回原有逻辑 —— 否则每次启动都换新 ID，反而让指纹更不稳定。
+    """
+    try:
+        p = _data_dir() / "device.id"
+        if p.is_file():
+            v = p.read_text(encoding="utf-8").strip()
+            if v:
+                return v
+        v = uuid.uuid4().hex
+        p.write_text(v, encoding="utf-8")
+        return v
+    except Exception:
+        return None
+
+
 def device_fingerprint() -> str:
     """本机稳定指纹（sha256，仅本地使用，绝不离开本机）。
 
@@ -52,6 +76,10 @@ def device_fingerprint() -> str:
             parts.append(platform.platform())
         except Exception:
             parts.append("fallback-unknown")
+    # 持久化稳定标识（能写数据目录时才有）：对抗容器重建 / machine-id 漂移
+    sid = _stable_id()
+    if sid:
+        parts.append(sid)
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 

@@ -236,6 +236,21 @@ class DomainAttribution:
             })
         return out
 
+    def cached_domains(self) -> set:
+        """已缓存归属结论的域名集合（覆盖率统计口径用）。
+
+        提供公开入口，避免调用方直读 ``_cache`` 这种内部结构。
+        """
+        return set(self._cache.keys())
+
+    def cached_results(self) -> list:
+        """已缓存的归属结论列表（快照导出用）。"""
+        return list(self._cache.values())
+
+    def put(self, result: "AttributionResult") -> None:
+        """把快照恢复出的归属结论放回缓存（同域名覆盖）。"""
+        self._cache[result.domain] = result
+
     def coverage(self, domains: Iterable[str]) -> CoverageReport:
         rep = CoverageReport()
         for d in domains:
