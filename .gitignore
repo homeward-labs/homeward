@@ -37,3 +37,7 @@ src/editions/
 
 # 任何文件若带闭源标记（见 docs/EDITIONS.md），即使不在上面目录也会被 pre-commit 拦截
 
+# 本地私有资料目录：敏感商业/竞品文档、隔离的竞品源码等，绝不上公开仓库
+# 目录本体整体忽略；内部另有 .gitignore（`*`）做双保险
+.private/
+
