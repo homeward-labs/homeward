@@ -1,0 +1,77 @@
+name: 缺陷报告
+description: 家卫跑起来不对 / 报错 / 界面异常
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **安全问题请不要开公开 Issue**，请按 [SECURITY.md](../../SECURITY.md) 走私有渠道报告。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 实际发生了什么？期望发生什么？
+    validations:
+      required: true
+
+  - type: select
+    id: deployment
+    attributes:
+      label: 部署形态
+      options:
+        - Docker（docker/docker-compose.yaml）
+        - Docker（docker-compose.istoreos.yml，软路由）
+        - Docker（docker-compose.full.yml，自带 dnsmasq）
+        - 源码跑（python -m src.ui.server）
+        - 演示模式（--demo）
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: 平台与系统
+      description: 例如「飞牛 OS / iStoreOS 22.03 / Ubuntu 24.04 / 群晖 DSM 7」，以及 x86 还是 ARM
+      placeholder: iStoreOS 22.03，x86_64
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 提交
+      description: 启动日志里会打印版本；或贴 `git rev-parse --short HEAD`
+      placeholder: 0.1.0 (756ee4e)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: |
+        `docker logs homeward` 或服务输出。
+        **请先自行脱敏**：日志里可能含你家设备的 MAC、IP、内网主机名，请替换成 `xx:xx:xx:xx:xx:xx` / `192.168.x.x` 之类。
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 自查
+      options:
+        - label: 已确认不是把端口暴露到公网导致的访问问题（默认无鉴权，属部署配置）
+          required: false
+        - label: 日志已脱敏，不含真实 MAC / 公网 IP
+          required: false

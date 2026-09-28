@@ -1,0 +1,93 @@
+name: 域名归属贡献（知识库共建）
+description: 补一条「这个域名是谁的、干什么用」——家卫的判定能力直接取决于它
+title: "[KB] <域名> → 归属组织"
+labels: ["knowledge-base"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢补知识库！这是本项目**最有价值的贡献**：社区版能不能把设备外联「读懂」，
+        完全取决于这张表覆盖多少域名。
+
+        > 想直接动手？编辑 `src/knowledge_base/domains.csv` 发 PR 更快（字段说明见下方）。
+        > 开这个 Issue 也完全可以，由维护者补录。
+
+  - type: input
+    id: domain
+    attributes:
+      label: 域名
+      description: 完整 FQDN，例如 `track.io.mi.com`（不要用带协议或路径的 URL）
+      placeholder: track.io.mi.com
+    validations:
+      required: true
+
+  - type: input
+    id: organization
+    attributes:
+      label: 归属组织
+      description: 域名实际归属于哪家公司 / 组织（写通用中文或英文名，如「小米 Xiaomi」）
+      placeholder: 小米 Xiaomi
+    validations:
+      required: true
+
+  - type: select
+    id: category
+    attributes:
+      label: 用途分类
+      options:
+        - IoT_core（设备必需的控制 / 状态通道）
+        - cloud_storage（云存储 / 备份）
+        - telemetry（设备遥测 / 诊断上报）
+        - analytics（数据统计 / 用户行为分析）
+        - advertising_sdk（广告 / 推送 SDK）
+        - machine_learning（模型 / 语音云端推理）
+        - cdn（通用内容分发）
+        - 其它（请在下方说明）
+    validations:
+      required: true
+
+  - type: select
+    id: confidence
+    attributes:
+      label: 你的把握有多大
+      options:
+        - high（官方文档 / 抓包确证）
+        - medium（有可靠旁证，如证书主体、WHOIS）
+        - low（仅凭域名前缀或第三方猜测）
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 中文人话描述
+      description: 一句话说清这个域名是干什么的，会显示在界面上给普通用户看
+      placeholder: 小米设备的数据统计上报通道
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 依据来源
+      description: |
+        请给出可核实的依据（官方文档链接、TLS 证书主体、WHOIS、抓包结论等）。
+        **不要贴含个人信息的完整日志**，域名与组织名足够。
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ### 附：直接改 CSV 发 PR 时的字段格式
+
+        ```csv
+        domain,organization,category,confidence,description,action,side_effects
+        track.io.mi.com,Xiaomi,analytics,medium,小米数据统计上报,block_soft,远程控制正常;本地控制正常;数据统计停止
+        ```
+
+        - `action` 只是**建议**（`allow` / `block_soft` / `block_medium`），社区版不执行拦截，仅用于预览后果。
+        - `side_effects` 写「拦了之后会怎样」，这是家卫区别于普通 DNS 过滤器的关键字段，能填请填。
+        - 数据以 **CC BY 4.0** 发布（使用须署名），请勿提交来源不明或受保密义务约束的内容。
