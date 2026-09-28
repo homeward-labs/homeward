@@ -9,6 +9,9 @@ __pycache__/
 .venv/
 venv/
 
+# 测试缓存
+.pytest_cache/
+
 # 编辑器 / 系统
 .vscode/
 .idea/

@@ -1,0 +1,43 @@
+name: 功能建议
+description: 希望家卫增加什么能力 / 改进什么体验
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决的问题
+      description: |
+        先说**场景与痛点**，再说想要的功能 —— 家卫的价值是「让普通用户看懂家里设备在干什么」，
+        能说清场景的建议更容易被采纳。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你设想的做法
+      description: 界面上你希望看到什么？判定上希望家卫怎么提示？
+    validations:
+      required: true
+
+  - type: select
+    id: edition
+    attributes:
+      label: 你认为这属于哪一层
+      description: |
+        社区版（开源）的边界是「只看见、不拦截」；真正的拦截执行属于闭源付费的标准版。
+        不确定就选「不确定」。
+      options:
+        - 社区版就该有（看见 / 解释 / 导出）
+        - 更像付费版能力（拦截执行 / 远程 / 多站点）
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你试过的替代办法
+      description: 现在是怎么凑合解决的？
+      placeholder: 目前只能自己在路由器里翻日志 / 用 tcpdump 抓包看

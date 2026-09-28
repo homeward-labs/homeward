@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题（请勿公开）
+    url: https://github.com/homeward-labs/homeward/security/advisories
+    about: 漏洞请走私有报告入口，见 SECURITY.md；不要开公开 Issue。
+  - name: 部署问题先看这里
+    url: https://github.com/homeward-labs/homeward/blob/main/docs/DEPLOYMENT.md
+    about: 接入方式 / 平台对照 / 环境变量 / 三条安全红线都在这份文档里。
+  - name: 贡献知识库（域名归属）
+    url: https://github.com/homeward-labs/homeward/issues/new?template=domain-attribution.yml
+    about: 最有价值的贡献 —— 补一条「这个域名是谁的、干什么用」。
