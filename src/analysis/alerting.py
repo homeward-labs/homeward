@@ -302,6 +302,21 @@ class AlertCenter:
         alert.status = "dismissed"
         return True
 
+    def has(self, alert_id: str) -> bool:
+        """该告警是否已存在。
+
+        给快照恢复去重用 —— 以前外部要直读 ``_alerts`` 才能判断，
+        一旦内部结构改名就会静默出错，故提供公开查询入口。
+        """
+        return alert_id in self._alerts
+
+    def restore(self, alert: "Alert") -> bool:
+        """把快照还原出来的告警放回中心（已存在则跳过）。返回是否新增。"""
+        if alert.alert_id in self._alerts:
+            return False
+        self._alerts[alert.alert_id] = alert
+        return True
+
     def to_dict(self) -> list[dict]:
         return [a.to_dict() for a in self.active()]
 

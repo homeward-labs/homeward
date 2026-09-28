@@ -105,11 +105,19 @@ def import_log_text(text: str, service, *, max_lines: int = MAX_LINES) -> dict:
         "flows": 0,
         "errors": 0,
     }
-    for line in lines:
+    # 只记前若干条错误明细：既能定位真 bug，又不会被一整份坏日志刷爆日志
+    ERR_DETAIL_LIMIT = 5
+
+    def _note_error(lineno: int, phase: str, exc: BaseException) -> None:
+        if stats["errors"] <= ERR_DETAIL_LIMIT:
+            logger.warning("第 %d 行%s失败（已跳过）：%s", lineno, phase, exc)
+
+    for lineno, line in enumerate(lines, start=1):
         try:
             obs = parse_log_line(line)
-        except Exception:  # 单行脏数据不能拖垮整次导入
+        except Exception as exc:  # 单行脏数据不能拖垮整次导入
             stats["errors"] += 1
+            _note_error(lineno, "解析", exc)
             continue
         if obs is None:
             continue
@@ -120,8 +128,9 @@ def import_log_text(text: str, service, *, max_lines: int = MAX_LINES) -> dict:
         stats["flows"] += 1
         try:
             service.process_flow(flow)
-        except Exception:
+        except Exception as exc:
             stats["errors"] += 1
+            _note_error(lineno, "回放", exc)
 
     # 小批量导入也可能产生行为告警，主动跑一轮扫描确保告警生成
     try:

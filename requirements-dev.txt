@@ -1,0 +1,18 @@
+# 家卫 Homeward — 开发期依赖（**绝不进运行时镜像**）
+#
+# 运行时（社区版）刻意做到零第三方依赖，理由见 requirements.txt。
+# 下面这些只用于开发 / CI 的**正确性校验**，不参与任何打包：
+#   · pytest                     —— 测试运行器（部分用例用到 importorskip / 参数化）
+#   · segno                      —— QR 矩阵比对的权威基准（tests/test_qr.py 矩阵级校验）
+#   · numpy / opencv-python-headless —— 渲染 PNG 后反解二维码（解码级校验）
+#
+# 未安装时 test_qr.py 会**静默 skip** 而不是报错 —— 这正是风险所在：
+# 本机环境漏装、或 CI 没装，那 152 例矩阵比对就等于没跑，
+# qr.py 的编码错误不会被任何人发现。因此 CI 必须安装本文件。
+#
+# 本地：pip install -r requirements-dev.txt
+
+pytest>=8.0
+segno>=1.6
+numpy>=1.26
+opencv-python-headless>=4.9

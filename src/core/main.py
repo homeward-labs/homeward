@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import signal
+import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -43,6 +44,7 @@ from inventory.device import Device, DeviceRegistry
 from inventory.attribution import AttributionResult, DomainAttribution
 from analysis.behavior import BehaviorDetector
 from analysis.alerting import Alert, AlertCenter
+from adapters.base import ActionRegistry
 from adapters.sqlite_registry import SqliteActionRegistry, SqliteObservationStore
 
 
@@ -121,6 +123,11 @@ class HomewardService:
 
     def __init__(self, config: Optional[dict] = None):
         self.config = config or {}
+        # 观测状态锁：采集线程（写）与 HTTP / 后台快照线程（读）共享设备台账、
+        # 归属缓存、告警中心。dict 在遍历中被并发修改会抛
+        # "dictionary changed size during iteration"，所以读写两侧都要持锁。
+        # 用 RLock：读路径内部会互相调用（如 export_report → get_stats）。
+        self._state_lock = threading.RLock()
         self.kb = KnowledgeBase(str(KB_DIR))
         self.behavior_matcher = BehaviorMatcher(str(KB_DIR / "behaviors.json"))
         self.engine = DecisionEngine(self.kb, self.behavior_matcher)
@@ -179,10 +186,16 @@ class HomewardService:
 
         # 动作注册表（SQLite 持久化）：进程重启不丢动作记录，避免孤儿规则。
         # 社区版只产出「建议」不产生已生效阻断，但标准版接同一服务时这条记录就关键了。
-        self.action_registry = SqliteActionRegistry(ROOT / "data" / "actions.db")
-        restored = self.action_registry.restore_all()
-        if restored:
-            logger.info(f"已从 SQLite 恢复 {len(restored)} 条动作记录")
+        # 演示模式（actions_db_path=None）用纯内存注册表：与 observations.db 的处理
+        # 保持一致，避免一次 --demo 把演示动作写进真实动作库污染生产数据。
+        act_db = self.config.get("actions_db_path", ROOT / "data" / "actions.db")
+        if act_db is None:
+            self.action_registry = ActionRegistry()
+        else:
+            self.action_registry = SqliteActionRegistry(act_db)
+            restored = self.action_registry.restore_all()
+            if restored:
+                logger.info(f"已从 SQLite 恢复 {len(restored)} 条动作记录")
 
         # 由信号处理器置位，由事件循环侧的关闭逻辑消费
         self._shutdown_requested = False
@@ -218,8 +231,13 @@ class HomewardService:
         这是核心入口，被采集层调用
 
         社区版**只产出建议，绝不自行下发阻断**：产品承诺「不默认自动阻断，一切以你
-        确认为准」。这里即使命中了阻断类规则，也只是把建议放进队列等用户确认。
+        确认为准」。        这里即使命中了阻断类规则，也只是把建议放进队列等用户确认。
         """
+        with self._state_lock:
+            return self._process_flow_locked(flow)
+
+    def _process_flow_locked(self, flow: FlowRecord) -> Decision:
+        """``process_flow`` 的实现体（调用方必须已持有 ``_state_lock``）。"""
         self.stats["flows_processed"] += 1
 
         # W2：把这条流量归到某台设备上，并解析域名归属
@@ -278,14 +296,15 @@ class HomewardService:
         返回本轮**新建**的告警（重复命中的只是更新，不占新条目）。
         传入 ``now`` 是为了让离线回放 / 单测能按数据里的时间戳判定，而不是按挂钟时间。
         """
-        findings = self.behavior_detector.scan(now=now)
-        new_alerts = self.alert_center.ingest(
-            findings,
-            device_view_of=self.get_device,
-            attribution_of=self.describe_domain,
-            rule_of=lambda rid: self._rules_by_id.get(rid, {}),
-            now=now,
-        )
+        with self._state_lock:
+            findings = self.behavior_detector.scan(now=now)
+            new_alerts = self.alert_center.ingest(
+                findings,
+                device_view_of=self.get_device,
+                attribution_of=self.describe_domain,
+                rule_of=lambda rid: self._rules_by_id.get(rid, {}),
+                now=now,
+            )
         for alert in new_alerts:
             logger.info(
                 f"[ALERT][{alert.severity_label}] {alert.device_name} → "
@@ -295,27 +314,32 @@ class HomewardService:
 
     def get_alerts(self, include_dismissed: bool = False) -> list[dict]:
         """给 UI / API 用的告警视图（已按严重度排序）"""
-        items = self.alert_center.all() if include_dismissed else self.alert_center.active()
-        return [a.to_dict() for a in items]
+        with self._state_lock:
+            items = (self.alert_center.all() if include_dismissed
+                     else self.alert_center.active())
+            return [a.to_dict() for a in items]
 
     def dismiss_alert(self, alert_id: str) -> bool:
         """忽略一条告警"""
-        return self.alert_center.dismiss(alert_id)
+        with self._state_lock:
+            return self.alert_center.dismiss(alert_id)
 
     def get_alert_stats(self) -> dict:
         """告警统计：数量、按严重度分布、模板渲染是否健康"""
-        missing = sorted({
-            k for a in self.alert_center.active() for k in a.missing_keys
-        })
-        return {
-            "active": len(self.alert_center.active()),
-            "by_severity": self.alert_center.counts_by_severity(),
-            "created": self.alert_center.stats["created"],
-            "updated": self.alert_center.stats["updated"],
-            "behaviors_supported": len(self.behavior_matcher.supported_rules),
-            "behaviors_unsupported": self.behavior_matcher.unsupported(),
-            "missing_template_keys": missing,  # 正常应为空；非空说明文案与渲染器脱节
-        }
+        with self._state_lock:
+            missing = sorted({
+                k for a in self.alert_center.active() for k in a.missing_keys
+            })
+            return {
+                "active": len(self.alert_center.active()),
+                "by_severity": self.alert_center.counts_by_severity(),
+                "created": self.alert_center.stats["created"],
+                "updated": self.alert_center.stats["updated"],
+                "behaviors_supported": len(self.behavior_matcher.supported_rules),
+                "behaviors_unsupported": self.behavior_matcher.unsupported(),
+                # 正常应为空；非空说明文案与渲染器脱节
+                "missing_template_keys": missing,
+            }
 
     def request_ai_analysis(self, domain: str, behavior: dict) -> Optional[AnalysisResult]:
         """
@@ -370,9 +394,11 @@ class HomewardService:
 
     def get_device(self, ip: str) -> Optional[dict]:
         """给 UI / 告警用的设备视图：查不到 MAC 也会返回一个 IP 兜底设备"""
-        dev = self.device_registry.get_by_ip(ip)
-        if dev is None:
-            dev = self.device_registry.observe_ip(ip)
+        with self._state_lock:
+            # observe_ip 会往台账里插新设备（写操作），必须持锁
+            dev = self.device_registry.get_by_ip(ip)
+            if dev is None:
+                dev = self.device_registry.observe_ip(ip)
         return {
             "name": dev.display_name,
             "mac": dev.mac,
@@ -385,35 +411,43 @@ class HomewardService:
 
     def get_devices(self) -> list[dict]:
         """设备台账视图（按最近活跃排序）"""
-        return [d.to_dict() for d in self.device_registry.list_devices()]
+        with self._state_lock:
+            devices = list(self.device_registry.list_devices())
+        return [d.to_dict() for d in devices]
 
     def get_destinations(self) -> dict:
         """去向地图：域名 → 组织 → 哪些设备在跟它说话
 
         只报**真实观测到过**的边；归属查不到就如实标 unknown，不做相似域名猜测。
         """
+        # 遍历设备台账期间采集线程可能正在插入新设备，须持锁并先取快照
+        with self._state_lock:
+            device_snapshot = list(self.device_registry.devices.values())
+
         edges: dict[str, list[dict]] = {}
-        for dev in self.device_registry.devices.values():
-            for domain, count in dev.domains.items():
+        for dev in device_snapshot:
+            # dev.domains 也会被采集线程并发改写，逐台取副本
+            for domain, count in list(dev.domains.items()):
                 edges.setdefault(domain, []).append({
                     "name": dev.display_name,
                     "ip": next(iter(sorted(dev.ips)), ""),
                     "count": count,
                 })
 
-        items = []
-        seen: set[str] = set()
-        for r in self.attribution.resolved_view():
-            seen.add(r["domain"])
-            items.append({**r, "devices": edges.get(r["domain"], [])})
-        # 缓存里没有、但设备确实访问过的域名（例如缓存被整体清空过）也要补上
-        for domain in sorted(set(edges) - seen):
-            items.append({**self.describe_domain(domain), "devices": edges[domain]})
-        # 判定为 unknown 的单次观测同样要露出来 —— 「不知道」也是一种结论
-        for domain in self.get_unknown_domains():
-            if domain in seen or domain in edges:
-                continue
-            items.append({**self.describe_domain(domain), "devices": []})
+        with self._state_lock:
+            items = []
+            seen: set[str] = set()
+            for r in self.attribution.resolved_view():
+                seen.add(r["domain"])
+                items.append({**r, "devices": edges.get(r["domain"], [])})
+            # 缓存里没有、但设备确实访问过的域名（例如缓存被整体清空过）也要补上
+            for domain in sorted(set(edges) - seen):
+                items.append({**self.describe_domain(domain), "devices": edges[domain]})
+            # 判定为 unknown 的单次观测同样要露出来 —— 「不知道」也是一种结论
+            for domain in self.get_unknown_domains():
+                if domain in seen or domain in edges:
+                    continue
+                items.append({**self.describe_domain(domain), "devices": []})
 
         items.sort(key=lambda x: (-len(x["devices"]), x["domain"]))
         known = sum(1 for x in items if x["known"])
@@ -439,7 +473,8 @@ class HomewardService:
 
     def get_unknown_domains(self) -> list[str]:
         """获取所有未识别域名"""
-        return sorted(self.stats["unknown_domains"])
+        with self._state_lock:
+            return sorted(self.stats["unknown_domains"])
 
     def get_blind_spots(self) -> list[str]:
         """当前部署形态下，家卫**看不见 / 认不出**的地方 —— UI 必须展示"""
@@ -453,7 +488,9 @@ class HomewardService:
 
     def attribution_coverage(self) -> dict:
         """归属覆盖率：衡量知识库够不够用，也是社区共建的进度指标"""
-        domains = sorted(self.stats["unknown_domains"] | set(self.attribution._cache))
+        with self._state_lock:
+            domains = sorted(self.stats["unknown_domains"]
+                             | self.attribution.cached_domains())
         rep = self.attribution.coverage(domains)
         return {
             "total": rep.total,
@@ -464,6 +501,11 @@ class HomewardService:
 
     def get_stats(self) -> dict:
         """获取统计信息"""
+        with self._state_lock:
+            return self._get_stats_locked()
+
+    def _get_stats_locked(self) -> dict:
+        """``get_stats`` 的实现体（调用方必须已持有 ``_state_lock``）。"""
         return {
             **self.stats,
             "collection": self.collection_status,
@@ -489,22 +531,32 @@ class HomewardService:
         不含知识库：这里只用到了「用户观测到的域名 + 其在本地查到的归属结论」
         （即 :class:`AttributionResult` 里的组织名），不导出知识库本体。
         """
-        reg = self.device_registry
-        attr_cache = [_attr_result_to_state(r) for r in self.attribution._cache.values()]
-        return {
-            "version": 1,
-            "saved_at": time.time(),
-            "devices": {k: _device_to_state(d) for k, d in reg.devices.items()},
-            "attribution_cache": attr_cache,
-            "unknown_domains": sorted(self.stats["unknown_domains"]),
-            "alerts": [a.to_dict() for a in self.alert_center.active()],
-        }
+        # 后台快照线程每 60s 调一次，与采集线程并发：持锁并先做浅拷贝，
+        # 避免遍历过程中 dict 被改写而抛 RuntimeError。
+        with self._state_lock:
+            reg = self.device_registry
+            attr_cache = [_attr_result_to_state(r)
+                          for r in self.attribution.cached_results()]
+            return {
+                "version": 1,
+                "saved_at": time.time(),
+                "devices": {k: _device_to_state(d)
+                            for k, d in list(reg.devices.items())},
+                "attribution_cache": attr_cache,
+                "unknown_domains": sorted(self.stats["unknown_domains"]),
+                "alerts": [a.to_dict() for a in self.alert_center.active()],
+            }
 
     def restore_observations(self, state: dict) -> int:
         """从快照恢复观测状态（合并式：不覆盖系统刚加载的设备 / 租约）。
 
         返回恢复的设备 + 告警数量（用于日志）。知识库本体不参与还原。
         """
+        with self._state_lock:
+            return self._restore_observations_locked(state)
+
+    def _restore_observations_locked(self, state: dict) -> int:
+        """``restore_observations`` 的实现体（调用方必须已持有 ``_state_lock``）。"""
         if not state:
             return 0
         reg = self.device_registry
@@ -518,8 +570,7 @@ class HomewardService:
 
         # 归属缓存：合并（已存在的覆盖）
         for st in (state.get("attribution_cache") or []):
-            r = _state_to_attr_result(st)
-            self.attribution._cache[r.domain] = r
+            self.attribution.put(_state_to_attr_result(st))
 
         # 未知域名：取并集
         self.stats["unknown_domains"] |= set(state.get("unknown_domains") or [])
@@ -528,11 +579,11 @@ class HomewardService:
         restored_alerts = 0
         for d in (state.get("alerts") or []):
             aid = d.get("alert_id")
-            if not aid or aid in self.alert_center._alerts:
+            if not aid or self.alert_center.has(aid):
                 continue
             try:
-                self.alert_center._alerts[aid] = Alert(**d)
-                restored_alerts += 1
+                if self.alert_center.restore(Alert(**d)):
+                    restored_alerts += 1
             except (TypeError, KeyError):
                 logger.warning("跳过一条无法还原的告警快照：%s", aid)
         logger.info("已恢复观测快照：设备 %d 台、告警 %d 条",

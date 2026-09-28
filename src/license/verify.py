@@ -18,8 +18,11 @@ verify.py —— 家卫社区版 许可令牌验证（零第三方依赖，仅�
 
 import base64
 import json
+import logging
 import os
 import time
+
+logger = logging.getLogger("homeward.license")
 
 # 兼容两种运行方式：作为包导入（from license.verify ...）或直接运行。
 try:  # 包内导入（src/ 已在 sys.path，server.py 已注入）
@@ -34,11 +37,63 @@ except ImportError:  # 直接运行 / 测试时按文件路径加载
     verify_signature = _mod.verify_signature
 
 
-# ── 内嵌公钥（Raw 32 字节，Base64）──
-# 生产构建时，由闭源构建流程把这里替换成正式公钥（对应 私有目录 下的私钥）。
-# 当前为**开发用**公钥，仅用于本地联调；上线前必须替换，否则任何人可用开发私钥签发许可。
+# ── 公钥（Ed25519 Raw 32 字节，Base64）──
+# 优先级：环境变量 HOMEWARD_LICENSE_PUBLIC_KEY_B64（构建期 / 部署期注入正式公钥）
+#         > 仓库内嵌的**开发公钥**（仅本地联调，绝不进对外构件）。
+#
+# 为什么必须有这一步：开发公钥对应的开发私钥存在于本地联调环境，
+# 任何人拿到它都能签出「验签通过」的令牌，付费升级形同虚设。
+# 因此对外发布的构件必须在构建时注入正式公钥（见 assert_production_key）。
 _DEV_PUBLIC_KEY_B64 = "/ADxAT6LVmMl2ytd8HURTl+1B2S6py7MFUBBKs5uRL8="
-PUBLIC_KEY = base64.b64decode(_DEV_PUBLIC_KEY_B64)
+_DEV_PUBLIC_KEY = base64.b64decode(_DEV_PUBLIC_KEY_B64)
+
+
+def _load_public_key() -> bytes:
+    """按优先级解析公钥：环境变量注入的正式公钥优先，否则退回开发公钥。
+
+    环境变量供 CI / 闭源构建流程使用，使公开仓库里的源码**无需改动源码**
+    即可产出「只认正式签发令牌」的构件（对应 私有目录 下的私钥）。
+    值不合法（非 base64 / 长度不是 32 字节）时记 error 并忽略——
+    绝不静默吞掉，否则会误以为注入成功、实则仍停在可伪造状态。
+    """
+    raw = os.environ.get("HOMEWARD_LICENSE_PUBLIC_KEY_B64")
+    if raw:
+        try:
+            key = base64.b64decode(raw, validate=True)
+        except Exception:
+            key = b""
+        if len(key) == 32:
+            return key
+        logger.error("HOMEWARD_LICENSE_PUBLIC_KEY_B64 不是合法的 32 字节 "
+                     "Ed25519 公钥（base64 解码后长度 %d），已忽略", len(key))
+    return _DEV_PUBLIC_KEY
+
+
+PUBLIC_KEY = _load_public_key()
+
+#: True 表示当前用的仍是仓库内嵌的开发公钥 —— 对外发布前必须替换。
+IS_DEV_PUBLIC_KEY = (PUBLIC_KEY == _DEV_PUBLIC_KEY)
+
+
+def assert_production_key(force: "bool | None" = None) -> None:
+    """发布门禁：仍在用开发公钥时明确告警 / 报错。
+
+    默认**只告警不阻断**：社区版没有许可也应能正常「看见」（许可只是升级闸门），
+    不能因为忘了注入公钥就让整个服务起不来。
+    发布流程（CI / 打包脚本）设 ``HOMEWARD_REQUIRE_PROD_KEY=1`` 则直接抛错，
+    把「忘了注入正式公钥」挡在发布之前，而不是等上线后被伪造许可打脸。
+    """
+    if not IS_DEV_PUBLIC_KEY:
+        return
+    if force is None:
+        force = os.environ.get("HOMEWARD_REQUIRE_PROD_KEY", "").strip() in (
+            "1", "true", "True", "yes")
+    msg = ("当前使用的是仓库内嵌的**开发公钥**：任何人拿到配套开发私钥都能签出"
+           "「验签通过」的许可，付费升级形同虚设。对外发布前请通过环境变量 "
+           "HOMEWARD_LICENSE_PUBLIC_KEY_B64 注入正式公钥并重新构建。")
+    if force:
+        raise RuntimeError(msg)
+    logger.warning(msg)
 
 
 def canonical(payload: dict) -> bytes:
@@ -89,8 +144,13 @@ def verify_token(
         # 3) 有效期
         if int(payload.get("valid_until", 0)) < int(time.time()):
             return None
-        # 4) 设备指纹绑定（调用方提供本机指纹才校验）
-        if expected_device_fp is not None and payload.get("device_fp") != expected_device_fp:
+        # 4) 设备指纹绑定：只有**令牌自身声明了 device_fp** 才做绑定校验。
+        #    发行端可以签发「通用令牌」（不绑定设备，例如多设备家庭套餐）；
+        #    这类令牌若因为调用方总是传入本机指纹就被一律拒绝，等于把通用令牌
+        #    变成了废纸。因此：令牌没声明 → 不校验；声明了 → 必须一致。
+        bound_fp = payload.get("device_fp")
+        if (bound_fp is not None and expected_device_fp is not None
+                and bound_fp != expected_device_fp):
             return None
         return payload
     except Exception:
