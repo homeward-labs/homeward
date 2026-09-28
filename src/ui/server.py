@@ -29,6 +29,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -38,9 +39,11 @@ SRC_DIR = Path(__file__).resolve().parent.parent  # src/
 sys.path.insert(0, str(SRC_DIR))
 
 from core.demo import seed_demo                    # noqa: E402
-from core.main import HomewardService              # noqa: E402
+from core.import_log import import_log_text        # noqa: E402
+from core.main import HomewardService, ROOT        # noqa: E402
 from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
 from ui.qr import qr_svg                          # noqa: E402
+from adapters.sqlite_registry import SqliteObservationStore  # noqa: E402
 from license.store import (                        # noqa: E402
     device_fingerprint,
     status as license_status,
@@ -93,7 +96,110 @@ EDITION_INFO = {
 }
 
 
+# ---------------------------------------------------------------- 报告渲染
+
+def _report_markdown(payload: dict) -> str:
+    """把观测报告结构化数据渲染成给人看的 Markdown（只含用户自己的遥测）
+
+    注意：这是下载文件，不进浏览器渲染管线，无需 esc()。知识库仍是服务器端商业机密，
+    此处**不**输出知识库全表，只呈现用户自己观测到的域名及其本地查询结论。
+    """
+    rep = payload.get("report", {})
+    stats = payload.get("stats", {}) or {}
+    cov = payload.get("coverage", {}) or {}
+    devices = payload.get("devices", []) or []
+    dests = payload.get("destinations", {}) or {}
+    unknowns = payload.get("unknown_domains", []) or []
+    alerts = payload.get("alerts", []) or []
+    spots = payload.get("blind_spots", []) or []
+
+    gen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rep.get("generated_at", 0) or 0))
+    rate = cov.get("hit_rate", 0.0)
+    rate_pct = f"{rate * 100:.1f}%" if isinstance(rate, (int, float)) else str(rate)
+
+    L = []
+    L.append("# 家卫 Homeward · 观测报告")
+    L.append("")
+    L.append(f"- 生成时间：{gen}")
+    L.append(f"- 版本：{stats.get('version', '?')}（社区版）")
+    L.append(f"- 范围：{rep.get('scope', '用户自己的观测遥测（不含知识库）')}")
+    L.append("")
+    L.append("> 本报告仅包含你自己的观测数据（设备、去向、未知域名、告警、盲区）。"
+             "知识库在服务器端，不会经此导出。")
+    L.append("")
+    L.append("## 概览")
+    L.append("")
+    L.append(f"- 设备总数：{stats.get('devices_total', 0)}（其中 {stats.get('vendors_resolved', 0)} 台识别出厂商）")
+    L.append(f"- 观测记录：{stats.get('flows_processed', 0)} 条，决策 {stats.get('decisions_made', 0)} 条")
+    L.append(f"- 活跃告警：{stats.get('alerts_active', 0)} 条")
+    L.append(f"- 域名归属覆盖率：{cov.get('hit', 0)} / {cov.get('total', 0)}（{rate_pct}）")
+    L.append("")
+    L.append("## 设备台账")
+    L.append("")
+    if devices:
+        L.append("| 名称 | IP | MAC | 厂商 | 品类 | 主要去向 |")
+        L.append("| --- | --- | --- | --- | --- | --- |")
+        for d in devices:
+            name = d.get("name") or "-"
+            ips = "、".join(d.get("ips") or []) or "-"
+            mac = d.get("mac") or "-"
+            vendor = d.get("vendor") or "-"
+            dtype = d.get("device_type") or "unknown"
+            top = "、".join(
+                f"{t.get('domain')}({t.get('count')})" for t in (d.get("top_domains") or [])[:5]
+            )
+            L.append(f"| {name} | {ips} | {mac} | {vendor} | {dtype} | {top} |")
+    else:
+        L.append("（无）")
+    L.append("")
+    L.append("## 去向地图")
+    L.append("")
+    items = dests.get("items", []) if isinstance(dests, dict) else dests
+    if items:
+        known = dests.get("known", 0) if isinstance(dests, dict) else 0
+        L.append(f"共 {len(items)} 个域名，认出 {known} 个。")
+        L.append("")
+        for x in items[:200]:
+            org = x.get("organization") or "未识别"
+            tail = f"；涉及 {len(x.get('devices', []))} 台设备" if x.get("devices") else ""
+            L.append(f"- `{x.get('domain')}` — {org}"
+                     f"（{x.get('category','?')}，置信度 {x.get('confidence','?')}）{tail}")
+    else:
+        L.append("（无）")
+    L.append("")
+    L.append("## 未知域名")
+    L.append("")
+    if unknowns:
+        for u in unknowns:
+            L.append(f"- {u}")
+    else:
+        L.append("（所有观测域名都能在知识库查到归属）")
+    L.append("")
+    L.append("## 告警")
+    L.append("")
+    if alerts:
+        for a in alerts:
+            dom = a.get("domain") or a.get("destination")
+            L.append(f"- **[{a.get('severity_label','?')}] {a.get('title','')}**"
+                     f" · {a.get('device_name','?')} → {dom}（归属：{a.get('organization') or '未识别'}）")
+            L.append(f"  - 说明：{a.get('summary','')}")
+            L.append(f"  - 建议：{a.get('action_label','')}；后果：{a.get('side_effects','')}")
+    else:
+        L.append("（无活跃告警）")
+    L.append("")
+    L.append("## 盲区")
+    L.append("")
+    if spots:
+        for s in spots:
+            L.append(f"- {s}")
+    else:
+        L.append("（无）")
+    L.append("")
+    return "\n".join(L)
+
+
 # ---------------------------------------------------------------- 请求处理
+
 
 class HomewardHandler(BaseHTTPRequestHandler):
     """HTTP 请求处理器
@@ -106,6 +212,7 @@ class HomewardHandler(BaseHTTPRequestHandler):
     service: HomewardService = None
     start_time: float = 0.0
     auth: "WebAuth | None" = None
+    observation_store: "SqliteObservationStore | None" = None
 
     # ---- 基础 ----
 
@@ -216,6 +323,32 @@ class HomewardHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length > 0 else b""
         return parse_qs(raw.decode("utf-8", "replace"))
 
+    def _read_text_body(self) -> str:
+        """读取请求体原文（用于离线日志导入等非表单输入）"""
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        raw = self.rfile.read(length) if length > 0 else b""
+        return raw.decode("utf-8", "replace")
+
+    def _parse_import_payload(self, text: str) -> str:
+        """从请求体里取出日志文本：支持 JSON / form / 裸文本三种入参"""
+        text = text or ""
+        # 1) JSON：{"log": "..."} 或 {"text": "..."}
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                log = obj.get("log") or obj.get("text") or ""
+                if log:
+                    return log
+        except (ValueError, TypeError):
+            pass
+        # 2) form-urlencoded：log=...
+        form = parse_qs(text)
+        log = (form.get("log") or [""])[0]
+        if log:
+            return log
+        # 3) 裸日志文本
+        return text
+
     # ---- 输出 ----
 
     def _send(self, status: int, body: bytes, content_type: str, extra_headers=None):
@@ -266,7 +399,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
         # 这里把只读性做成接口契约，而不是靠前端自觉。
         if path in ("/api/health", "/api/overview", "/api/devices", "/api/destinations",
                     "/api/alerts", "/api/suggestions", "/api/unknown-domains",
-                    "/api/blind-spots", "/api/domain", "/api/license/status", "/api/qr"
+                    "/api/blind-spots", "/api/domain", "/api/license/status", "/api/qr",
+                    "/api/report"
                     ) and method not in ("GET", "HEAD"):
             self._json(405, {"error": "method_not_allowed", "need": "GET"})
             return
@@ -411,38 +545,85 @@ class HomewardHandler(BaseHTTPRequestHandler):
             self._json(200, {"cleared": clear_token()})
             return
 
+        # —— 离线日志导入（Task #15）——
+        # 把用户粘贴 / 上传的一段 dnsmasq 日志或 conntrack 快照离线回放成观测。
+        # 等价于实时采集器看到的内容，不产生任何网络侧改动（社区版「只看见」边界不变）。
+        # 知识库是服务器端商业机密，此处**绝不读取或导出**知识库。
+        if path == "/api/import":
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed", "need": "POST"})
+                return
+            try:
+                log = self._parse_import_payload(self._read_text_body())
+                stats = import_log_text(log, svc)
+            except ValueError as exc:   # 日志过大等上限保护
+                self._json(413, {"error": "payload_too_large", "detail": str(exc)})
+                return
+            except Exception as exc:     # 单行脏数据已在内部吞掉，这里兜底其他异常
+                self._json(500, {"error": "import_failed", "detail": str(exc)})
+                return
+            # 导入后顺手持久化一次，避免还没等到周期保存就重启丢失
+            if self.observation_store is not None:
+                try:
+                    self.observation_store.save(svc.snapshot_observations())
+                except Exception:
+                    logger.exception("导入后持久化观测快照失败")
+            self._json(200, {"ok": True, "stats": stats})
+            return
+
+        # —— 观测报告导出（Task #17）——
+        # 只导用户自己的观测遥测（设备 / 去向 / 未知域名 / 告警 / 盲区）；
+        # **绝不 Dump 知识库**，也不提供「浏览全部已知域名」接口。
+        if path == "/api/report":
+            payload = svc.export_report()
+            fmt = (query.get("format") or ["markdown"])[0].lower()
+            if fmt == "json":
+                self._json(200, payload)
+                return
+            md = _report_markdown(payload)
+            self._send(200, md.encode("utf-8"), "text/markdown; charset=utf-8")
+            return
+
         self._json(404, {"error": "not_found", "path": path})
 
 
 # ---------------------------------------------------------------- 启动
 
 def make_server(service: HomewardService, host: str = DEFAULT_HOST,
-                port: int = DEFAULT_PORT, auth: "WebAuth | None" = None
+                port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
+                observation_store: "SqliteObservationStore | None" = None
                 ) -> ThreadingHTTPServer:
     """创建一个绑定好的服务实例（未启动 serve_forever）
 
-    用子类注入 service / auth，避免全局变量 —— 单测里可以起多个互不干扰的实例。
+    用子类注入 service / auth / observation_store，避免全局变量 —— 单测里可以起多个
+    互不干扰的实例。
     """
     handler_cls = type(
         "HomewardHandler",
         (HomewardHandler,),
-        {"service": service, "start_time": time.time(), "auth": auth},
+        {"service": service, "start_time": time.time(),
+         "auth": auth, "observation_store": observation_store},
     )
     ThreadingHTTPServer.allow_reuse_address = True
     return ThreadingHTTPServer((host, port), handler_cls)
 
 
 def run_server(service: HomewardService, host: str = DEFAULT_HOST,
-               port: int = DEFAULT_PORT, auth: "WebAuth | None" = None) -> None:
+               port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
+               observation_store: "SqliteObservationStore | None" = None) -> None:
     """阻塞运行直到 Ctrl-C"""
-    httpd = make_server(service, host=host, port=port, auth=auth)
+    httpd = make_server(service, host=host, port=port, auth=auth,
+                        observation_store=observation_store)
     _warn_if_exposed(host, auth)
     logger.info("家卫 Web UI：http://%s:%d", host, port)
+    saver = _ObservationSaver(observation_store, service)
+    saver.start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("收到中断，正在关闭 Web UI")
     finally:
+        saver.stop()
         httpd.server_close()
 
 
@@ -458,6 +639,45 @@ def _warn_if_exposed(host: str, auth: "WebAuth | None" = None) -> None:
                "或用防火墙限制来源 IP。")
     logger.warning(msg)
     print("[警告] " + msg)
+
+
+class _ObservationSaver:
+    """后台周期把观测状态快照落盘（SQLite），关闭时再落一次。
+
+    只在 ``observation_store`` 非空时工作；演示模式（会灌入演示数据）默认不启用，
+    避免把演示数据持久化进真实数据库。
+    """
+
+    def __init__(self, store: "SqliteObservationStore", service: HomewardService,
+                 interval: float = 60.0) -> None:
+        self.store = store
+        self.service = service
+        self.interval = interval
+        self._stop = threading.Event()
+        self._thread: "threading.Thread | None" = None
+
+    def start(self) -> None:
+        if self.store is None:
+            return
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.interval):
+            try:
+                self.store.save(self.service.snapshot_observations())
+            except Exception:
+                logger.exception("周期持久化观测快照失败")
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+        if self.store is not None:
+            try:
+                self.store.save(self.service.snapshot_observations())
+            except Exception:
+                logger.exception("关闭前持久化观测快照失败")
 
 
 def main(argv=None) -> int:
@@ -486,6 +706,9 @@ def main(argv=None) -> int:
                          "也可由环境变量 HOMEWARD_AUTH_TOKEN 提供")
     ap.add_argument("--no-auth", action="store_true",
                     help="强制关闭鉴权（默认即无鉴权；此开关用于有口令时仍要关）")
+    ap.add_argument("--no-persist", action="store_true",
+                    help="关闭观测状态持久化（默认生产模式开启：重启后保留设备/告警；"
+                         "演示模式 --demo 默认关闭）")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -503,6 +726,19 @@ def main(argv=None) -> int:
             auth = WebAuth(token=tok)
 
     service = HomewardService(config={"load_system_devices": not args.demo})
+
+    # 观测状态持久化：生产模式默认开启（重启不丢设备/告警），演示模式默认关闭
+    # （避免把演示数据落进真实数据库）。--no-persist 可强制关闭。
+    observation_store = None
+    if (not args.demo) and (not args.no_persist):
+        observation_store = SqliteObservationStore(ROOT / "data" / "observations.db")
+        snapshot = observation_store.load()
+        if snapshot:
+            n = service.restore_observations(snapshot)
+            logger.info("已从 SQLite 恢复观测快照（%d 条）", n)
+        else:
+            logger.info("暂无历史观测快照，本次从零开始累计")
+
     runner = None
     if args.demo:
         out = seed_demo(service)
@@ -518,7 +754,8 @@ def main(argv=None) -> int:
         print(f"[采集] 已启动：{note}")
 
     try:
-        run_server(service, host=args.host, port=args.port, auth=auth)
+        run_server(service, host=args.host, port=args.port, auth=auth,
+                   observation_store=observation_store)
     finally:
         if runner is not None:
             runner.stop()

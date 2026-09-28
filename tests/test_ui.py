@@ -68,6 +68,17 @@ class ServerTestCase(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code
 
+    def post_text(self, path, body, content_type="text/plain"):
+        req = urllib.request.Request(
+            self.base + path, data=body.encode("utf-8"),
+            headers={"Content-Type": content_type}, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, json.loads(r.read().decode("utf-8"))
+
+    def get_raw(self, path):
+        with urllib.request.urlopen(self.base + path, timeout=10) as r:
+            return r.status, r.headers.get("Content-Type", ""), r.read()
+
 
 # ---------------------------------------------------------------- 静态资源
 
@@ -354,6 +365,115 @@ class TestUpgradeApi(ServerTestCase):
         with urllib.request.urlopen(req, timeout=10) as r:
             d = json.loads(r.read().decode("utf-8"))
         self.assertTrue(d["cleared"])
+
+
+# ---------------------------------------------------------------- 离线导入 / 报告 / 持久化（P0 三件套）
+
+class TestImportAndReportApi(ServerTestCase):
+    """离线日志导入 + 观测报告导出接口。
+
+    约束（见 open-core 边界约定）：报告只导用户自己的观测遥测，**绝不 Dump 知识库**，
+    也不提供「浏览全部已知域名」接口。导入只喂用户给的原始日志，不读取知识库。
+    """
+
+    SAMPLE_DNS = (
+        "Jun 1 12:00:01 dnsmasq[1234]: query[A] example.com from 192.168.1.177\n"
+        "Jun 1 12:00:02 dnsmasq[1234]: query[A] tracker.acme-iot.net from 192.168.1.177\n"
+        "Jun 1 12:00:03 dnsmasq[1234]: query[A] weather.google.com from 192.168.1.177\n"
+        "this line is garbage and should be ignored\n"
+    )
+    SAMPLE_DNS_2 = (
+        "Jun 1 12:00:01 dnsmasq[1234]: query[A] example.org from 192.168.1.178\n"
+        "Jun 1 12:00:02 dnsmasq[1234]: query[A] ad.doubleclick.net from 192.168.1.178\n"
+    )
+
+    def test_import_returns_stats(self):
+        status, body = self.post_text("/api/import", self.SAMPLE_DNS)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+        s = body["stats"]
+        self.assertGreater(s["parsed"], 0, "应当解析出至少一行 DNS 查询")
+        self.assertGreater(s["flows"], 0)
+        self.assertGreaterEqual(s["new_devices"], 1, "应当识别出一台新设备")
+
+    def test_import_accepts_json_and_form(self):
+        # JSON：{"log": "..."}
+        status, body = self.post_text(
+            "/api/import", json.dumps({"log": self.SAMPLE_DNS_2}),
+            content_type="application/json")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+        self.assertGreaterEqual(body["stats"]["new_devices"], 1)
+        # form-urlencoded：log=...
+        status, body = self.post_text(
+            "/api/import", "log=" + urllib.parse.quote(self.SAMPLE_DNS_2),
+            content_type="application/x-www-form-urlencoded")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+
+    def test_import_rejects_get(self):
+        # /api/import 是写操作，GET 必须 405
+        self.assertEqual(self.status_of("/api/import", method="GET"), 405)
+
+    def test_report_markdown(self):
+        status, ctype, raw = self.get_raw("/api/report?format=markdown")
+        self.assertEqual(status, 200)
+        self.assertIn("text/markdown", ctype)
+        text = raw.decode("utf-8")
+        self.assertIn("家卫 Homeward · 观测报告", text)
+        self.assertIn("概览", text)
+        self.assertIn("盲区", text)
+        # 绝不出现「浏览全部已知域名」式的能力
+        self.assertNotIn("知识库全表", text)
+
+    def test_report_json_structure(self):
+        d = self.get_json("/api/report?format=json")
+        self.assertIn("devices", d)
+        self.assertIn("destinations", d)
+        self.assertIn("alerts", d)
+        self.assertIn("blind_spots", d)
+        # 报告里出现的域名应当都是「用户观测到」的，而非知识库全部域名
+        kb = self.get_json("/api/health")["kb_domains"]
+        reported_domains = {x["domain"] for x in d["destinations"]["items"]}
+        self.assertLessEqual(len(reported_domains), kb,
+                             "报告不应把整个知识库都列出来")
+
+    def test_report_rejects_post(self):
+        self.assertEqual(self.status_of("/api/report", method="POST"), 405)
+
+
+class TestObservationPersistence(unittest.TestCase):
+    """观测状态持久化（SQLite 快照 + 服务还原）"""
+
+    def test_store_roundtrip(self):
+        from adapters.sqlite_registry import SqliteObservationStore
+        import tempfile, shutil
+        tmp = tempfile.mkdtemp(prefix="homeward-obs-")
+        try:
+            db = SqliteObservationStore(Path(tmp) / "obs.db")
+            db.save({"version": 1, "x": 42})
+            loaded = db.load()
+            self.assertEqual(loaded["x"], 42)
+            db.clear()
+            self.assertIsNone(db.load())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_service_snapshot_restore(self):
+        from core.main import HomewardService
+        svc_a = HomewardService(config={"load_system_devices": False})
+        seed_demo(svc_a)
+        snap = svc_a.snapshot_observations()
+        self.assertGreater(len(snap["devices"]), 0)
+        self.assertGreater(len(snap["alerts"]), 0)
+
+        # 全新服务：从快照还原，应当拿回设备与告警
+        svc_b = HomewardService(config={"load_system_devices": False})
+        self.assertEqual(len(svc_b.device_registry.devices), 0)
+        restored = svc_b.restore_observations(snap)
+        self.assertGreater(restored, 0)
+        self.assertGreater(len(svc_b.device_registry.devices), 0)
+        self.assertGreater(len(svc_b.alert_center.active()), 0)
 
 
 if __name__ == "__main__":
