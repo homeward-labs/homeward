@@ -302,6 +302,16 @@ class AlertCenter:
         alert.status = "dismissed"
         return True
 
+    def clear(self) -> int:
+        """清空全部告警（含已忽略的）。返回清掉的条数。
+
+        只在用户主动「清除观测记录」时调用 —— 让用户能干净地重新开始分析，
+        把"修复前的旧证据"和"重新采集到的新数据"彻底分开。
+        """
+        n = len(self._alerts)
+        self._alerts.clear()
+        return n
+
     def has(self, alert_id: str) -> bool:
         """该告警是否已存在。
 

@@ -469,6 +469,17 @@ class DeviceRegistry:
             for ip in dev.ips:
                 self._ip_index[ip] = dev.key
 
+    def clear(self) -> int:
+        """清空设备台账（保留 OUI 表等静态加载项）。返回清掉的台数。
+
+        只在用户主动「清除观测记录」时调用 —— 实时流量会重新把设备建档，
+        这样"清除后看到的"就全是新采集到的，方便区分旧数据与新数据。
+        """
+        n = len(self.devices)
+        self.devices.clear()
+        self._ip_index.clear()
+        return n
+
     def blind_spots(self) -> list[str]:
         """
         当前识别能力的盲区清单 —— 直接给 UI 用。

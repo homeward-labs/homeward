@@ -324,6 +324,36 @@ class HomewardService:
         with self._state_lock:
             return self.alert_center.dismiss(alert_id)
 
+    def reset_observations(self) -> dict:
+        """清空全部观测态（设备 / 归属缓存 / 未知域名 / 告警），只动内存。
+
+        不触碰动作注册表（actions.db，许可指纹）与知识库。落盘快照由调用方
+        （Web handler 持有 ``observation_store``）随后一并 clear。
+
+        用途：用户想"重新分析"——把修复前的旧证据与重新采集到的新数据彻底分开。
+        清完后实时流量会重新建档，所以"清除后看到的"保证是全新的。
+        """
+        with self._state_lock:
+            before = {
+                "devices": len(self.device_registry.devices),
+                "alerts": len(self.alert_center.active()),
+                "unknown_domains": len(self.stats["unknown_domains"]),
+            }
+            n_dev = self.device_registry.clear()
+            n_attr = self.attribution.clear_cache()
+            n_alert = self.alert_center.clear()
+            self.stats["unknown_domains"].clear()
+            after = {
+                "devices": len(self.device_registry.devices),
+                "alerts": len(self.alert_center.active()),
+                "unknown_domains": len(self.stats["unknown_domains"]),
+            }
+            logger.info("已清空观测态：设备 %d / 归属缓存 %d / 告警 %d",
+                        n_dev, n_attr, n_alert)
+            return {"before": before, "after": after, "cleared": {
+                "devices": n_dev, "attribution_cache": n_attr, "alerts": n_alert,
+            }}
+
     def get_alert_stats(self) -> dict:
         """告警统计：数量、按严重度分布、模板渲染是否健康"""
         with self._state_lock:

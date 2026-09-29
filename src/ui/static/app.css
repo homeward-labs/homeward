@@ -88,6 +88,12 @@ html, body {
 .btn:hover { background: var(--surface-alt); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn-sm { padding: 3px 9px; font-size: 12px; }
+.btn-warn { border-color: var(--warn, #d98c00); color: var(--warn, #b9790a); }
+.btn-warn:hover { background: var(--warn-bg, rgba(217,140,0,.12)); }
+
+/* 区块标题 + 右侧操作按钮 */
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sec-head h2 { margin: 0; }
 
 /* ---------------------------------------------------------- 标签页 */
 

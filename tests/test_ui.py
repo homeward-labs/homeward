@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 import threading
 import unittest
 import urllib.error
@@ -214,6 +215,38 @@ class TestApi(ServerTestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(req, timeout=10)
         self.assertEqual(ctx.exception.code, 404)
+
+    def test_clear_observations_endpoint(self):
+        """一键清除观测记录：清掉设备/归属缓存/告警，但不碰许可（actions.db 独立）
+
+        用独立 service 实例，避免污染 TestApi 共享的 cls.service。
+        """
+        from core.main import HomewardService
+        svc = HomewardService(config={"load_system_devices": False})
+        # 喂一点真实数据进去，确保清空前有东西可清
+        svc.device_registry.observe_ip("203.0.113.9")
+        svc.attribution.resolve("track.io.mi.com")
+        svc.stats["unknown_domains"].add("zzz.unknown.example.org")
+        from analysis.alerting import Alert
+        svc.alert_center._alerts["test-alert-x"] = Alert(
+            alert_id="test-alert-x", rule_id="r", title="测试规则",
+            summary="测试告警", side_effects="无", severity="high",
+            severity_label="高", confidence="high", category="test",
+            suggested_action="allow", action_label="允许",
+            device_name="测试设备", device_ip="203.0.113.9", vendor="",
+            device_type="unknown", destination="track.io.mi.com",
+            domain="track.io.mi.com", organization="Xiaomi",
+            first_seen=time.time(), last_seen=time.time())
+
+        # 直接调服务方法（不依赖 httpd/store），验证内核行为
+        res = svc.reset_observations()
+        self.assertEqual(res["cleared"]["alerts"], 1)
+        self.assertGreater(res["cleared"]["devices"], 0)
+        self.assertEqual(len(svc.device_registry.devices), 0)
+        self.assertEqual(len(svc.alert_center.active()), 0)
+        self.assertEqual(len(svc.stats["unknown_domains"]), 0)
+        # 许可注册表（actions.db）路径不受影响
+        self.assertIsNotNone(svc.action_registry)
 
     def test_suggestions_are_never_applied(self):
         d = self.get_json("/api/suggestions")
