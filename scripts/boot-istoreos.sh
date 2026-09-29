@@ -19,34 +19,32 @@ echo " 家卫 Homeward · iStoreOS 一键安装"
 echo "======================================"
 echo "① 下载家卫源码包（进度条会动；直连慢自动换镜像）..."
 
-if [ -s "$TARBALL" ] && tarball_ok; then
-    echo "   ✓ 发现已下载好的合格包，跳过下载（想重新下载请先删 /tmp/hw.tar.gz）"
-else
-    if [ -s "$TARBALL" ]; then
-        echo "   ！发现旧包/坏包（缺少安装脚本或已损坏），自动删除重新下载…"
-        rm -f "$TARBALL"
+# 注意：每次都重新下载，确保拿到的永远是最新代码（旧包合格也会导致装到旧版本）
+if [ -s "$TARBALL" ]; then
+    echo "   清理旧包，重新下载最新版…"
+    rm -f "$TARBALL"
+fi
+GOT=0
+for U in "https://ghfast.top/$SRC_URL" "https://gh-proxy.com/$SRC_URL" "$SRC_URL"; do
+    echo "   尝试下载源：$U"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fL --connect-timeout 10 --max-time 300 --progress-bar -o "$TARBALL" "$U" && GOT=1
+    else
+        wget -O "$TARBALL" "$U" && GOT=1
+    fi
+    if [ "$GOT" = "1" ] && tarball_ok; then
+        break
     fi
     GOT=0
-    for U in "https://ghfast.top/$SRC_URL" "https://gh-proxy.com/$SRC_URL" "$SRC_URL"; do
-        echo "   尝试下载源：$U"
-        if command -v curl >/dev/null 2>&1; then
-            curl -fL --connect-timeout 10 --max-time 300 --progress-bar -o "$TARBALL" "$U" && GOT=1
-        else
-            wget -O "$TARBALL" "$U" && GOT=1
-        fi
-        if [ "$GOT" = "1" ] && tarball_ok; then
-            break
-        fi
-        GOT=0
-        rm -f "$TARBALL"
-        echo "   （这个源的包不合格，自动换下一个…）"
-    done
-    if [ "$GOT" != "1" ]; then
-        echo "   ✗ 所有下载源都失败了"
-        echo "     出路：电脑浏览器打开 $SRC_URL 下载，"
-        echo "     拷到路由器 /tmp/ 并命名 hw.tar.gz，再重新执行本命令（会自动跳过下载）。"
-        exit 1
-    fi
+    rm -f "$TARBALL"
+    echo "   （这个源的包不合格，自动换下一个…）"
+done
+if [ "$GOT" != "1" ]; then
+    echo "   ✗ 所有下载源都失败了"
+    echo "     出路：电脑浏览器打开 $SRC_URL 下载，"
+    echo "     拷到路由器 /tmp/ 并命名 hw.tar.gz，然后手动执行："
+    echo "       tar xzf /tmp/hw.tar.gz -C /tmp && sh /tmp/homeward-main/scripts/install-istoreos.sh"
+    exit 1
 fi
 echo "   ✓ 下载完成（已确认包内有安装脚本）"
 
