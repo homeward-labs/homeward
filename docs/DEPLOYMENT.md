@@ -302,7 +302,7 @@ docker stats homeward                                       # 看真实内存占
 git clone https://github.com/homeward-labs/homeward
 cd homeward
 bash scripts/install.sh
-# 脚本结束会直接打印类似：浏览器打开: http://192.168.1.50:9595
+# 脚本结束会直接打印类似：浏览器打开: http://<设备IP>:9595
 ```
 
 脚本行为：
