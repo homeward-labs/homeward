@@ -186,7 +186,7 @@ class BehaviorDetector:
                 records = [f for f in bucket if now - window <= f.timestamp <= now]
                 if not records:
                     continue
-                if not self.matcher._matches(records, pattern):
+                if not self.matcher._matches(records, pattern, window):
                     continue
 
                 src_ip, dest = key if scope == "destination" else (key, "")

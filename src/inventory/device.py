@@ -47,6 +47,9 @@ OUI_CSV = Path(__file__).resolve().parent.parent / "knowledge_base" / "oui_prefi
 
 _UNKNOWN_TYPE = "unknown"
 
+# 回环地址：查询来自路由器/软路由本机的服务，不是局域网设备
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
 # 单台设备最多记多少个去向。家庭场景一台设备通常几十个域名足够，
 # 但 DNS 隧道 / 域名生成算法会瞬间刷出海量子域 —— 没有上限的话内存会被打爆。
 MAX_DOMAINS_PER_DEVICE = 200
@@ -86,9 +89,13 @@ class Device:
 
     @property
     def display_name(self) -> str:
-        """给人看的名字：主机名 → 厂商 → IP，都没有就退回 IP"""
+        """给人看的名字：主机名 → 路由器自身 → 厂商 → IP"""
         if self.hostname:
             return self.hostname
+        # 回环地址上的 DNS 查询来自路由器本机的服务（iStore / DDNS / 系统自身），
+        # 不是局域网里的某台设备 —— 直接标明，别让它伪装成一台"未知设备"
+        if self.key in _LOOPBACK or (self.ips & _LOOPBACK):
+            return "路由器自身"
         if self.vendor_cn or self.vendor:
             return self.vendor_cn or self.vendor
         ip = next(iter(sorted(self.ips)), None)

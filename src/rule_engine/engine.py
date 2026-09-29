@@ -162,13 +162,23 @@ def _longest_label(flow: FlowRecord) -> int:
     return max((len(label) for label in domain.split(".")), default=0)
 
 
-def _dns_rate(flows: list[FlowRecord]) -> float:
-    """DNS 查询速率（次/秒）。窗口跨度为 0 时按 1 秒计，避免除零。"""
+def _dns_rate(
+    flows: list[FlowRecord], window_seconds: Optional[float] = None
+) -> float:
+    """DNS 查询速率（次/秒），分母取「观测跨度与规则窗口的较大者」。
+
+    只用观测跨度有个实测踩过的坑：dnsmasq 会把一批查询挤在同一秒写出
+    （span=0），旧逻辑按 1 秒兜底，把 20 条同秒突发算成 20 次/秒，
+    直接把路由器自身的一次批量解析误报成 DNS 隧道。
+    分母至少取规则声明的窗口长度：突发再密，也只是「一个窗口里的 N 条」，
+    真隧道是持续整个窗口的高频，依然会被抓到。
+    """
     queries = [f for f in flows if f.dns_query]
     if not queries:
         return 0.0
     span = flows[-1].timestamp - flows[0].timestamp
-    return len(queries) / (span if span > 0 else 1.0)
+    denom = max(span, float(window_seconds) if window_seconds else 0.0, 1.0)
+    return len(queries) / denom
 
 
 def _dest_matches_regex(flow: FlowRecord, pattern: str) -> bool:
@@ -305,11 +315,14 @@ class BehaviorMatcher:
         results = []
         for rule in self.supported_rules:
             pattern = rule.get("pattern") or {}
-            if self._matches(flow_history, pattern):
+            if self._matches(flow_history, pattern, rule.get("window_seconds")):
                 results.append(rule)
         return results
 
-    def _matches(self, flows: list[FlowRecord], pattern: dict) -> bool:
+    def _matches(
+        self, flows: list[FlowRecord], pattern: dict,
+        window_seconds: Optional[float] = None,
+    ) -> bool:
         """判断 flow 序列是否满足行为模式
 
         两个早期踩过的语义坑，这里刻意写死，别再退化回去：
@@ -435,17 +448,19 @@ class BehaviorMatcher:
             if longest < int(subdomain_len):
                 return False
 
-        # DNS 隧道特征二：查询速率（次/秒）
+        # DNS 隧道特征二：查询速率（次/秒）—— 分母不低于规则窗口，见 _dns_rate
         dns_rate = pattern.get("dns_rate_min")
         if dns_rate is not None:
-            if _dns_rate(relevant) < float(dns_rate):
+            if _dns_rate(relevant, window_seconds) < float(dns_rate):
                 return False
 
         # 任一成立即可（用于「长子域 OR 高频查询」这类并列特征）
         any_of = pattern.get("any_of")
         if any_of:
             if not any(
-                self._matches(relevant, dict(sub, direction=direction))
+                self._matches(
+                    relevant, dict(sub, direction=direction), window_seconds
+                )
                 for sub in any_of
                 if isinstance(sub, dict)
             ):
