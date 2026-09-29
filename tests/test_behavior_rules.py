@@ -187,9 +187,20 @@ class TestEachRuleFires(unittest.TestCase):
                                     proto="udp")))
 
     def test_dns_tunneling_by_high_rate(self):
+        """真隧道是**持续**整个窗口的高频（600+ 次/分钟），不是一瞬间的突发"""
         self.assertIn("dns_tunneling",
-                      hit_ids(flows(30, step=0.05, size=0, dns=True,
+                      hit_ids(flows(650, step=0.09, size=0, dns=True,
                                     domain="a.example.com", port=53, proto="udp")))
+
+    def test_same_second_burst_is_not_tunneling(self):
+        """dnsmasq 会把一批查询挤在同一秒写出（span=0）—— 突发 ≠ 隧道
+
+        实机误报（2026-09-29）：路由器本机 1 分钟内 20 条同秒批量解析，
+        旧算法按 1 秒兜底算出 20 次/秒，直接误报 DNS 隧道。
+        """
+        self.assertNotIn("dns_tunneling",
+                         hit_ids(flows(20, step=0, size=0, dns=True,
+                                       domain="www.example.com", port=53, proto="udp")))
 
     def test_normal_dns_is_not_tunneling(self):
         self.assertNotIn("dns_tunneling",

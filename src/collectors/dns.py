@@ -216,12 +216,19 @@ class DnsLogCollector(Collector):
                 last_inode = None
 
             while True:
+                pos = handle.tell()
                 line = handle.readline()
                 if line:
-                    rec = parse_dnsmasq_line(line)
-                    if rec is not None:
-                        yield self._to_observation(rec)
-                    continue
+                    if not line.endswith("\n"):
+                        # dnsmasq 正在写、只写了一半的行：退回起点等它写完。
+                        # 若照单全收，行尾的 from IP 可能被截断成 "1" 这类
+                        # 半个 IP —— 凭空造出一台幽灵设备（实机踩过）。
+                        handle.seek(pos)
+                    else:
+                        rec = parse_dnsmasq_line(line)
+                        if rec is not None:
+                            yield self._to_observation(rec)
+                        continue
 
                 time.sleep(self.poll_interval)
 
