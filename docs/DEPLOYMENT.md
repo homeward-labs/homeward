@@ -82,6 +82,40 @@
 
 ---
 
+## 三-B、代理软件（Clash / Mihomo 等）与家卫的可见性矩阵
+
+家卫看不看得见，**只取决于它是否处在 DNS / 网关 / 旁路抓包路径上**，与代理用哪种模式无关。下面按代理常见的 4 种模式逐一说明（以 Clash / Mihomo 为例）。
+
+| 代理模式 | 客户端是否发出真实域名查询 | 家卫能否看到（家卫在 DNS 解析路径 / 网关位） | 家卫能否看到（代理独立设备、家卫不在路径上） |
+|---|---|---|---|
+| ① fake-ip | 是（明文真实域名；被伪造的是「回答里的 IP」`198.18.0.0/16`，**不是问题里的域名**） | ✅ DNS 层可见（Tier1） | ❌ 全盲 |
+| ② redir-host（真解析） | 是 | ✅ DNS 层可见，且最干净（代理不伪造、直接外发真实查询） | ❌ 全盲 |
+| ③ TUN（虚拟网卡接管） | 是（仍发真实查询） | ⚠️ 仅当家卫在 TUN 出口的网关 / 旁路抓包路径上可见；否则 ❌ | ❌ 全盲（查询被 TUN 在**内核层** `tun.dns-hijack: any:53` 劫持进代理自身 DNS 引擎，不经过系统 dnsmasq、也不产生 dnsmasq 日志） |
+| ④ 系统代理 / 应用层 HTTP+SOCKS | 否（客户端不本地解析，由远端代理解析） | ❌ DNS 层全盲 | ❌ 全盲 |
+
+**关键结论（部署定位铁律）**：
+
+- 家卫必须处在 DNS / 网关 / 旁路抓包路径上才看得见。代理的 fake-ip / TUN 只是改变了「查询在哪被解析」，不改变这条铁律。
+- 模式 ① ② 下，只要家卫是 DNS 解析器（网关位 / 旁路由 / DNS 转发器），客户端发出的真实域名查询就会落到 dnsmasq 查询日志里，**家卫照常看见**。代理作为「独立设备」、但客户端 DNS 仍指向家卫时同理。
+- 模式 ③ ④ 下，查询根本不经过家卫一侧的 dnsmasq：TUN 在内核层劫持、系统代理在远端解析。此时 DNS 层（Tier1）必然全盲，必须靠 **标准版的 pcap 采集器（SNI / SOCKS5 明文域名 / HTTP CONNECT host，抓包层兜底）** 才能恢复可见性——该能力属**标准版（闭源付费）**，社区版仅留接口、不含实现。
+
+### dns_source：无代理 / 代理两套数据源可切换
+
+社区版提供 `dns_source` 开关，让「换数据源、架构不变」成为配置项：
+
+| `dns_source` | 读什么 | 适用 |
+|---|---|---|
+| `dnsmasq`（默认） | dnsmasq 专属查询日志文件 | 无代理；或代理 ①/② 模式下家卫即 DNS 解析器 |
+| `syslog` | 系统 syslog 里的 dnsmasq 查询行 | 代理接管 DNS、但家卫仍在解析路径上；或 OpenWrt / iStoreOS 把查询发到系统 syslog（不写专属文件） |
+
+两种都是 Tier1、共用同一套解析（`parse_dnsmasq_line`），切换只换「从哪读」，不碰架构。conntrack（Tier2）在两种模式下都照常启动。
+
+> ⚠️ `dns_source=syslog` 解决的是「数据源换了个地方」，**解决不了** TUN / 系统代理的 DNS 层全盲——那需要家卫站在抓包路径上 + 标准版 pcap。别把「切到 syslog」当成「开了代理也能全看见」的万金油。
+
+配置方式见 §六-B（环境变量 `DNS_SOURCE` / `SYSLOG_PATH`）与启动参数 `--dns-source` / `--syslog-path`。
+
+---
+
 ## 四、安装方式对照表
 
 | 安装方式 | 适用平台 | 状态 | 说明 |
@@ -383,6 +417,8 @@ dnsmasq 开 `log-queries=extra` + `log-facility=/var/log/dnsmasq.log`（容器�
 |---|---|---|
 | `HOST` / `PORT` | 监听地址 / 端口 | `127.0.0.1` / `9595` |
 | `DNS_LOG_PATH` | dnsmasq 查询日志路径（不给则按内置路径探测） | 探测 |
+| `DNS_SOURCE` | Tier1 DNS 数据源：`dnsmasq`（默认）/ `syslog`（见 §三-B，代理/系统 syslog 场景） | `dnsmasq` |
+| `SYSLOG_PATH` | `DNS_SOURCE=syslog` 时指定 syslog 文件路径（不给则按内置路径探测） | 探测 |
 | `HOMEWARD_AUTH_TOKEN` | Web UI 登录口令；**设了才启用鉴权** | 空（无鉴权） |
 | `HOMEWARD_DATA_DIR` | 许可令牌 / CRL / 设备标识的落盘目录 | `~/.homeward` |
 | `HOMEWARD_LICENSE_PUBLIC_KEY_B64` | **构建期注入正式许可公钥**（32 字节 Ed25519 Raw 的 base64） | 空（退回开发公钥） |

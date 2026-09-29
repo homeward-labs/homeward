@@ -714,6 +714,8 @@ def main(argv=None) -> int:
     except ValueError:
         env_port = DEFAULT_PORT
     env_dns_log = os.environ.get("DNS_LOG_PATH") or None
+    env_dns_source = os.environ.get("DNS_SOURCE") or "dnsmasq"
+    env_syslog_path = os.environ.get("SYSLOG_PATH") or None
 
     ap = argparse.ArgumentParser(description="家卫 Web UI（社区版：只读）")
     ap.add_argument("--host", default=env_host,
@@ -725,6 +727,14 @@ def main(argv=None) -> int:
     ap.add_argument("--dns-log", default=env_dns_log,
                     help="dnsmasq 查询日志路径（默认按 /var/log/dnsmasq.log 等探测，"
                          "或由环境变量 DNS_LOG_PATH 指定）")
+    ap.add_argument("--dns-source", default=env_dns_source,
+                    choices=("dnsmasq", "syslog"),
+                    help="Tier1 DNS 数据源：dnsmasq=读 dnsmasq 专属日志（默认，无代理/家卫即"
+                         "解析器）；syslog=读系统 syslog 里的 dnsmasq 查询行（代理接管 DNS 但家卫"
+                         "仍在解析路径上、或 OpenWrt/iStoreOS 把查询发到系统 syslog 时使用）")
+    ap.add_argument("--syslog-path", default=env_syslog_path,
+                    help="dns_source=syslog 时指定 syslog 文件路径（默认按 /var/log/messages 等探测，"
+                         "或由环境变量 SYSLOG_PATH 指定）")
     ap.add_argument("--auth-token", default=None,
                     help="Web UI 登录口令；不填则默认无鉴权（浏览器直开）。"
                          "也可由环境变量 HOMEWARD_AUTH_TOKEN 提供")
@@ -784,11 +794,17 @@ def main(argv=None) -> int:
     else:
         # 生产模式：启动采集泵，把真实 DNS / conntrack 数据持续喂给 service
         from core.collector import CollectorRunner
-        runner = CollectorRunner(service, dns_log_path=args.dns_log, poll_interval=0.5)
+        runner = CollectorRunner(
+            service,
+            dns_log_path=args.dns_log,
+            dns_source=args.dns_source,
+            syslog_path=args.syslog_path,
+            poll_interval=0.5,
+        )
         status = runner.start()
         active = [s["collector"] for s in status if s["active"]]
-        note = "、".join(active) if active else "无（请确认 dnsmasq 日志路径，详见界面「盲区」视图）"
-        print(f"[采集] 已启动：{note}")
+        note = "、".join(active) if active else "无（请确认 DNS 数据源配置，详见界面「盲区」视图）"
+        print(f"[采集] 已启动（dns_source={args.dns_source}）：{note}")
 
     try:
         run_server(service, host=args.host, port=args.port, auth=auth,
