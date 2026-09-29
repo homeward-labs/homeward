@@ -364,6 +364,20 @@ function renderImport() {
         </div>
         <div class="small muted" style="margin-top:8px">下载的文件保存在你本地，可离线查看或转发。</div>
       </div>
+    </div>
+
+    <div class="section">
+      <h2>重置观测数据</h2>
+      <div class="note">清空全部观测记录（设备台账、域名归属缓存、未知域名、所有告警，含已忽略），
+        让家卫从零开始重新采集。常用于：区分「修复前的旧证据」与「重新抓到的新数据」。
+        不会删除你的许可 / 标准版动作记录。</div>
+      <div class="card" style="margin-top:12px">
+        <div class="item-foot">
+          <button class="btn btn-warn" type="button" data-action="clear-observations"
+            title="清空设备/域名/告警等全部观测记录，重新开始分析（不删除许可）">清除全部观测记录</button>
+          <span class="small muted">操作不可撤销，但只影响本机观测态。</span>
+        </div>
+      </div>
     </div>`;
 }
 

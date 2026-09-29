@@ -53,8 +53,10 @@ services:
       start_period: 15s
 
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      # 持久化数据目录：默认 ./data（相对 compose 文件）；安装脚本会用 HOMEWARD_DATA_HOST
+      # 覆盖为宿主机上的持久路径（如 /userdata/homeward/homeward-data），避免重装/重启丢数据。
+      - ${HOMEWARD_DATA_HOST:-./data}:/app/data
+      - ${HOMEWARD_LOGS_HOST:-./logs}:/app/logs
       # iStoreOS / OpenWrt 系统 dnsmasq 日志（只读）。默认 /tmp/dnsmasq.log；
       # 若你改过 logfacility，把这里的源路径一并改掉。
       - /tmp/dnsmasq.log:/tmp/dnsmasq.log:ro

@@ -12,7 +12,26 @@ set -u
 TARBALL="/tmp/hw.tar.gz"
 SRC_URL="https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz"
 MIRRORS="https://ghfast.top/ https://gh-proxy.com/"
-DIR="/tmp/homeward-main"
+
+# 安装位置：遵循 iStoreOS 规范，Docker 应用统一放在 /userdata/apps/<应用名>/ 下
+# （/userdata 是 iStoreOS 的持久分区，重启/重装都不丢；/tmp 是 tmpfs，重启即清空，绝不能用）。
+# 源码目录每次重装会被 rm -rf 重建；数据目录独立到同级的 homeward-data，重装/重启都不丢。
+BASE=""
+for _c in /userdata/apps /userdata /root; do
+  if mkdir -p "$_c/.hw_probe" 2>/dev/null; then
+    rmdir "$_c/.hw_probe" 2>/dev/null
+    BASE="$_c"
+    break
+  fi
+done
+if [ -z "$BASE" ]; then
+  echo "  ！ 未找到可用的持久目录（/userdata/apps、/userdata、/root 均不可写），将退回 /tmp（重启/重装数据会丢失）"
+  BASE="/tmp"
+  mkdir -p "$BASE"
+fi
+DIR="$BASE/homeward"                   # 源码目录（iStore 标准应用位）：每次重装 rm -rf 重建
+DATA_DIR="$BASE/homeward-data"         # 数据目录：独立于源码，重装/重启都不丢
+BACKUP_FILE="$BASE/homeward-data-backup.tar.gz"
 LOG_FILE="/tmp/dnsmasq.log"
 COMPOSE_FILE="docker/docker-compose.istoreos.yml"
 
@@ -74,17 +93,50 @@ else
     fi
 fi
 
-# ---------- 第 3 步：校验并解压 ----------
-step "第 3 步 / 共 5 步：校验并解压"
+# ---------- 第 3 步：校验、备份既有数据并解压 ----------
+step "第 3 步 / 共 5 步：校验、备份既有数据并解压"
 if ! tar -tzf "$TARBALL" >/dev/null 2>&1; then
     no "压缩包损坏（下载不完整）"
     echo "    处理：rm -f $TARBALL 后重新运行本脚本。"
     exit 1
 fi
 ok "压缩包完好"
+
+# —— 重装前：先保住既有数据 ——
+# 数据目录 $DATA_DIR 独立于源码目录，下面的 rm -rf "$DIR" 不会动它；这里再打一份备份到
+# 持久位置，并兼容旧版（旧安装把数据放在 /tmp/homeward-main），若还在就先迁过来。
+BACKUP_FILE="$BASE/homeward-data-backup.tar.gz"
+LEGACY="/tmp/homeward-main"
+if [ ! -d "$DATA_DIR" ] && [ -d "$LEGACY" ]; then
+    for _ld in "$LEGACY/data" "$LEGACY/docker/data"; do
+        if [ -d "$_ld" ]; then
+            mkdir -p "$DATA_DIR"
+            cp -a "$_ld/." "$DATA_DIR/" 2>/dev/null && ok "已从旧位置迁移历史数据：$_ld"
+            break
+        fi
+    done
+fi
+if [ -d "$DATA_DIR" ] && [ -n "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+    tar czf "$BACKUP_FILE" -C "$BASE" "$(basename "$DATA_DIR")" 2>/dev/null \
+        && ok "已备份既有数据到 $BACKUP_FILE" \
+        || echo "  ！ 备份失败（不影响安装，数据仍在 $DATA_DIR）"
+else
+    echo "  · 没有既有数据需要备份（首次安装或数据目录为空）"
+fi
+
 rm -rf "$DIR"
-if tar xzf "$TARBALL" -C /tmp && [ -f "$DIR/scripts/install-istoreos.sh" ]; then
-    ok "解压完成：$DIR"
+if tar xzf "$TARBALL" -C "$BASE"; then
+    # GitHub 归档顶层目录通常为 homeward-main，重命名为标准应用名 homeward
+    _src=$(tar tzf "$TARBALL" | head -1 | cut -d/ -f1)
+    if [ -n "$_src" ] && [ "$_src" != "$(basename "$DIR")" ] && [ -d "$BASE/$_src" ]; then
+        mv "$BASE/$_src" "$DIR"
+    fi
+    if [ -f "$DIR/scripts/install-istoreos.sh" ]; then
+        ok "解压完成：$DIR"
+    else
+        no "解压失败（未找到安装脚本）"
+        exit 1
+    fi
 else
     no "解压失败"
     exit 1
@@ -137,8 +189,18 @@ else
     no "未检测到 Docker Compose —— iStoreOS 请在 Docker 插件里启用 Compose"
     exit 1
 fi
+mkdir -p "$DATA_DIR"
+# 把持久化数据目录传给 compose（docker/docker-compose.istoreos.yml 用它做 bind 挂载源）
+export HOMEWARD_DATA_HOST="$DATA_DIR"
+export HOMEWARD_LOGS_HOST="$DATA_DIR/logs"
 if $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d --build; then
     ok "家卫容器已启动"
+    # 重装后若数据目录为空但有备份，则自动恢复（兜底：极少触发，因 $DATA_DIR 本身持久）
+    _empty=1
+    [ -d "$DATA_DIR" ] && [ -n "$(ls -A "$DATA_DIR" 2>/dev/null)" ] && _empty=0
+    if [ "$_empty" = "1" ] && [ -f "$BACKUP_FILE" ]; then
+        tar xzf "$BACKUP_FILE" -C "$BASE" 2>/dev/null && ok "已从备份自动恢复历史数据"
+    fi
 else
     no "容器启动失败 —— 把上面最后几行报错发给维护者排查"
     exit 1
@@ -156,7 +218,10 @@ else
 fi
 echo "======================================"
 echo ""
-echo "  下一步（重要）：面板现在是空的，因为还没有设备把查询发到这台路由器。"
+echo "  数据持久化：观测记录与许可指纹保存在 $DATA_DIR（独立于源码，重装/重启不丢）。"
+echo "  若之前装过旧版，历史数据会在重装时自动迁移/恢复。"
+echo ""
+echo "  下一步（重要）：若面板是空的，是因为还没有设备把查询发到这台路由器。"
 echo "  ▸ 这台软路由若带无线网卡，可以开一个 WiFi 让设备连进来："
 echo "    - 当主路由用：设备直接连它的 WiFi 上网；"
 echo "    - 当旁路由用：主路由不动，只把部分设备的网关/DNS 指向它。"
