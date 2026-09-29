@@ -598,12 +598,24 @@ class HomewardService:
             restored_devices += 1
         reg.reindex()
 
-        # 归属缓存：合并（已存在的覆盖）
+        # 归属缓存：合并（已存在的覆盖）。
+        # 关键：快照里的旧结论必须拿**当前知识库**重判 —— 知识库会随版本扩量
+        # （实机教训：补录 GitHub 生态后，旧快照的「未知」若原样 put() 回缓存，
+        # 会永久顶住新规则，面板永远显示未知）。已知的新结论优先，旧的「未知」不落缓存。
         for st in (state.get("attribution_cache") or []):
-            self.attribution.put(_state_to_attr_result(st))
+            old = _state_to_attr_result(st)
+            fresh = self.attribution.resolve(old.domain)
+            if not fresh.known and old.known:
+                # 知识库反而收窄（理论上不该发生）：保留旧的已知结论，不丢信息
+                self.attribution.put(old)
 
-        # 未知域名：取并集
-        self.stats["unknown_domains"] |= set(state.get("unknown_domains") or [])
+        # 未知域名：取并集，但先剔除当前知识库已能归属的 ——
+        # 否则域名一旦进过未知名单，知识库补录后会仍然挂在「未知域名」列表里
+        unknown_set = {
+            d for d in (state.get("unknown_domains") or [])
+            if not self.attribution.resolve(d).known
+        }
+        self.stats["unknown_domains"] |= unknown_set
 
         # 告警：合并（已存在的跳过）
         restored_alerts = 0
