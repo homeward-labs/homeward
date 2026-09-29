@@ -90,6 +90,35 @@ class TestDnsParsing(unittest.TestCase):
         self.assertIsNotNone(rec)
         self.assertEqual(rec["domain"], "example.com")
 
+    def test_parse_openwrt_extra_format(self):
+        """OpenWrt/iStoreOS 实机格式：serial + 客户端/端口前缀（2026-09-29 实测）"""
+        rec = parse_dnsmasq_line(
+            "Sep 29 14:02:27 dnsmasq[11]: 1796 192.168.1.124/55293 "
+            "query[A] www.baidu.com from 192.168.1.124"
+        )
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec["domain"], "www.baidu.com")
+        self.assertEqual(rec["client_ip"], "192.168.1.124")
+        self.assertEqual(rec["query_type"], "A")
+        self.assertIsInstance(rec["timestamp"], float)
+
+    def test_parse_openwrt_extra_variants(self):
+        """serial 与 客户端/端口 前缀各自可独立出现或缺省"""
+        rec = parse_dnsmasq_line(
+            "Sep 29 13:53:16 dnsmasq[11]: 1790 127.0.0.1/47771 "
+            "query[PTR] 173.1.168.192.in-addr.arpa from 127.0.0.1"
+        )
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec["client_ip"], "127.0.0.1")
+        self.assertEqual(rec["query_type"], "PTR")
+
+        rec = parse_dnsmasq_line(
+            "dnsmasq[11]: 1792 192.168.1.252/50771 "
+            "query[AAAA] tunnel.linkease.com from 127.0.0.1"
+        )
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec["domain"], "tunnel.linkease.com")
+
 
 # ==================== Tier 2：conntrack 解析 ====================
 

@@ -137,7 +137,7 @@ else
     no "未检测到 Docker Compose —— iStoreOS 请在 Docker 插件里启用 Compose"
     exit 1
 fi
-if $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d; then
+if $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d --build; then
     ok "家卫容器已启动"
 else
     no "容器启动失败 —— 把上面最后几行报错发给维护者排查"
