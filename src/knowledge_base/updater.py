@@ -32,15 +32,27 @@ class KnowledgeBaseUpdater:
 
     DEFAULT_REPO = "https://raw.githubusercontent.com/homeward-labs/knowledge-base/main"
 
+    #: 环境变量名：自建内容源地址（覆盖默认源）
+    ENV_SOURCE = "HOMEWARD_KB_SOURCE"
+
     def __init__(self, kb_dir: str, repo_url: str = None, auto_update: bool = True, interval: int = 604800):
         """
         kb_dir: 知识库目录
         repo_url: 远程仓库地址
         auto_update: 是否自动更新
         interval: 更新间隔（秒），默认 7 天
+
+        源优先级：**显式传参 > 环境变量 HOMEWARD_KB_SOURCE > DEFAULT_REPO**。
+
+        环境变量这条路径是给「自建源 / 内网镜像」准备的：内容源本质上只是一组
+        静态文件（VERSION + domains.csv + behaviors.json + CHECKSUM），
+        所以在飞牛或任意一台内网机器上放一份、起个 HTTP 服务，
+        家卫指向 ``http://<内网IP>:8080/kb/`` 即可 —— **不需要任何公网服务器**。
+        测试阶段尤其该走这条路：零成本、不对外暴露、改完立刻生效。
         """
         self.kb_dir = Path(kb_dir)
-        self.repo_url = repo_url or self.DEFAULT_REPO
+        env_source = os.environ.get(self.ENV_SOURCE, "").strip()
+        self.repo_url = repo_url or env_source or self.DEFAULT_REPO
         self.auto_update = auto_update
         self.interval = interval
         self._thread: threading.Thread | None = None

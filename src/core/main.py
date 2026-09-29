@@ -140,8 +140,11 @@ class HomewardService:
         )
 
         # 知识库更新器
+        # 源优先级：config["kb_source"] > 环境变量 HOMEWARD_KB_SOURCE > 默认源。
+        # 留空（默认）时行为与之前完全一致，不会意外改变任何人的联网目标。
         self.kb_updater = KnowledgeBaseUpdater(
             kb_dir=str(KB_DIR),
+            repo_url=self.config.get("kb_source"),
             # 默认关闭：隐私工具默认不联网，知识库更新需用户显式开启
             auto_update=self.config.get("kb_auto_update", False),
             interval=self.config.get("kb_update_interval", 604800),
