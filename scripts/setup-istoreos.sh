@@ -52,12 +52,13 @@ echo "[3/4] 拉起家卫容器 ..."
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "错误：找不到 $COMPOSE_FILE"
     echo "      本脚本需要在家卫源码目录下运行。请先用下面的方式获取完整源码"
-    echo "      （iStoreOS 默认没装 git，用压缩包方式，不需要 git）："
-    echo "        cd /tmp && (curl -fsSL -o hw.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz || wget -O hw.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz) && tar xzf hw.tar.gz && cd homeward-main"
-    echo "      然后再执行：sh scripts/setup-istoreos.sh"
+    echo "      （iStoreOS 默认没装 git，用压缩包方式，不需要 git；下载带进度条，"
+    echo "       GitHub 直连太慢会自动换镜像加速）："
+    echo "        sh -c 'cd /tmp && U=https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz && echo \"[1/3] 下载家卫源码包（进度条会动）\" && { curl -fL --connect-timeout 15 --progress-bar -o hw.tar.gz \"\$U\" || curl -fL --connect-timeout 15 --progress-bar -o hw.tar.gz \"https://ghfast.top/\$U\" || wget -O hw.tar.gz \"https://ghfast.top/\$U\"; } && echo \"[2/3] 解压\" && tar xzf hw.tar.gz && cd homeward-main && echo \"[3/3] 运行安装脚本\" && sh scripts/setup-istoreos.sh'"
     exit 1
 fi
 if command -v docker >/dev/null 2>&1; then
+    echo "      （首次安装需要构建镜像，可能要 3~10 分钟，取决于路由器性能，请耐心等待）"
     if docker compose version >/dev/null 2>&1; then
         docker compose -f "$COMPOSE_FILE" up -d
     elif command -v docker-compose >/dev/null 2>&1; then

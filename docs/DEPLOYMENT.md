@@ -318,8 +318,11 @@ iStoreOS 自带 Docker 管理器，部署步骤与飞牛一致，只是你是网
 ```bash
 # 在 iStoreOS 的终端里（iStoreOS 默认未安装 git，用源码压缩包方式，不依赖 git）
 cd /tmp
-curl -fsSL -o homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz \
-  || wget -O homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+U=https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+# 直连带进度条；GitHub 直连失败自动换镜像加速（ghfast.top 可按当地可用性替换）
+curl -fL --connect-timeout 15 --progress-bar -o homeward.tar.gz "$U" \
+  || curl -fL --connect-timeout 15 --progress-bar -o homeward.tar.gz "https://ghfast.top/$U" \
+  || wget -O homeward.tar.gz "https://ghfast.top/$U"
 tar xzf homeward.tar.gz
 cd homeward-main
 docker compose -f docker/docker-compose.yaml up -d --build
