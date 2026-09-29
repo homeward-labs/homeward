@@ -256,6 +256,53 @@ class TestCollectorContract(unittest.TestCase):
         self.assertTrue(DnsLogCollector(source=lambda: iter([])).probe().available)
         self.assertTrue(ConntrackCollector(source=lambda: []).probe().available)
 
+    def test_partial_line_is_not_parsed_prematurely(self):
+        """dnsmasq 写到一半的行不许提前消费 —— 否则 from IP 被截成幽灵设备
+
+        实机踩坑（2026-09-29）：面板上出现一台叫 "1" 的设备，
+        就是尾行 `... from 192.168.1.124` 被截断成 `... from 1` 造成的。
+        """
+        import queue
+        import tempfile
+        import threading
+        import time
+
+        td = tempfile.mkdtemp(prefix="hw_dns_follow_")
+        log = Path(td) / "dnsmasq.log"
+        log.write_text("", encoding="utf-8")   # 采集器只读打开之后的新增内容
+
+        out: queue.Queue = queue.Queue()
+        coll = DnsLogCollector(log_path=str(log), poll_interval=0.01)
+        worker = threading.Thread(
+            target=lambda: [out.put(o) for o in coll.records()], daemon=True
+        )
+        worker.start()
+        time.sleep(0.05)   # 等采集器打开文件并定位到末尾
+
+        full = ("Sep 29 14:02:27 dnsmasq[11]: 1 192.168.1.50/5 "
+                "query[A] a.example.com from 192.168.1.50\n")
+        partial = ("Sep 29 14:02:28 dnsmasq[11]: 2 192.168.1.51/6 "
+                   "query[A] b.example.com from 192.168.1.5")
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(full + partial)
+
+        try:
+            obs1 = out.get(timeout=2)
+            self.assertEqual(obs1.device_id, "192.168.1.50")
+            # 半行还没写完：不许产生第二条观测（更不许把 IP 截成 "1"）
+            with self.assertRaises(queue.Empty):
+                out.get(timeout=0.3)
+            time.sleep(0.05)
+            with open(log, "a", encoding="utf-8") as f:
+                f.write("1\n")   # 补完半行：from 192.168.1.5 + "1" + 换行
+            obs2 = out.get(timeout=2)
+            self.assertEqual(obs2.device_id, "192.168.1.51")
+            self.assertEqual(obs2.fields["domain"], "b.example.com")
+        finally:
+            # 线程是 daemon，进程退出即回收；日志目录留给系统临时目录清理
+            # （Windows 下文件仍被跟随线程打开，主动删除会失败）
+            pass
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
