@@ -63,6 +63,42 @@
 
 ---
 
+## 自建内容源（HOMEWARD_KB_SOURCE）
+
+内容源本质上就是**一组静态文件 + 一个版本号**，所以任何人都可以自建一份 ——
+不需要服务器进程、不需要数据库、不需要公网。
+
+**在任意一台内网机器上**（飞牛 NAS、软路由、开发机均可）：
+
+```bash
+mkdir -p /kb && cd /kb
+# 放入 VERSION / domains.csv / behaviors.json / CHECKSUM
+python3 -m http.server 8080 --directory /kb
+```
+
+**然后让家卫指向它**：
+
+```bash
+export HOMEWARD_KB_SOURCE="http://192.168.1.10:8080"
+# Docker：docker-compose 里加 environment: HOMEWARD_KB_SOURCE=...
+```
+
+源的优先级是 **显式传参 > 环境变量 `HOMEWARD_KB_SOURCE` > 默认源**。
+**不设置时行为与默认完全一致**，不会改变任何人的联网目标。
+
+自建源的两个典型用途：
+
+- **内网镜像**：家里所有设备从局域网拉更新，绕开公网可达性问题，也便于离线环境。
+- **本地测试**：开发/调试时指向本机目录，改完立刻生效，无需等待远端。
+
+生成 `CHECKSUM` 的格式（sha256 + 两个空格 + 文件名）：
+
+```bash
+sha256sum domains.csv behaviors.json > CHECKSUM
+```
+
+---
+
 ## 为什么服务端优先级要高于「客户端新功能」和「打包渠道」
 
 1. **它是唯一「改一次、全网生效」的地方。** 客户端改动要等用户拉新镜像 / 升级包才生效；
