@@ -247,6 +247,16 @@ class DomainAttribution:
         """已缓存的归属结论列表（快照导出用）。"""
         return list(self._cache.values())
 
+    def clear_cache(self) -> int:
+        """清空归属缓存（只清缓存，不删知识库）。
+
+        与设备台账、告警一起在「清除观测记录」时调用：
+        清掉旧的归属结论，让清除后出现的域名重新走一次真实解析。
+        """
+        n = len(self._cache)
+        self._cache.clear()
+        return n
+
     def put(self, result: "AttributionResult") -> None:
         """把快照恢复出的归属结论放回缓存（同域名覆盖）。"""
         self._cache[result.domain] = result

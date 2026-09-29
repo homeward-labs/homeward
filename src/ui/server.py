@@ -456,6 +456,22 @@ class HomewardHandler(BaseHTTPRequestHandler):
                        {"dismissed": ok, "id": alert_id})
             return
 
+        if path == "/api/observations/clear":
+            # 一键清除全部观测记录（设备/域名/告警），让用户能重新开始分析：
+            # 把"修复前的旧证据"和"重新采集到的新数据"彻底分开。
+            # 只清观测态 + 落盘快照（observations.db），绝不碰 actions.db（许可指纹）。
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed", "need": "POST"})
+                return
+            result = svc.reset_observations()
+            if self.observation_store is not None:
+                try:
+                    self.observation_store.clear()
+                except Exception as exc:  # 内存态已清，落盘失败不致命
+                    logger.warning("清除落盘观测快照失败（内存态已清空）：%s", exc)
+            self._json(200, {"ok": True, **result})
+            return
+
         if path == "/api/suggestions":
             self._json(200, {
                 "items": list(svc.suggested_rules),
