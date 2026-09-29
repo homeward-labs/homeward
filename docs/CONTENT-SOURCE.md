@@ -91,7 +91,7 @@ python3 -m http.server 8080 --directory /kb
 **然后让家卫指向它**：
 
 ```bash
-export HOMEWARD_KB_SOURCE="http://192.168.1.10:8080"
+export HOMEWARD_KB_SOURCE="http://<宿主机IP>:8080"
 # Docker：docker-compose 里加 environment: HOMEWARD_KB_SOURCE=...
 ```
 
