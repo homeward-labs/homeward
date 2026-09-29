@@ -8,9 +8,12 @@
 #   docker compose -f docker/docker-compose.istoreos.yml up -d
 #   # 浏览器开 http://<iStoreOS IP>:9595
 #
-# 前置（一次性，在 iStoreOS 上开启 dnsmasq 日志到文件）：
-#   方式 A（图形）：iStoreOS 管理页 → 网络 → DHCP/DNS → 常规设置 → 把「日志设施」填为 /tmp/dnsmasq.log → 保存应用
+# 前置（一次性，在 iStoreOS 上开启 dnsmasq 日志到文件；或直接用仓库 scripts/setup-istoreos.sh 一键完成）：
+#   方式 A（图形）：iStoreOS 管理页 → 网络 → DHCP/DNS → 「日志」标签页（不在「常规」里）→
+#     勾选「记录 DNS 查询」；在「日志设施」下拉框选 /tmp/dnsmasq.log
+#     （第一次列表里没有：在下拉框最下面的输入框输入 /tmp/dnsmasq.log 并回车添加）→ 保存应用
 #   方式 B（命令行）：在 iStoreOS 终端执行
+#     uci set dhcp.@dnsmasq[0].logqueries='1'
 #     uci set dhcp.@dnsmasq[0].logfacility='/tmp/dnsmasq.log'
 #     uci commit dhcp && /etc/init.d/dnsmasq restart
 #   确认产生日志：logread -e dnsmasq 或 cat /tmp/dnsmasq.log 能看到 query[...] 行即可。
