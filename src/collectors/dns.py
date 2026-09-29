@@ -39,13 +39,16 @@ _MONTHS = {
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
 }
 
-# dnsmasq 查询行两种形态都兼容：
-#   带 syslog 前缀：Feb 11 12:34:56 dnsmasq[1234]: query[A] www.example.com from 192.168.1.50
-#   不带前缀（部分容器 / 直写 stderr）：dnsmasq[1234]: query[A] www.example.com from 192.168.1.50
+# dnsmasq 查询行三种形态都兼容：
+#   标准：Feb 11 12:34:56 dnsmasq[1234]: query[A] www.example.com from 192.168.1.50
+#   OpenWrt / iStoreOS（log-queries 带 serial + 客户端/端口前缀，2026-09-29 实机确认）：
+#     Sep 29 14:02:27 dnsmasq[11]: 1796 192.168.1.124/55293 query[A] www.baidu.com from 192.168.1.124
+#   不带 syslog 前缀（部分容器 / 直写 stderr）：dnsmasq[1234]: query[A] www.example.com from 192.168.1.50
 _QUERY_RE = re.compile(
     r"^(?:(?P<mon>[A-Z][a-z]{2})\s+(?P<day>\d{1,2})\s+"
     r"(?P<hh>\d{1,2}):(?P<mm>\d{2}):(?P<ss>\d{2})\s+)?"
     r"dnsmasq(?:\[(?P<pid>\d+)\])?:\s+"
+    r"(?:(?P<serial>\d+)\s+)?(?:\S+/\d+\s+)?"  # OpenWrt extra 字段：查询序号 + 客户端/端口
     r"query\[(?P<qtype>[A-Za-z0-9]+)\]\s+(?P<domain>\S+)\s+from\s+(?P<client>\S+)\s*$"
 )
 
