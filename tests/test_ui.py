@@ -248,6 +248,43 @@ class TestApi(ServerTestCase):
         # 许可注册表（actions.db）路径不受影响
         self.assertIsNotNone(svc.action_registry)
 
+    def test_restore_rejudges_stale_unknowns(self):
+        """快照恢复时旧「未知」归属必须用当前知识库重判（iStoreOS 实机教训）
+
+        场景：旧版本知识库认不出 fastly.jsdelivr.net，快照里存了「未知」结论；
+        知识库补录 jsdelivr.net 父域后重启，恢复快照不应把旧「未知」原样放回，
+        未知域名列表也要同步剔除已能归属的条目。
+        """
+        from core.main import HomewardService
+        svc = HomewardService(config={"load_system_devices": False})
+        stale_unknown = {
+            "domain": "fastly.jsdelivr.net", "organization": None,
+            "category": "unknown", "confidence": "none", "description": "",
+            "action": "allow", "side_effects": [],
+            "matched_domain": None, "matched_by": "none",
+        }
+        state = {
+            "version": 1, "saved_at": time.time(),
+            "devices": {},
+            "attribution_cache": [stale_unknown],
+            "unknown_domains": ["fastly.jsdelivr.net", "api.ip.sb",
+                                "still-unknown.example.org"],
+            "alerts": [],
+        }
+        svc.restore_observations(state)
+
+        # 旧「未知」必须被当前知识库转正（父域 jsdelivr.net 兜上）
+        r = svc.attribution.resolve("fastly.jsdelivr.net")
+        self.assertTrue(r.known, "快照恢复后旧未知结论必须用当前知识库重判")
+        self.assertIn("jsDelivr", r.organization)
+        self.assertEqual(r.matched_domain, "jsdelivr.net")
+
+        # 未知域名列表：已能归属的剔除，真未知的保留
+        unknowns = svc.get_unknown_domains()
+        self.assertNotIn("fastly.jsdelivr.net", unknowns)
+        self.assertNotIn("api.ip.sb", unknowns)
+        self.assertIn("still-unknown.example.org", unknowns)
+
     def test_suggestions_are_never_applied(self):
         d = self.get_json("/api/suggestions")
         self.assertGreater(len(d["items"]), 0)
