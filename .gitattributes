@@ -1,0 +1,5 @@
+# 强制脚本类文件使用 LF 换行，避免 Windows  checkout 变成 CRLF 后
+# 在 Linux 路由器（iStoreOS）上 sh 执行报错
+*.sh text eol=lf
+*.py text eol=lf
+docker-compose*.yml text eol=lf
