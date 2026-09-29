@@ -63,8 +63,11 @@ cat /var/log/dnsmasq.log    # Debian 系常见落点
 ```bash
 # Docker（当前唯一可实际跑起来的方式；iStoreOS 等未装 git 的系统也能用下面的压缩包方式）
 cd /tmp
-curl -fsSL -o homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz \
-  || wget -O homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+U=https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+# 直连带进度条；GitHub 直连失败自动换镜像加速（ghfast.top 可按当地可用性替换）
+curl -fL --connect-timeout 15 --progress-bar -o homeward.tar.gz "$U" \
+  || curl -fL --connect-timeout 15 --progress-bar -o homeward.tar.gz "https://ghfast.top/$U" \
+  || wget -O homeward.tar.gz "https://ghfast.top/$U"
 tar xzf homeward.tar.gz
 cd homeward-main
 docker compose up -d
