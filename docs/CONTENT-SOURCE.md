@@ -68,11 +68,23 @@
 内容源本质上就是**一组静态文件 + 一个版本号**，所以任何人都可以自建一份 ——
 不需要服务器进程、不需要数据库、不需要公网。
 
-**在任意一台内网机器上**（飞牛 NAS、软路由、开发机均可）：
+**在任意一台内网机器上**（NAS、软路由、开发机均可）。内容源只有 4 个文件、几十 KB，
+所以**把源放在家卫运行的同一台机器上**是最省事的形态 —— 改完立刻生效，
+还能随时停掉服务来演练「源不可达」降级。
+
+⚠️ **OpenWrt / iStoreOS 上不要用 `python3 -m http.server`** —— 这类系统默认没有 python3。
+用 busybox 自带的 httpd：
 
 ```bash
-mkdir -p /kb && cd /kb
-# 放入 VERSION / domains.csv / behaviors.json / CHECKSUM
+mkdir -p /userdata/kb && cd /userdata/kb
+# 放入 VERSION / domains.csv / behaviors.json
+sha256sum domains.csv behaviors.json > CHECKSUM
+busybox httpd -p 8080 -h /userdata/kb
+```
+
+一般 Linux 上则用：
+
+```bash
 python3 -m http.server 8080 --directory /kb
 ```
 
@@ -86,10 +98,21 @@ export HOMEWARD_KB_SOURCE="http://192.168.1.10:8080"
 源的优先级是 **显式传参 > 环境变量 `HOMEWARD_KB_SOURCE` > 默认源**。
 **不设置时行为与默认完全一致**，不会改变任何人的联网目标。
 
+### ⚠️ 家卫跑在 Docker 里时，`127.0.0.1` 指的是容器自己
+
+这是自建源最容易踩的坑：**容器内的 `127.0.0.1` 不是宿主机**。按网络模式选填：
+
+| Docker 网络模式 | 该填的地址 |
+|---|---|
+| **bridge（默认）** | `http://172.17.0.1:8080`（docker0 网关）或 `http://<宿主机局域网IP>:8080` |
+| **host** | `http://127.0.0.1:8080` |
+
+**推荐统一填宿主机的局域网 IP** —— 两种网络模式下都通，也便于防火墙放行。
+
 自建源的两个典型用途：
 
-- **内网镜像**：家里所有设备从局域网拉更新，绕开公网可达性问题，也便于离线环境。
-- **本地测试**：开发/调试时指向本机目录，改完立刻生效，无需等待远端。
+- **内网镜像**：所有设备从局域网拉更新，绕开公网可达性问题，也便于离线环境。
+- **本地测试**：开发/调试时指向本机目录，改完立刻生效；**停掉服务即可演练降级**。
 
 生成 `CHECKSUM` 的格式（sha256 + 两个空格 + 文件名）：
 
