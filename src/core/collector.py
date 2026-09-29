@@ -28,6 +28,7 @@ from adapters.base import Collector, Observation
 from analysis.ingest import observation_to_flow
 from collectors.conntrack import ConntrackCollector
 from collectors.dns import DnsLogCollector
+from collectors.syslog_dns import SyslogDnsCollector
 
 logger = logging.getLogger("homeward.collector")
 
@@ -41,6 +42,8 @@ class CollectorRunner:
         *,
         collectors=None,
         dns_log_path: Optional[str] = None,
+        dns_source: str = "dnsmasq",
+        syslog_path: Optional[str] = None,
         conntrack_command=None,
         poll_interval: float = 0.5,
         stop_event: Optional[threading.Event] = None,
@@ -50,6 +53,13 @@ class CollectorRunner:
             service: HomewardService 实例（被喂数据的决策层）
             collectors: **测试注入用**，直接给出采集器列表；留空则按能力协商自动选
             dns_log_path: 显式指定 dnsmasq 日志路径（留空按 DEFAULT_LOG_PATHS 探测）
+            dns_source: Tier1 DNS 数据源开关，决定用哪个采集器：
+                ``"dnsmasq"``（默认）—— 读 dnsmasq 专属日志文件，无代理 / 家卫即 DNS
+                解析器时的最常见形态；
+                ``"syslog"`` —— 读系统 syslog 里的 dnsmasq 查询行，用于「代理接管 DNS 但
+                家卫仍在解析路径上」「OpenWrt/iStoreOS 把查询发到系统 syslog」等场景。
+                两种都是 Tier 1，解析逻辑共享，可经配置切换、互不干扰。
+            syslog_path: ``dns_source="syslog"`` 时显式指定 syslog 文件路径（留空按探测）
             conntrack_command: 显式指定 conntrack 命令（argv 元组）
             poll_interval: 无新记录时的休眠间隔（秒）
             stop_event: 外部注入的停止信号（留空内部新建）
@@ -57,6 +67,8 @@ class CollectorRunner:
         self.service = service
         self._inject = collectors
         self.dns_log_path = dns_log_path
+        self.dns_source = dns_source
+        self.syslog_path = syslog_path
         self.conntrack_command = conntrack_command
         self.poll_interval = poll_interval
         self._stop = stop_event or threading.Event()
@@ -68,11 +80,24 @@ class CollectorRunner:
         if self._inject is not None:
             return list(self._inject)
         chosen: list[Collector] = []
-        # Tier1 DNS：社区版主路径，尽力启动
-        chosen.append(
-            DnsLogCollector(log_path=self.dns_log_path, poll_interval=self.poll_interval)
-        )
-        # Tier2 conntrack：best-effort，构造失败不拖累 DNS
+        # Tier1 DNS：社区版主路径，尽力启动。
+        # dns_source 决定「从哪读」——两种采集器同属 Tier 1、共用解析逻辑，
+        # 切换只换数据源、不动架构（无代理走 dnsmasq 文件；代理/系统 syslog 走 syslog 文件）。
+        if self.dns_source == "syslog":
+            dns_collector: Collector = SyslogDnsCollector(
+                log_path=self.syslog_path, poll_interval=self.poll_interval
+            )
+        else:
+            # 未知值兜底回 dnsmasq，避免配置笔误导致 Tier1 直接消失
+            if self.dns_source not in ("dnsmasq",):
+                logger.warning(
+                    "未识别的 dns_source=%r，回退到 dnsmasq 数据源", self.dns_source
+                )
+            dns_collector = DnsLogCollector(
+                log_path=self.dns_log_path, poll_interval=self.poll_interval
+            )
+        chosen.append(dns_collector)
+        # Tier2 conntrack：best-effort，构造失败不拖累 DNS；与 DNS 数据源无关，照常启动
         try:
             # 注意：command 默认是元组，不要传 None 覆盖默认（否则 probe 里
             # ' '.join(None) 直接 TypeError，会让整个服务在非 demo 模式起不来）
