@@ -408,6 +408,35 @@ class TestAttributionWithRealKB(unittest.TestCase):
         """扩量后规则数应明显大于初始规模（初始约 100 条，扩量后 >140）"""
         self.assertGreater(len(self.attr._rules), 140)
 
+    def test_kb_github_ecosystem(self):
+        """实战补录（2026-09 iStoreOS 实机）：GitHub 生态与公网 IP 回显应可归属
+
+        实机面板曾 24 个域名只认出 1 个（4%），全是软路由自身升级时
+        查询的 GitHub 及其社区加速镜像——暴露知识库缺口。
+        """
+        # GitHub 官方域（精确/父域命中）
+        self.assertEqual(self.attr.resolve("github.com").organization, "GitHub (Microsoft)")
+        self.assertEqual(self.attr.resolve("raw.githubusercontent.com").matched_domain,
+                         "githubusercontent.com")
+        self.assertEqual(self.attr.resolve("objects.githubusercontent.com").organization,
+                         "GitHub (Microsoft)")
+        # jsDelivr：父域兜底覆盖 fastly./data. 等子域
+        r = self.attr.resolve("fastly.jsdelivr.net")
+        self.assertTrue(r.known)
+        self.assertEqual(r.matched_domain, "jsdelivr.net")
+        # 公网 IP 回显
+        self.assertTrue(self.attr.resolve("api.ipify.org").known)
+        self.assertTrue(self.attr.resolve("api.ip.sb").known)
+        # 社区加速镜像：能归属但必须是 low 置信度 + allow（不猜测组织真名）
+        m = self.attr.resolve("ghfast.top")
+        self.assertTrue(m.known)
+        self.assertEqual(m.confidence, "low")
+        self.assertEqual(m.action, "allow")
+        self.assertTrue(self.attr.resolve("gh-proxy.com").known)
+        # 查证不了的镜像域名保持未知（不猜红线）
+        self.assertFalse(self.attr.resolve("cdn.akaere.online").known)
+        self.assertFalse(self.attr.resolve("down.mxw.xx.kg").known)
+
 
 class TestAttributionLoading(unittest.TestCase):
 
