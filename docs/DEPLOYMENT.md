@@ -316,9 +316,12 @@ systemctl restart docker
 iStoreOS 自带 Docker 管理器，部署步骤与飞牛一致，只是你是网关位而非单臂：
 
 ```bash
-# 在 iStoreOS 的终端或 Docker 管理器里
-git clone https://github.com/homeward-labs/homeward
-cd homeward
+# 在 iStoreOS 的终端里（iStoreOS 默认未安装 git，用源码压缩包方式，不依赖 git）
+cd /tmp
+curl -fsSL -o homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz \
+  || wget -O homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+tar xzf homeward.tar.gz
+cd homeward-main
 docker compose -f docker/docker-compose.yaml up -d --build
 # 浏览器开 http://<iStoreOS IP>:9595
 ```

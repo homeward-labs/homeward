@@ -51,7 +51,10 @@ echo ""
 echo "[3/4] 拉起家卫容器 ..."
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "错误：找不到 $COMPOSE_FILE"
-    echo "      请确认你在本仓库根目录下执行本脚本。"
+    echo "      本脚本需要在家卫源码目录下运行。请先用下面的方式获取完整源码"
+    echo "      （iStoreOS 默认没装 git，用压缩包方式，不需要 git）："
+    echo "        cd /tmp && (curl -fsSL -o hw.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz || wget -O hw.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz) && tar xzf hw.tar.gz && cd homeward-main"
+    echo "      然后再执行：sh scripts/setup-istoreos.sh"
     exit 1
 fi
 if command -v docker >/dev/null 2>&1; then

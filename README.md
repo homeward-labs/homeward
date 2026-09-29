@@ -61,9 +61,12 @@ cat /var/log/dnsmasq.log    # Debian 系常见落点
 ### ② 正式部署：跑在设备上持续观测
 
 ```bash
-# Docker（当前唯一可实际跑起来的方式）
-git clone https://github.com/homeward-labs/homeward
-cd homeward
+# Docker（当前唯一可实际跑起来的方式；iStoreOS 等未装 git 的系统也能用下面的压缩包方式）
+cd /tmp
+curl -fsSL -o homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz \
+  || wget -O homeward.tar.gz https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz
+tar xzf homeward.tar.gz
+cd homeward-main
 docker compose up -d
 # 打开 http://<设备IP>:9595
 ```
