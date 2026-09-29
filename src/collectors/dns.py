@@ -130,6 +130,10 @@ class DnsLogCollector(Collector):
     因此 ``degrade_to()`` 返回 ``None``（Tier 2 conntrack 会降级到它，它没有下一级）。
     """
 
+    # 数据源标签：子类（如 SyslogDnsCollector）覆盖它，probe 文案随之变化，
+    # 不必在多处硬编码「dnsmasq」。UI 盲区视图也据此如实说明当前用的是哪个源。
+    SOURCE_LABEL = "dnsmasq"
+
     DEFAULT_LOG_PATHS = (
         "/var/log/dnsmasq.log",
         "/var/log/dnsmasq/dnsmasq.log",
@@ -176,8 +180,9 @@ class DnsLogCollector(Collector):
             tried = "、".join(self.DEFAULT_LOG_PATHS)
             return ProbeResult(
                 False,
-                f"未找到 dnsmasq 日志文件（已尝试：{tried}）。"
-                f"请确认 dnsmasq 开启了 log-queries 并指定了 log-facility",
+                f"未找到 {self.SOURCE_LABEL} 日志文件（已尝试：{tried}）。"
+                f"请确认 DNS 服务开启了查询日志"
+                f"（{self.SOURCE_LABEL} 需 log-queries 并指定 log-facility）",
                 caps,
             )
         if not os.access(path, os.R_OK):
