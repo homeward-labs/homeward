@@ -245,7 +245,11 @@ function renderAlerts() {
     return '<div class="card empty">暂无活跃告警。行为识别看的是「一段时间内的若干次观测」，不是单条流量。</div>';
   }
   return `<div class="section">
-    <h2>告警 <span class="count">（${items.length} 条，按严重度排序）</span></h2>
+    <div class="sec-head">
+      <h2>告警 <span class="count">（${items.length} 条，按严重度排序）</span></h2>
+      <button class="btn btn-sm btn-warn" type="button" data-action="clear-observations"
+        title="清空设备/域名/告警等全部观测记录，重新开始分析（不删除许可）">清除全部观测记录</button>
+    </div>
     <div class="list">${items.map(alertCard).join("")}</div>
   </div>`;
 }
@@ -531,6 +535,29 @@ document.getElementById("view").addEventListener("click", async (e) => {
     } catch (err) {
       dismiss.disabled = false;
       alert("忽略失败：" + (err.message || err));
+    }
+    return;
+  }
+
+  // —— 一键清除全部观测记录 ——
+  const clearBtn = e.target.closest("[data-action='clear-observations']");
+  if (clearBtn) {
+    if (!confirm("确定要清空全部观测记录吗？\n\n会删除：设备台账、域名归属缓存、未知域名、所有告警（含已忽略）。\n不会删除：你的许可 / 标准版动作记录。\n\n清完后家卫会重新开始采集——之后看到的都是全新数据，方便区分哪些是旧的、哪些是刚抓到的。")) {
+      return;
+    }
+    clearBtn.disabled = true;
+    try {
+      const r = await fetch("/api/observations/clear", { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      await loadAll();
+      if (j.ok && j.cleared) {
+        const c = j.cleared;
+        alert(`已清除 ${c.devices} 台设备、${c.attribution_cache} 条归属缓存、${c.alerts} 条告警。\n现在重新采集，之后看到的全是新的。`);
+      }
+    } catch (err) {
+      alert("清除失败：" + (err.message || err));
+    } finally {
+      clearBtn.disabled = false;
     }
     return;
   }
