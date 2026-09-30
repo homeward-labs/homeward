@@ -284,8 +284,23 @@ class KnowledgeBaseUpdater:
         try:
             from license.ed25519 import verify_signature
         except Exception:
-            print("[KB Update] 无法加载 ed25519 验签模块，跳过签名验证")
-            return not require
+            # ``license`` 撞上 Python 标准库同名模块：当 ``src/`` 不在 sys.path 顶层
+            # （或路径顺序让标准库优先）时，上面的绝对导入会解析到标准库的 ``license``，
+            # 从而找不到 ``ed25519`` 属性。退路：直接按文件路径加载本项目的
+            # ``src/license/ed25519.py``，彻底绕开名字冲突（与 license/verify.py 一致）。
+            try:
+                import importlib.util as _ilu
+                _here = os.path.dirname(os.path.abspath(__file__))
+                _spec = _ilu.spec_from_file_location(
+                    "homeward_license_ed25519",
+                    os.path.join(_here, "..", "license", "ed25519.py"),
+                )
+                _mod = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_mod)
+                verify_signature = _mod.verify_signature
+            except Exception:
+                print("[KB Update] 无法加载 ed25519 验签模块，跳过签名验证")
+                return not require
 
         pubkey = self._load_pubkey()
         if pubkey is None:

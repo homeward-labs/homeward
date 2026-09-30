@@ -416,6 +416,38 @@ class TestSignature(unittest.TestCase):
         self.assertFalse(u.check_and_update())
         self.assertEqual((kb / "domains.csv").read_text(), "keepme\n")
 
+    def test_signed_update_works_without_src_on_syspath(self):
+        """回归（生产路径）：家卫以 ``python -m src.ui.server`` 启动时 ``src/`` 不在
+        sys.path 顶层，``from license.ed25519`` 会解析到 Python 标准库的 ``license``
+        模块（无 ed25519 属性）→ 若没有 importlib 文件路径兜底，验签会被**静默跳过**，
+        C2 安全能力在生产环境形同虚设。
+
+        本测试复现该条件（临时把 src/ 移出 sys.path），用 importlib 从文件加载 updater，
+        再跑一次带签名的内容源更新，验证签名校验**确实生效且通过**。"""
+        import importlib.util as _ilu
+
+        src_dir = Path(__file__).resolve().parent.parent / "src"
+        updater_path = src_dir / "knowledge_base" / "updater.py"
+        saved = list(sys.path)
+        # 复现生产：src/ 不在 sys.path 顶层（标准库 license 优先）
+        sys.path = [p for p in sys.path if os.path.abspath(p) != str(src_dir)]
+        try:
+            spec = _ilu.spec_from_file_location("kb_updater_prod", str(updater_path))
+            mod = _ilu.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        finally:
+            sys.path = saved
+
+        os.environ[self.ENV_PUB] = self.pub
+        src = self._signed_source()  # 带有效 SIGNATURE
+        kb = make_kb(self.root / "kb_prod")
+        base = self._serve(src)
+        u = mod.KnowledgeBaseUpdater(kb_dir=str(kb), repo_url=base)
+        self.assertTrue(u.check_and_update())
+        self.assertEqual((kb / "VERSION").read_text().strip(), "1.0.0")
+        # 验签函数确实可用（未被跳过）
+        self.assertTrue(callable(u._verify_signature))
+
     def _serve(self, directory: Path) -> str:
         s = _Server(directory)
         self.servers.append(s)
