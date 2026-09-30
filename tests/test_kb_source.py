@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from knowledge_base.updater import KnowledgeBaseUpdater  # noqa: E402
+from knowledge_base.updater import KnowledgeBaseUpdater, _version_key  # noqa: E402
 
 DEFAULT_REPO = KnowledgeBaseUpdater.DEFAULT_REPO
 ENV = KnowledgeBaseUpdater.ENV_SOURCE
@@ -94,26 +94,26 @@ class TestSourceConfig(unittest.TestCase):
 
     def test_default_when_nothing_set(self):
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_url, DEFAULT_REPO)
+        self.assertEqual(u.repo_urls, [DEFAULT_REPO])
 
     def test_explicit_arg_wins(self):
         u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_url="http://a.invalid/kb")
-        self.assertEqual(u.repo_url, "http://a.invalid/kb")
+        self.assertEqual(u.repo_urls, ["http://a.invalid/kb"])
 
     def test_env_used_when_no_arg(self):
         os.environ[ENV] = "http://nas.local:8080/kb"
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_url, "http://nas.local:8080/kb")
+        self.assertEqual(u.repo_urls, ["http://nas.local:8080/kb"])
 
     def test_explicit_arg_beats_env(self):
         os.environ[ENV] = "http://nas.local:8080/kb"
         u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_url="http://explicit.invalid/kb")
-        self.assertEqual(u.repo_url, "http://explicit.invalid/kb")
+        self.assertEqual(u.repo_urls, ["http://explicit.invalid/kb"])
 
     def test_blank_env_falls_back_to_default(self):
         os.environ[ENV] = "   "
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_url, DEFAULT_REPO)
+        self.assertEqual(u.repo_urls, [DEFAULT_REPO])
 
     def test_main_service_respects_env(self):
         """主服务实例化时也要吃到环境变量 —— 否则 T0 等于没做"""
@@ -121,7 +121,7 @@ class TestSourceConfig(unittest.TestCase):
 
         os.environ[ENV] = "http://nas.local:8080/kb"
         svc = HomewardService()
-        self.assertEqual(svc.kb_updater.repo_url, "http://nas.local:8080/kb")
+        self.assertEqual(svc.kb_updater.repo_urls, ["http://nas.local:8080/kb"])
         os.environ.pop(ENV, None)
 
     def test_main_service_default_unchanged(self):
@@ -129,7 +129,31 @@ class TestSourceConfig(unittest.TestCase):
         from core.main import HomewardService
 
         svc = HomewardService()
-        self.assertEqual(svc.kb_updater.repo_url, DEFAULT_REPO)
+        self.assertEqual(svc.kb_updater.repo_urls, [DEFAULT_REPO])
+
+
+    def test_env_comma_separated_resolves_to_list(self):
+        os.environ[ENV] = "http://a.local/kb, http://b.local/kb "
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root))
+        self.assertEqual(u.repo_urls, ["http://a.local/kb", "http://b.local/kb"])
+
+    def test_explicit_repo_urls_list_wins(self):
+        u = KnowledgeBaseUpdater(
+            kb_dir=str(self.root), repo_urls=["http://x/kb", "http://y/kb"]
+        )
+        self.assertEqual(u.repo_urls, ["http://x/kb", "http://y/kb"])
+
+    def test_explicit_list_beats_env(self):
+        os.environ[ENV] = "http://env.local/kb"
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_urls=["http://x/kb"])
+        self.assertEqual(u.repo_urls, ["http://x/kb"])
+
+    def test_dedup_sources(self):
+        u = KnowledgeBaseUpdater(
+            kb_dir=str(self.root),
+            repo_urls=["http://x/kb", "http://x/kb", "http://y/kb"],
+        )
+        self.assertEqual(u.repo_urls, ["http://x/kb", "http://y/kb"])
 
 
 class TestUpdateLoop(unittest.TestCase):
@@ -218,6 +242,100 @@ class TestUpdateLoop(unittest.TestCase):
                 name.lower(),
                 f"更新器不应存在上报类方法：{name}（家卫零遥测）",
             )
+
+
+    def test_multi_source_falls_through_to_working(self):
+        """主源不可达时，自动切到备用源完成更新（抖动兜底）"""
+        src = make_source(self.root / "src")
+        kb = make_kb(self.root / "kb")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(
+            kb_dir=str(kb), repo_urls=["http://127.0.0.1:1/dead", base]
+        )
+        self.assertTrue(u.check_and_update())
+        self.assertEqual((kb / "VERSION").read_text().strip(), "1.0.0")
+
+    def test_multi_source_first_higher_wins(self):
+        """多源均可用时，按顺序取第一个能更新的源"""
+        src = make_source(self.root / "src", version="1.0.0")
+        kb = make_kb(self.root / "kb", version="0.0.0")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(
+            kb_dir=str(kb), repo_urls=[base, "http://127.0.0.1:1/dead"]
+        )
+        self.assertTrue(u.check_and_update())
+        self.assertEqual((kb / "VERSION").read_text().strip(), "1.0.0")
+
+
+class TestBundledVersion(unittest.TestCase):
+    """C1：内置知识库必须自带 VERSION，否则 UI 恒显示 0.0.0（P1）"""
+
+    def test_bundled_kb_has_nonzero_version(self):
+        bundled = Path(__file__).resolve().parent.parent / "src" / "knowledge_base" / "VERSION"
+        self.assertTrue(bundled.exists(), "内置知识库必须带 VERSION 文件")
+        v = bundled.read_text(encoding="utf-8").strip()
+        self.assertNotEqual(v, "0.0.0", "内置 VERSION 不得为 0.0.0（那是『读不到』的兜底值）")
+        self.assertTrue(
+            _version_key(v) > (0,),
+            f"内置 VERSION 必须是合法数值版本，实际：{v!r}",
+        )
+
+    def test_read_local_version_reads_file(self):
+        kb = Path(tempfile.mkdtemp()) / "kb"
+        kb.mkdir(parents=True)
+        (kb / "VERSION").write_text("2.3.1\n", encoding="utf-8")
+        (kb / "domains.csv").write_text("x\n", encoding="utf-8")
+        (kb / "behaviors.json").write_text("[]", encoding="utf-8")
+        u = KnowledgeBaseUpdater(kb_dir=str(kb))
+        self.assertEqual(u._read_local_version(), "2.3.1")
+
+
+class TestMakeKbSource(unittest.TestCase):
+    """C4：一键起内容源脚本，CHECKSUM 格式须与 updater 解析一致"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _load_module(self):
+        import importlib.util
+
+        p = (
+            Path(__file__).resolve().parent.parent
+            / "scripts"
+            / "make_kb_source.py"
+        )
+        spec = importlib.util.spec_from_file_location("make_kb_source", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_build_checksum_format_and_verifiable(self):
+        from knowledge_base.updater import KnowledgeBaseUpdater
+
+        src = self.root / "kb"
+        src.mkdir(parents=True)
+        (src / "domains.csv").write_text("x,y\n", encoding="utf-8")
+        (src / "behaviors.json").write_text("[]", encoding="utf-8")
+        mks = self._load_module()
+        checksum = mks.build_checksum(src)
+        # 格式：<sha256>  <filename>（两空格）
+        for line in checksum.strip().splitlines():
+            self.assertRegex(line, r"^[0-9a-f]{64}  \S+$")
+        # updater 能认这个 CHECKSUM（反方向校验，防止格式漂移）
+        u = KnowledgeBaseUpdater(kb_dir=str(src))
+        self.assertTrue(u._verify_checksum(src, checksum))
+
+    def test_build_checksum_missing_required_raises(self):
+        src = self.root / "kb"
+        src.mkdir()
+        (src / "domains.csv").write_text("x\n", encoding="utf-8")
+        # 故意缺 behaviors.json
+        mks = self._load_module()
+        with self.assertRaises(SystemExit):
+            mks.build_checksum(src)
 
 
 if __name__ == "__main__":
