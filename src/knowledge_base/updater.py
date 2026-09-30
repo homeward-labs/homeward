@@ -10,7 +10,18 @@ import shutil
 import tempfile
 import threading
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
+
+#: 客户端 UA。Cloudflare 边缘默认拦截 ``Python-urllib`` UA（403），
+#: 必须用可识别的产品 UA 访问自建内容源（Cloudflare Worker 等）。
+USER_AGENT = "Homeward-KB/1.0 (+https://github.com/homeward-labs/homeward)"
+
+
+def _http_get(url: str, timeout: int) -> bytes:
+    """带产品 UA 的 GET。Cloudflare（及部分 CDN）会 403 掉默认 ``Python-urllib`` UA。"""
+    req = Request(url, headers={"User-Agent": USER_AGENT})
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read()
 
 
 def _version_key(version: str) -> tuple:
@@ -151,9 +162,9 @@ class KnowledgeBaseUpdater:
     def _fetch_version(self, url: str) -> str | None:
         """获取远程版本号"""
         try:
-            with urlopen(f"{url}/VERSION", timeout=10) as resp:
-                return resp.read().decode().strip()
-        except Exception:
+            return _http_get(f"{url}/VERSION", 10).decode().strip()
+        except Exception as e:
+            print(f"[KB Update] 获取 VERSION 失败（{url}）：{e}")
             return None
 
     def _read_local_version(self) -> str:
@@ -188,8 +199,7 @@ class KnowledgeBaseUpdater:
             for fname in self.REQUIRED_FILES:
                 dst = tmpdir / fname
                 try:
-                    with urlopen(f"{url}/{fname}", timeout=30) as resp:
-                        dst.write_bytes(resp.read())
+                    dst.write_bytes(_http_get(f"{url}/{fname}", 30))
                 except Exception as e:
                     print(f"[KB Update] 必需文件下载失败：{fname} ({e})")
                     missing.append(fname)
@@ -204,8 +214,7 @@ class KnowledgeBaseUpdater:
             for fname in self.OPTIONAL_FILES:
                 dst = tmpdir / fname
                 try:
-                    with urlopen(f"{url}/{fname}", timeout=30) as resp:
-                        dst.write_bytes(resp.read())
+                    dst.write_bytes(_http_get(f"{url}/{fname}", 30))
                 except Exception as e:
                     print(f"[KB Update] 可选文件下载失败，跳过：{fname} ({e})")
 
@@ -213,8 +222,7 @@ class KnowledgeBaseUpdater:
             checksum_url = f"{url}/CHECKSUM"
             expected = ""
             try:
-                with urlopen(checksum_url, timeout=10) as resp:
-                    expected = resp.read().decode()
+                expected = _http_get(checksum_url, 10).decode()
                 if not self._verify_checksum(tmpdir, expected):
                     print("[KB Update] Checksum mismatch, aborting")
                     return False
@@ -286,8 +294,7 @@ class KnowledgeBaseUpdater:
 
         sig_url = f"{url}/{self.SIGNATURE_FILENAME}"
         try:
-            with urlopen(sig_url, timeout=10) as resp:
-                sig_hex = resp.read().decode("utf-8").strip()
+            sig_hex = _http_get(sig_url, 10).decode("utf-8").strip()
         except Exception:
             print(f"[KB Update] 内容源未提供签名文件（{self.SIGNATURE_FILENAME}）")
             if require:
