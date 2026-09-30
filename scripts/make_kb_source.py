@@ -34,6 +34,9 @@ import shutil
 import sys
 from pathlib import Path
 
+# 让脚本能直接 import 仓内模块（src/license/ed25519.py 等）
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 # 与 KnowledgeBaseUpdater 保持一致：必需文件缺失则家卫拒绝替换
 REQUIRED = ("domains.csv", "behaviors.json")
 OPTIONAL = ("asn.csv",)
@@ -86,6 +89,16 @@ def main(argv: list[str] | None = None) -> int:
         metavar="PORT",
         help="打印一条以该端口起 http.server 的命令（不实际启动）",
     )
+    ap.add_argument(
+        "--sign",
+        action="store_true",
+        help="对 CHECKSUM 用 Ed25519 私钥签名，产出 SIGNATURE 文件（需 --seed 或 HOMEWARD_KB_SIGN_SEED）",
+    )
+    ap.add_argument(
+        "--seed",
+        default=None,
+        help="签名私钥种子（hex，32 字节）。不传则读环境变量 HOMEWARD_KB_SIGN_SEED",
+    )
     args = ap.parse_args(argv)
 
     src = Path(args.src).resolve()
@@ -103,6 +116,28 @@ def main(argv: list[str] | None = None) -> int:
 
     checksum = build_checksum(src)
 
+    signature_hex = None
+    if args.sign:
+        seed_hex = args.seed or os.environ.get("HOMEWARD_KB_SIGN_SEED", "").strip()
+        if not seed_hex:
+            print(
+                "[make_kb_source] --sign 需要种子：传 --seed <hex> 或设环境变量 HOMEWARD_KB_SIGN_SEED",
+                file=sys.stderr,
+            )
+            return 3
+        try:
+            seed = bytes.fromhex(seed_hex)
+        except ValueError:
+            print("[make_kb_source] 种子不是合法 hex", file=sys.stderr)
+            return 3
+        try:
+            from license.ed25519 import sign_message
+        except Exception as e:  # pragma: no cover
+            print(f"[make_kb_source] 无法加载签名模块：{e}", file=sys.stderr)
+            return 3
+        sig = sign_message(checksum.encode("utf-8"), seed)
+        signature_hex = sig.hex()
+
     if args.out:
         out = Path(args.out).resolve()
         out.mkdir(parents=True, exist_ok=True)
@@ -110,9 +145,13 @@ def main(argv: list[str] | None = None) -> int:
         for f in src.iterdir():
             if f.is_file():
                 shutil.copy2(f, out / f.name)
-        (out / "CHECKSUM").write_text(checksum, encoding="utf-8")
+        (out / "CHECKSUM").write_text(checksum, encoding="utf-8", newline="")
+        if signature_hex is not None:
+            (out / "SIGNATURE").write_text(signature_hex + "\n", encoding="utf-8", newline="")
         print(f"[make_kb_source] 已发布到 {out}")
         print(f"  含 {len([l for l in checksum.strip().splitlines()])} 个校验项")
+        if signature_hex is not None:
+            print("  已写入 SIGNATURE（Ed25519 签名）")
         if args.serve:
             print(
                 f"\n  起服务命令：\n    cd {out} && python -m http.server {args.serve}\n"
@@ -120,9 +159,13 @@ def main(argv: list[str] | None = None) -> int:
             )
     else:
         # 仅写回源目录的 CHECKSUM（就地更新校验和）
-        (src / "CHECKSUM").write_text(checksum, encoding="utf-8")
+        (src / "CHECKSUM").write_text(checksum, encoding="utf-8", newline="")
+        if signature_hex is not None:
+            (src / "SIGNATURE").write_text(signature_hex + "\n", encoding="utf-8", newline="")
         print(f"[make_kb_source] 已写入 CHECKSUM：{src / 'CHECKSUM'}")
         print(f"  含 {len([l for l in checksum.strip().splitlines()])} 个校验项")
+        if signature_hex is not None:
+            print(f"[make_kb_source] 已写入 SIGNATURE：{src / 'SIGNATURE'}")
         if args.serve:
             print(
                 f"\n  起服务命令：\n    cd {src} && python -m http.server {args.serve}\n"
