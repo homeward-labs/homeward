@@ -35,6 +35,15 @@ class KnowledgeBaseUpdater:
     #: 环境变量名：自建内容源地址（覆盖默认源）
     ENV_SOURCE = "HOMEWARD_KB_SOURCE"
 
+    #: 环境变量名：验签公钥（hex，32 字节 raw Ed25519 公钥）。不设置则回退仓内文件
+    ENV_PUBKEY = "HOMEWARD_KB_PUBKEY"
+    #: 环境变量名：是否强制验签（1/true/yes = 无签名或验签失败一律拒绝更新）
+    ENV_REQUIRE_SIG = "HOMEWARD_KB_REQUIRE_SIGNATURE"
+    #: 仓内公钥文件名（与 updater.py 同仓、随开源分发）
+    KB_PUBKEY_FILENAME = "kb_pubkey.txt"
+    #: 内容源签名文件名（对 CHECKSUM 内容的 Ed25519 签名，hex 编码）
+    SIGNATURE_FILENAME = "SIGNATURE"
+
     def __init__(
         self,
         kb_dir: str,
@@ -202,6 +211,7 @@ class KnowledgeBaseUpdater:
 
             # 校验（可选：比对 checksum）
             checksum_url = f"{url}/CHECKSUM"
+            expected = ""
             try:
                 with urlopen(checksum_url, timeout=10) as resp:
                     expected = resp.read().decode()
@@ -211,12 +221,95 @@ class KnowledgeBaseUpdater:
             except Exception:
                 pass  # 校验文件不存在则跳过
 
+            # C2 签名验证：签名覆盖 CHECKSUM，CHECKSUM 再覆盖各文件。
+            # 即便 CHECKSUM 缺失也仍执行（缺失则对空串验签，强制模式会据此拒绝）。
+            if not self._verify_signature(expected, url):
+                return False
+
             # 原子替换
             for fname in files:
                 src = tmpdir / fname
                 if src.exists():
                     shutil.move(str(src), str(self.kb_dir / fname))
 
+        return True
+
+    def _load_pubkey(self) -> bytes | None:
+        """加载验签公钥（双轨：环境变量优先，回退仓内文件）。
+
+        - 环境变量 ``HOMEWARD_KB_PUBKEY`` 直接给 hex 公钥；
+        - 否则读仓内 ``src/license/kb_pubkey.txt``（与 updater 同仓、随开源分发）。
+        - 都没有返回 None —— 此时降级为「仅告警不阻断」，除非处于强制验签模式。
+        """
+        env = os.environ.get(self.ENV_PUBKEY, "").strip()
+        if env:
+            try:
+                return bytes.fromhex(env)
+            except ValueError:
+                print(f"[KB Update] {self.ENV_PUBKEY} 不是合法 hex，忽略")
+        kb_file = (
+            Path(__file__).resolve().parent.parent / "license" / self.KB_PUBKEY_FILENAME
+        )
+        if kb_file.exists():
+            try:
+                return bytes.fromhex(kb_file.read_text(encoding="utf-8").strip())
+            except ValueError:
+                print(f"[KB Update] 仓内公钥文件格式错误：{kb_file}")
+        return None
+
+    def _verify_signature(self, checksum_text: str, url: str) -> bool:
+        """验证内容源签名（C2）。
+
+        签名是对 ``CHECKSUM`` 内容的 Ed25519 签名（见 ``scripts/make_kb_source.py --sign``）。
+        返回 True=可继续替换；False=应拒绝替换。
+
+        降级策略由 ``HOMEWARD_KB_REQUIRE_SIGNATURE`` 控制：
+          - 未设 / 非真值：无签名、公钥缺失、或验签失败**仅告警**，仍允许更新
+            （开发/测试期默认，避免本地源还没签名就被卡死）；
+          - 设为 1/true/yes：无签名或验签失败**一律拒绝更新**。
+        """
+        require = os.environ.get(self.ENV_REQUIRE_SIG, "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        try:
+            from license.ed25519 import verify_signature
+        except Exception:
+            print("[KB Update] 无法加载 ed25519 验签模块，跳过签名验证")
+            return not require
+
+        pubkey = self._load_pubkey()
+        if pubkey is None:
+            print("[KB Update] 未配置验签公钥，跳过签名验证（建议设置 HOMEWARD_KB_PUBKEY 或仓内 kb_pubkey.txt）")
+            return not require
+
+        sig_url = f"{url}/{self.SIGNATURE_FILENAME}"
+        try:
+            with urlopen(sig_url, timeout=10) as resp:
+                sig_hex = resp.read().decode("utf-8").strip()
+        except Exception:
+            print(f"[KB Update] 内容源未提供签名文件（{self.SIGNATURE_FILENAME}）")
+            if require:
+                print("[KB Update] 强制验签模式：无签名，拒绝本次更新")
+                return False
+            return True
+
+        try:
+            sig = bytes.fromhex(sig_hex)
+        except ValueError:
+            print("[KB Update] 签名文件不是合法 hex")
+            return not require
+
+        if verify_signature(sig, checksum_text.encode("utf-8"), pubkey):
+            print("[KB Update] 内容源签名校验通过 ✅")
+            return True
+
+        print("[KB Update] 签名校验失败！内容源可能被篡改")
+        if require:
+            print("[KB Update] 强制验签模式：拒绝本次更新")
+            return False
+        print("[KB Update] 降级模式：仍允许更新（建议核查内容源可信度）")
         return True
 
     def _verify_checksum(self, directory: Path, expected: str) -> bool:

@@ -3,3 +3,5 @@
 *.sh text eol=lf
 *.py text eol=lf
 docker-compose*.yml text eol=lf
+# 知识库内容源（CHECKSUM/SIGNATURE 为字节级签名，必须 LF，否则跨平台验签失败）
+src/knowledge_base/* text eol=lf

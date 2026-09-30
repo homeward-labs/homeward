@@ -338,5 +338,89 @@ class TestMakeKbSource(unittest.TestCase):
             mks.build_checksum(src)
 
 
+class TestSignature(unittest.TestCase):
+    """C2：内容源 Ed25519 签名验证（双轨公钥 + 降级告警）
+
+    自包含：测试内生成密钥对，不依赖真实私钥（真实种子仅在私有目录）。
+    """
+
+    ENV_PUB = "HOMEWARD_KB_PUBKEY"
+    ENV_REQ = "HOMEWARD_KB_REQUIRE_SIGNATURE"
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.servers = []
+        from license.ed25519 import generate_seed, derive_public
+
+        self.seed = generate_seed()
+        self.pub = derive_public(self.seed).hex()
+        self._old_pub = os.environ.pop(self.ENV_PUB, None)
+        self._old_req = os.environ.pop(self.ENV_REQ, None)
+        os.environ[self.ENV_PUB] = self.pub  # 用环境变量注入公钥
+
+    def tearDown(self):
+        for s in getattr(self, "servers", []):
+            s.stop()
+        os.environ.pop(self.ENV_PUB, None)
+        os.environ.pop(self.ENV_REQ, None)
+        if self._old_pub is not None:
+            os.environ[self.ENV_PUB] = self._old_pub
+        if self._old_req is not None:
+            os.environ[self.ENV_REQ] = self._old_req
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _signed_source(self, version: str = "1.0.0", tamper: bool = False) -> tuple[Path, str]:
+        """构造一份带有效 SIGNATURE 的内容源，返回 (源目录, base_url)"""
+        from license.ed25519 import sign_message
+
+        src = make_source(self.root / "src", version=version)
+        checksum = (src / "CHECKSUM").read_text(encoding="utf-8")
+        if tamper:
+            sig = sign_message(b"tampered", self.seed)
+        else:
+            sig = sign_message(checksum.encode("utf-8"), self.seed)
+        (src / "SIGNATURE").write_text(sig.hex() + "\n", encoding="utf-8")
+        return src
+
+    def test_valid_signature_passes(self):
+        src = self._signed_source()
+        kb = make_kb(self.root / "kb")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(kb_dir=str(kb), repo_url=base)
+        self.assertTrue(u.check_and_update())
+        self.assertEqual((kb / "VERSION").read_text().strip(), "1.0.0")
+
+    def test_invalid_signature_rejected_when_required(self):
+        os.environ[self.ENV_REQ] = "1"
+        src = self._signed_source(tamper=True)  # 用错消息签名 → 验签失败
+        kb = make_kb(self.root / "kb")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(kb_dir=str(kb), repo_url=base)
+        self.assertFalse(u.check_and_update())
+        self.assertEqual((kb / "domains.csv").read_text(), "keepme\n")
+
+    def test_absent_signature_warns_when_not_required(self):
+        """降级模式：无签名仅告警，仍允许更新"""
+        src = make_source(self.root / "src")
+        kb = make_kb(self.root / "kb")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(kb_dir=str(kb), repo_url=base)
+        self.assertTrue(u.check_and_update())
+
+    def test_absent_signature_rejected_when_required(self):
+        os.environ[self.ENV_REQ] = "1"
+        src = make_source(self.root / "src")  # 无 SIGNATURE
+        kb = make_kb(self.root / "kb")
+        base = self._serve(src)
+        u = KnowledgeBaseUpdater(kb_dir=str(kb), repo_url=base)
+        self.assertFalse(u.check_and_update())
+        self.assertEqual((kb / "domains.csv").read_text(), "keepme\n")
+
+    def _serve(self, directory: Path) -> str:
+        s = _Server(directory)
+        self.servers.append(s)
+        return s.base
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
