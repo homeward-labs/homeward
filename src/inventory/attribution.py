@@ -30,10 +30,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
+from knowledge_base.constants import KB_DIR_NAME, DOMAINS_CSV
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DOMAINS_CSV = Path(__file__).resolve().parent.parent / "knowledge_base" / "domains.csv"
+DEFAULT_DOMAINS_CSV = Path(__file__).resolve().parent.parent / KB_DIR_NAME / DOMAINS_CSV
 
 # 多级后缀（写全才会把 registrable 算成三段，如 example.com.cn）
 MULTI_SUFFIXES = frozenset({

@@ -31,6 +31,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
+from knowledge_base.constants import KB_DIR_NAME, OUI_PREFIXES_CSV
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ DEFAULT_LEASES_PATHS = (
 )
 ARP_PATH = "/proc/net/arp"
 
-OUI_CSV = Path(__file__).resolve().parent.parent / "knowledge_base" / "oui_prefixes.csv"
+OUI_CSV = Path(__file__).resolve().parent.parent / KB_DIR_NAME / OUI_PREFIXES_CSV
 
 _UNKNOWN_TYPE = "unknown"
 

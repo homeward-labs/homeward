@@ -14,7 +14,42 @@ from urllib.request import Request, urlopen
 
 #: 客户端 UA。Cloudflare 边缘默认拦截 ``Python-urllib`` UA（403），
 #: 必须用可识别的产品 UA 访问自建内容源（Cloudflare Worker 等）。
-USER_AGENT = "Homeward-KB/1.0 (+https://github.com/homeward-labs/homeward)"
+#: 知识库内容源配置：地址 / 文件名 / 路径等所有「可能变动」的项，全部集中在
+#: ``constants.py``，此处只负责取到它们。
+#:
+#: 导入策略（与项目对 ``license`` 模块的处理**保持一致**）：
+#: 优先走包导入；但当 ``src`` 不在 sys.path 顶层时（生产以 ``python -m src.ui.server``
+#: 启动即如此），绝对导入 ``knowledge_base`` 会解析不到 —— 这正是历史上
+#: 「``license`` 撞标准库同名模块 → 验签被静默跳过」的同一处坑。
+#: 故退化为按文件路径加载同目录的 ``constants.py``，保证任何加载方式下配置都取得到。
+try:
+    from knowledge_base.constants import (
+        KB_SOURCE_DEFAULT_URL,
+        VERSION_FILE,
+        CHECKSUM_FILE,
+        SIGNATURE_FILE,
+        KB_LICENSE_DIRNAME,
+        KB_PUBKEY_FILENAME,
+        ED25519_MODULE_BASENAME,
+        USER_AGENT_HOMEPAGE,
+    )
+except Exception:
+    import importlib.util as _ilu
+
+    _c_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "constants.py")
+    _c_spec = _ilu.spec_from_file_location("homeward_kb_constants", _c_path)
+    _c_mod = _ilu.module_from_spec(_c_spec)
+    _c_spec.loader.exec_module(_c_mod)
+    KB_SOURCE_DEFAULT_URL = _c_mod.KB_SOURCE_DEFAULT_URL
+    VERSION_FILE = _c_mod.VERSION_FILE
+    CHECKSUM_FILE = _c_mod.CHECKSUM_FILE
+    SIGNATURE_FILE = _c_mod.SIGNATURE_FILE
+    KB_LICENSE_DIRNAME = _c_mod.KB_LICENSE_DIRNAME
+    KB_PUBKEY_FILENAME = _c_mod.KB_PUBKEY_FILENAME
+    ED25519_MODULE_BASENAME = _c_mod.ED25519_MODULE_BASENAME
+    USER_AGENT_HOMEPAGE = _c_mod.USER_AGENT_HOMEPAGE
+
+USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
 
 
 def _http_get(url: str, timeout: int) -> bytes:
@@ -41,7 +76,7 @@ def _version_key(version: str) -> tuple:
 class KnowledgeBaseUpdater:
     """知识库在线更新器"""
 
-    DEFAULT_REPO = "https://homeward-kb.782238788.workers.dev"
+    DEFAULT_REPO = KB_SOURCE_DEFAULT_URL
 
     #: 环境变量名：自建内容源地址（覆盖默认源）
     ENV_SOURCE = "HOMEWARD_KB_SOURCE"
@@ -53,7 +88,7 @@ class KnowledgeBaseUpdater:
     #: 仓内公钥文件名（与 updater.py 同仓、随开源分发）
     KB_PUBKEY_FILENAME = "kb_pubkey.txt"
     #: 内容源签名文件名（对 CHECKSUM 内容的 Ed25519 签名，hex 编码）
-    SIGNATURE_FILENAME = "SIGNATURE"
+    SIGNATURE_FILENAME = SIGNATURE_FILE
 
     def __init__(
         self,
@@ -162,21 +197,21 @@ class KnowledgeBaseUpdater:
     def _fetch_version(self, url: str) -> str | None:
         """获取远程版本号"""
         try:
-            return _http_get(f"{url}/VERSION", 10).decode().strip()
+            return _http_get(f"{url}/{VERSION_FILE}", 10).decode().strip()
         except Exception as e:
             print(f"[KB Update] 获取 VERSION 失败（{url}）：{e}")
             return None
 
     def _read_local_version(self) -> str:
         """读取本地版本"""
-        version_file = self.kb_dir / "VERSION"
+        version_file = self.kb_dir / VERSION_FILE
         if version_file.exists():
             return version_file.read_text().strip()
         return "0.0.0"
 
     def _write_local_version(self, version: str):
         """写入本地版本"""
-        (self.kb_dir / "VERSION").write_text(version)
+        (self.kb_dir / VERSION_FILE).write_text(version)
 
     # 必需文件：缺任何一个就不允许替换（否则会出现「新域名库 + 旧行为库」的错配）
     REQUIRED_FILES = ("domains.csv", "behaviors.json")
@@ -219,7 +254,7 @@ class KnowledgeBaseUpdater:
                     print(f"[KB Update] 可选文件下载失败，跳过：{fname} ({e})")
 
             # 校验（可选：比对 checksum）
-            checksum_url = f"{url}/CHECKSUM"
+            checksum_url = f"{url}/{CHECKSUM_FILE}"
             expected = ""
             try:
                 expected = _http_get(checksum_url, 10).decode()
@@ -256,7 +291,7 @@ class KnowledgeBaseUpdater:
             except ValueError:
                 print(f"[KB Update] {self.ENV_PUBKEY} 不是合法 hex，忽略")
         kb_file = (
-            Path(__file__).resolve().parent.parent / "license" / self.KB_PUBKEY_FILENAME
+            Path(__file__).resolve().parent.parent / KB_LICENSE_DIRNAME / self.KB_PUBKEY_FILENAME
         )
         if kb_file.exists():
             try:
@@ -293,7 +328,7 @@ class KnowledgeBaseUpdater:
                 _here = os.path.dirname(os.path.abspath(__file__))
                 _spec = _ilu.spec_from_file_location(
                     "homeward_license_ed25519",
-                    os.path.join(_here, "..", "license", "ed25519.py"),
+                    os.path.join(_here, "..", KB_LICENSE_DIRNAME, ED25519_MODULE_BASENAME),
                 )
                 _mod = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_mod)
