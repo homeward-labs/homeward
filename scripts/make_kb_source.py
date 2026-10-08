@@ -37,9 +37,12 @@ from pathlib import Path
 # 让脚本能直接 import 仓内模块（src/license/ed25519.py 等）
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-# 与 KnowledgeBaseUpdater 保持一致：必需文件缺失则家卫拒绝替换
-REQUIRED = ("domains.csv", "behaviors.json")
-OPTIONAL = ("asn.csv",)
+# 文件清单取自 knowledge_base/constants.py —— 与客户端 KnowledgeBaseUpdater
+# 共用同一份定义，避免两端各写一份导致「源里有的文件客户端不下载」这类错配。
+from knowledge_base.constants import (  # noqa: E402
+    REQUIRED_DATA_FILES as REQUIRED,
+    OPTIONAL_DATA_FILES as OPTIONAL,
+)
 
 
 def sha256_of(path: Path) -> str:

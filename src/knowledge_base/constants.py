@@ -29,6 +29,15 @@ BEHAVIORS_JSON = "behaviors.json"
 OUI_PREFIXES_CSV = "oui_prefixes.csv"
 ASN_CSV = "asn.csv"
 
+# 更新清单：决定客户端更新时下载/校验哪些数据文件。
+# 必需项缺失即判定更新失败；可选项下载失败只跳过、不影响更新成功。
+# 变更「更新哪些文件」只需改这两个元组，业务逻辑无需改动。
+# 注：OUI_PREFIXES_CSV 随客户端分发、体积较大(约 217KB)且变化缓慢，
+#     故默认**不**纳入更新清单（保持随包静态）。若要开启其在线更新，
+#     把它加进 OPTIONAL_DATA_FILES 即可（一处改动，两端生效）。
+REQUIRED_DATA_FILES = (DOMAINS_CSV, BEHAVIORS_JSON)
+OPTIONAL_DATA_FILES = (ASN_CSV,)
+
 # 验签相关
 KB_LICENSE_DIRNAME = "license"
 KB_PUBKEY_FILENAME = "kb_pubkey.txt"
