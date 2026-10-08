@@ -109,9 +109,10 @@
     "window_seconds": 600,
     "pattern": {
       "direction": "out",
-      "destination_keywords": ["pool", "mining", "stratum", "xmr", "monero", "nanopool", "f2pool", "ethermine", "nicehash"],
+      "destination_keywords": ["mining", "stratum", "xmr", "monero", "nanopool", "f2pool", "ethermine", "nicehash"],
       "min_connections": 3,
-      "min_occurrences": 20
+      "min_occurrences": 20,
+      "total_bytes_min": 1
     },
     "action": "block_hard",
     "explanation": "设备 {device_name} 在 {window_minutes} 分钟内连接了 {connections} 个疑似矿池地址（如 {destination}，归属 {organization}），累计 {occurrences} 次连接。IoT 设备算力低、防护弱，是僵尸网络招募挖矿的常见目标，典型症状还有设备发烫、变卡。",
