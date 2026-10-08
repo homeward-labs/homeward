@@ -1,54 +1,54 @@
 domain,organization,category,confidence,description,action,side_effects
-ot.io.mi.com,Xiaomi,cloud_storage,high,小米IoT设备指令与状态通道,allow,
-api.io.mi.com,Xiaomi,IoT_core,high,小米IoT核心API,allow,
+ot.io.mi.com,Xiaomi,cloud_storage,high,小米IoT设备指令与状态通道,allow
+api.io.mi.com,Xiaomi,IoT_core,high,小米IoT核心API,allow
 track.io.mi.com,Xiaomi,analytics,medium,小米数据统计上报,block_soft,远程控制正常;本地控制正常;数据统计停止
 ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告服务,block_soft,广告推送停止
 api.ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告归因,block_soft,广告推送停止
 data.mistat.xiaomi.com,Xiaomi,telemetry,medium,小米设备遥测数据上报,block_soft,数据统计停止;设备功能不受影响
 sdkconfig.ad.xiaomi.com,Xiaomi,advertising_sdk,high,小米广告SDK配置,block_soft,广告推送停止
-a.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT核心服务,allow,
-a2.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT备用通道,allow,
-api.tuya.com,Tuya Smart,IoT_core,high,涂鸦API网关,allow,
-mq.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦MQTT消息通道,allow,
-a.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区网关,allow,
-apigw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区API,allow,
+a.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT核心服务,allow
+a2.tuya.com,Tuya Smart,IoT_core,high,涂鸦IoT备用通道,allow
+api.tuya.com,Tuya Smart,IoT_core,high,涂鸦API网关,allow
+mq.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦MQTT消息通道,allow
+a.gw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区网关,allow
+apigw.tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区API,allow
 api-ad.tuya.com,Tuya Smart,advertising_sdk,high,涂鸦广告归因,block_soft,广告推送停止
 api.ad.tuya.com,Tuya Smart,advertising_sdk,high,涂鸦广告归因(别名),block_soft,广告推送停止
 api-analytics.tuya.com,Tuya Smart,analytics,medium,涂鸦数据分析,block_soft,数据分析停止
-n-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云端服务,allow,
-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云设备发现,allow,
-eu-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link欧洲区云,allow,
-tapocn.tplink.com,TP-Link,IoT_core,high,Tapo中国区服务,allow,
-kasa.tplinkcloud.com,TP-Link,IoT_core,high,Kasa云端服务,allow,
-conservation-client.cn-east-3.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT设备管理服务,allow,
-iot-mqtts.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT MQTT通道,allow,
-device-connector.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为设备连接服务,allow,
+n-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云端服务,allow
+wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link云设备发现,allow
+eu-wap.tplinkcloud.com,TP-Link,IoT_core,high,TP-Link欧洲区云,allow
+tapocn.tplink.com,TP-Link,IoT_core,high,Tapo中国区服务,allow
+kasa.tplinkcloud.com,TP-Link,IoT_core,high,Kasa云端服务,allow
+conservation-client.cn-east-3.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT设备管理服务,allow
+iot-mqtts.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为IoT MQTT通道,allow
+device-connector.cn-north-4.myhuaweicloud.com,Huawei,IoT_core,high,华为设备连接服务,allow
 agc-data.cn-north-4.myhuaweicloud.com,Huawei,analytics,medium,华为分析服务,block_soft,数据统计停止
-dueros.baidu.com,Baidu,IoT_core,high,小度语音交互服务,allow,
-xiaodu.baidu.com,Baidu,IoT_core,high,小度设备服务,allow,
+dueros.baidu.com,Baidu,IoT_core,high,小度语音交互服务,allow
+xiaodu.baidu.com,Baidu,IoT_core,high,小度设备服务,allow
 hm.baidu.com,Baidu,analytics,medium,百度统计(移动),block_soft,数据统计停止
 hmma.baidu.com,Baidu,analytics,medium,百度移动统计,block_soft,数据统计停止
-iot-as-mqtt.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT MQTT,allow,
-iot-auth.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT认证,allow,
-ali.genie.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵设备通道,allow,
-iotcloud-mqtt.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT MQTT,allow,
-iotcloud-ota.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT OTA升级,allow,
-api.ys7.com,Ezviz (Hikvision),cloud_storage,high,萤石云视频服务,allow,
-passport.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石账号认证,allow,
-ilink.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石设备连接,allow,
-open.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石开放平台,allow,
-admin.lechange.com,Dahua,cloud_storage,high,乐橙云视频服务,allow,
-passport.lechange.com,Dahua,IoT_core,high,乐橙账号认证,allow,
-appcloud.360.cn,Qihoo 360,cloud_storage,high,360智能设备云服务,allow,
-appcloud.api.360.cn,Qihoo 360,cloud_storage,high,360设备API,allow,
-mpush.midea.com,Midea,IoT_core,high,美的推送服务,allow,
-msmart.meizu.com,Meizu (魅族),IoT_core,high,魅族mSmart设备通道,allow,
-haier.net,Haier,IoT_core,high,海尔U+平台,allow,
-smart-home.api.haier.net,Haier,IoT_core,high,海尔智慧家API,allow,
-api.broadlink.com.cn,Broadlink,IoT_core,high,Broadlink设备服务,allow,
-blz.cloudcmdb.broadlink.com.tw,Broadlink,IoT_core,high,Broadlink云服务,allow,
-awag.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵音箱,allow,
-lbs.netease.im,NetEase,IoT_core,medium,网易音箱服务,allow,
+iot-as-mqtt.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT MQTT,allow
+iot-auth.cn-shanghai.aliyuncs.com,Alibaba Cloud,IoT_core,high,阿里云IoT认证,allow
+ali.genie.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵设备通道,allow
+iotcloud-mqtt.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT MQTT,allow
+iotcloud-ota.tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT OTA升级,allow
+api.ys7.com,Ezviz (Hikvision),cloud_storage,high,萤石云视频服务,allow
+passport.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石账号认证,allow
+ilink.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石设备连接,allow
+open.ys7.com,Ezviz (Hikvision),IoT_core,high,萤石开放平台,allow
+admin.lechange.com,Dahua,cloud_storage,high,乐橙云视频服务,allow
+passport.lechange.com,Dahua,IoT_core,high,乐橙账号认证,allow
+appcloud.360.cn,Qihoo 360,cloud_storage,high,360智能设备云服务,allow
+appcloud.api.360.cn,Qihoo 360,cloud_storage,high,360设备API,allow
+mpush.midea.com,Midea,IoT_core,high,美的推送服务,allow
+msmart.meizu.com,Meizu (魅族),IoT_core,high,魅族mSmart设备通道,allow
+haier.net,Haier,IoT_core,high,海尔U+平台,allow
+smart-home.api.haier.net,Haier,IoT_core,high,海尔智慧家API,allow
+api.broadlink.com.cn,Broadlink,IoT_core,high,Broadlink设备服务,allow
+blz.cloudcmdb.broadlink.com.tw,Broadlink,IoT_core,high,Broadlink云服务,allow
+awag.tmall.com,Alibaba Cloud,IoT_core,high,天猫精灵音箱,allow
+lbs.netease.im,NetEase,IoT_core,medium,网易音箱服务,allow
 xiaomi.speech.ai,Xiaomi,machine_learning,medium,小米语音AI处理,block_medium,语音助手可能受限
 umeng.com,Alibaba,analytics,high,友盟数据统计,block_soft,数据统计停止
 umengcloud.com,Alibaba,analytics,high,友盟云服务,block_soft,数据统计停止
@@ -82,120 +82,120 @@ bugly.qq.com,Tencent,analytics,high,腾讯Bugly崩溃上报,block_soft,崩溃上
 bugly.qq.com.cn,Tencent,analytics,high,Bugly中国,block_soft,崩溃上报停止
 datacollector.qq.com,Tencent,analytics,medium,腾讯数据收集,block_soft,数据收集停止
 datacollector.qq.com.cn,Tencent,analytics,medium,腾讯数据收集中国,block_soft,数据收集停止
-cdn.iot.qq.com,Tencent Cloud,cdn,high,腾讯云IoT CDN,allow,
-cdn.tuya.com,Tuya Smart,cdn,high,涂鸦CDN,allow,
-cdn.aliyun.com,Alibaba Cloud,cdn,high,阿里云CDN,allow,
-cdn.myqcloud.com,Tencent Cloud,cdn,high,腾讯云CDN,allow,
-cdn.bcebos.com,Baidu Cloud,cdn,high,百度云CDN,allow,
-cdn.jsdelivr.net,jsDelivr,cdn,high,开源CDN,allow,
-unpkg.com,Cloudflare,cdn,high,开源CDN,allow,
-cdnjs.cloudflare.com,Cloudflare,cdn,high,Cloudflare CDN,allow,
-ntp.aliyun.com,Alibaba Cloud,telemetry,low,阿里云NTP,allow,
-ntp.tencent.com,Tencent Cloud,telemetry,low,腾讯云NTP,allow,
-ntp.tuna.tsinghua.edu.cn,Tsinghua University,telemetry,low,清华TUNA NTP,allow,
-pool.ntp.org,Pool Project,telemetry,low,NTP公共池,allow,
-ota.tuya.com,Tuya Smart,IoT_core,medium,涂鸦OTA升级,allow,
-ota.mi.com,Xiaomi,IoT_core,medium,小米OTA升级,allow,
-firmware.ys7.com,Ezviz (Hikvision),IoT_core,medium,萤石固件升级,allow,
-upgrade.tplink.com,TP-Link,IoT_core,medium,TP-Link固件升级,allow,
-firmware.kasa.com,TP-Link,IoT_core,medium,Kasa固件升级,allow,
-api.upgrade.mi.com,Xiaomi,IoT_core,medium,小米升级API,allow,
-mi.com,Xiaomi,IoT_core,high,小米主域名（设备/账号/云服务）,allow,
-xiaomi.com,Xiaomi,IoT_core,high,小米国际与官网域名,allow,
-tuya.com,Tuya Smart,IoT_core,high,涂鸦智能主域名,allow,
-tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区主域名,allow,
-tplink.com,TP-Link,IoT_core,high,TP-Link主域名,allow,
-huawei.com,Huawei,IoT_core,high,华为主域名（HiLink/智能家居）,allow,
-hisilicon.com,Huawei,IoT_core,medium,海思芯片相关云服务,allow,
-myhuaweicloud.com,Huawei,IoT_core,high,华为云IoT域名,allow,
-tmall.com,Alibaba Cloud,IoT_core,high,天猫/天猫精灵域名,allow,
-tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT主域名,allow,
-hisense.com,Hisense (海信),IoT_core,high,海信智能设备服务,allow,
-tcl.com,TCL (TCL),IoT_core,medium,TCL智能设备/电视服务,allow,
-changhong.com,Changhong (长虹),IoT_core,medium,长虹智能设备服务,allow,
-skyworth.com,Skyworth (创维),IoT_core,medium,创维智能设备服务,allow,
-gree.com,Gree (格力),IoT_core,medium,格力智能家电服务,allow,
-midea.com,Midea (美的),IoT_core,high,美的智能家电服务,allow,
-roborock.com,Roborock (石头科技),IoT_core,high,石头扫地机器人服务,allow,
-ecovacs.com,Ecovacs (科沃斯),IoT_core,high,科沃斯扫地机器人服务,allow,
-dji.com,DJI (大疆),IoT_core,high,大疆无人机/手持设备服务,allow,
-ninebot.com,Ninebot (九号),IoT_core,high,九号平衡车/滑板车服务,allow,
-aqara.com,Aqara (绿米),IoT_core,high,Aqara绿米智能设备服务,allow,
-yeelight.com,Yeelight (易来),IoT_core,high,Yeelight智能照明服务,allow,
-viomi.com,Viomi (云米),IoT_core,high,云米智能家电服务,allow,
-orvibo.com,Orvibo (欧瑞博),IoT_core,high,欧瑞博智能家居服务,allow,
-jd.com,JD (京东),IoT_core,high,京东主域名,allow,
-jdsmart.com,JD (京东微联),IoT_core,high,京东微联设备服务,allow,
-jddc.jd.com,JD (京东微联),IoT_core,high,京东微联数据通道,allow,
-suning.com,Suning (苏宁),IoT_core,medium,苏宁智能设备服务,allow,
-meizu.com,Meizu (魅族),IoT_core,medium,魅族智能设备/推送服务,allow,
-iflytek.com,iFlytek (科大讯飞),machine_learning,medium,讯飞语音与AI服务,block_medium,语音助手可能受限,
-gdt.qq.com,Tencent (广点通),advertising_sdk,high,腾讯广点通广告,block_soft,广告停止,
-ad.qq.com,Tencent,advertising_sdk,high,腾讯广告服务,block_soft,广告停止,
-cpro.baidu.com,Baidu (百度联盟),advertising_sdk,high,百度联盟广告,block_soft,广告停止,
-union.baidu.com,Baidu (百度联盟),advertising_sdk,high,百度联盟,block_soft,广告停止,
-tanx.com,Alibaba (阿里妈妈),advertising_sdk,high,阿里妈妈tanx广告,block_soft,广告停止,
-ad.360.cn,Qihoo 360 (360广告),advertising_sdk,high,360广告服务,block_soft,广告停止,
-kuaishou.com,Kuaishou (快手),analytics,medium,快手统计与广告,block_soft,统计停止,
-pinduoduo.com,Pinduoduo (拼多多),analytics,medium,拼多多数据上报,block_soft,统计停止,
-iqiyi.com,iQiyi (爱奇艺),cdn,medium,爱奇艺内容CDN,allow,
-youku.com,Youku (优酷),cdn,medium,优酷内容CDN,allow,
-v.qq.com,Tencent (腾讯视频),cdn,medium,腾讯视频内容分发,allow,
-github.com,GitHub (Microsoft),developer_service,high,GitHub 主站,allow,
-githubusercontent.com,GitHub (Microsoft),developer_service,high,GitHub 内容托管（raw/objects/gist 子域）,allow,
-githubassets.com,GitHub (Microsoft),developer_service,high,GitHub 静态资源,allow,
-github.io,GitHub (Microsoft),developer_service,high,GitHub Pages,allow,
-jsdelivr.net,jsDelivr,cdn,high,开源CDN（cdn/fastly/data 等子域统一归属）,allow,
-ipify.org,ipify,telemetry,high,公网IP回显（DDNS/联网检查常用）,allow,
-ip.sb,ip.sb,telemetry,medium,公网IP回显服务（api.ip.sb 等）,allow,
-qcloud.com,Tencent (腾讯云),cloud_storage,high,腾讯云（im.qcloud.com 等子域）,allow,
-ardot.tencent.com,Tencent (腾讯),developer_service,high,腾讯 Ardot 设计工具（tencent.com 子域，归属确定）,allow,
-workbuddy.cn,WorkBuddy,developer_service,medium,WorkBuddy 官方域名（static 等子域为静态资源）,allow,
-ipip.net,IPIP.net,telemetry,medium,公网IP回显（myip.ipip.net），IP 地理数据服务商,allow,
-kspeeder.com,Linkease (iStoreOS生态),cdn,medium,Docker镜像/下载加速服务（KSpeeder，iStoreOS 团队开发）,allow,
-gh.idayer.com,GitHub加速镜像（社区）,cdn,low,GitHub文件加速代理（第三方社区服务，与GitHub无隶属，归属易变）,allow,
-ghfast.top,GitHub加速镜像（社区）,cdn,low,GitHub加速代理（第三方社区服务，与GitHub无隶属，归属易变）,allow,
-gh-proxy.com,GitHub加速镜像（社区）,cdn,low,GitHub加速代理（gh-proxy开源项目公共实例，归属易变）,allow,
-ghproxy.monkeyray.net,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-gh.monlor.com,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-gh.jasonzeng.dev,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-ghm.078465.xyz,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-git.yylx.win,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-github.tbap.top,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow,
-open.iot.10086.cn,China Mobile (中移物联网/OneNET),IoT_core,high,中移物联网OneNET开放API,allow,
-api.heclouds.com,China Mobile (中移物联网/OneNET),IoT_core,high,中移物联网OneNET设备接入,allow,
-iot.ctwing.cn,China Telecom (天翼物联/CTWing),IoT_core,high,天翼物联设备接入平台,allow,
-ctwing.cn,China Telecom (天翼物联/CTWing),IoT_core,medium,天翼物联平台门户,allow,
-dreame.tech,Dreame (追觅),IoT_core,high,追觅智能设备主域名,allow,
-api.dreame.tech,Dreame (追觅),IoT_core,high,追觅智能设备服务,allow,
-narwal.com,Narwal (云鲸),IoT_core,medium,云鲸智能清洁设备服务,allow,
-tineco.com,Tineco (添可),IoT_core,medium,添可智能清洁设备,allow,
-kaadas.com,Kaadas (凯迪仕),IoT_core,medium,凯迪仕智能门锁服务,allow,
-loock.com,Loock (鹿客),IoT_core,medium,鹿客智能门锁服务,allow,
-konka.com,Konka (康佳),IoT_core,medium,康佳智能设备服务,allow,
-opple.com,OPPLE (欧普照明),IoT_core,medium,欧普智能照明服务,allow,
-meethue.com,Signify (飞利浦 Hue),IoT_core,medium,飞利浦Hue智能照明桥接服务,allow,
-bull.com.cn,BULL (公牛),IoT_core,low,公牛智能插座/开关服务,allow,
-panasonic.com,Panasonic (松下),IoT_core,low,松下智能设备服务,allow,
-dyson.com,Dyson (戴森),IoT_core,low,戴森智能设备服务,allow,
-sony.com,Sony (索尼),IoT_core,low,索尼智能设备/电视服务,allow,
-lgthinq.com,LG (LG ThinQ),IoT_core,low,LG ThinQ智能家电服务,allow,
-samsung.com,Samsung (三星),IoT_core,low,三星SmartThings/家电服务,allow,
-ikea.com,IKEA (宜家),IoT_core,low,宜家Tradfri智能照明,allow,
-home-connect.com,BSH (博世/西门子),IoT_core,low,博世西门子Home Connect家电,allow,
-yitechnology.com,Yi (小蚁),IoT_core,medium,小蚁摄像头设备服务,allow,
-lenovomm.com,Lenovo (联想),IoT_core,medium,联想推送/设备服务,allow,
-nubia.com,Nubia (努比亚),IoT_core,low,努比亚设备服务,allow,
-honor.com,Honor (荣耀),IoT_core,medium,荣耀智能设备/账号服务,allow,
-cloud.honor.com,Honor (荣耀),IoT_core,medium,荣耀云服务,allow,
-restapi.amap.com,Alibaba (高德地图),developer_service,medium,高德地图API（定位/导航SDK）,allow,
-apis.map.qq.com,Tencent (腾讯地图),developer_service,medium,腾讯地图API（定位SDK）,allow,
-loc.map.baidu.com,Baidu (百度地图),developer_service,medium,百度地图定位SDK,allow,
-api.map.baidu.com,Baidu (百度地图),developer_service,medium,百度地图API,allow,
-oss-cn-hangzhou.aliyuncs.com,Alibaba Cloud (阿里云OSS),cloud_storage,medium,阿里云对象存储（设备媒体上传）,allow,
-cos.ap-guangzhou.myqcloud.com,Tencent Cloud (腾讯云COS),cloud_storage,medium,腾讯云对象存储（设备媒体上传）,allow,
-bcs.baidubce.com,Baidu Cloud (百度云BOS),cloud_storage,low,百度云对象存储,allow,
-qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云主域名,allow,
-up.qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云上传端点,allow,
-ximalaya.com,Ximalaya (喜马拉雅),cdn,low,喜马拉雅音频内容（智能音箱）,allow,
-music.163.com,NetEase (网易云音乐),cdn,low,网易云音乐内容（智能音箱）,allow,
+cdn.iot.qq.com,Tencent Cloud,cdn,high,腾讯云IoT CDN,allow
+cdn.tuya.com,Tuya Smart,cdn,high,涂鸦CDN,allow
+cdn.aliyun.com,Alibaba Cloud,cdn,high,阿里云CDN,allow
+cdn.myqcloud.com,Tencent Cloud,cdn,high,腾讯云CDN,allow
+cdn.bcebos.com,Baidu Cloud,cdn,high,百度云CDN,allow
+cdn.jsdelivr.net,jsDelivr,cdn,high,开源CDN,allow
+unpkg.com,Cloudflare,cdn,high,开源CDN,allow
+cdnjs.cloudflare.com,Cloudflare,cdn,high,Cloudflare CDN,allow
+ntp.aliyun.com,Alibaba Cloud,telemetry,low,阿里云NTP,allow
+ntp.tencent.com,Tencent Cloud,telemetry,low,腾讯云NTP,allow
+ntp.tuna.tsinghua.edu.cn,Tsinghua University,telemetry,low,清华TUNA NTP,allow
+pool.ntp.org,Pool Project,telemetry,low,NTP公共池,allow
+ota.tuya.com,Tuya Smart,IoT_core,medium,涂鸦OTA升级,allow
+ota.mi.com,Xiaomi,IoT_core,medium,小米OTA升级,allow
+firmware.ys7.com,Ezviz (Hikvision),IoT_core,medium,萤石固件升级,allow
+upgrade.tplink.com,TP-Link,IoT_core,medium,TP-Link固件升级,allow
+firmware.kasa.com,TP-Link,IoT_core,medium,Kasa固件升级,allow
+api.upgrade.mi.com,Xiaomi,IoT_core,medium,小米升级API,allow
+mi.com,Xiaomi,IoT_core,high,小米主域名（设备/账号/云服务）,allow
+xiaomi.com,Xiaomi,IoT_core,high,小米国际与官网域名,allow
+tuya.com,Tuya Smart,IoT_core,high,涂鸦智能主域名,allow
+tuyacn.com,Tuya Smart,IoT_core,high,涂鸦中国区主域名,allow
+tplink.com,TP-Link,IoT_core,high,TP-Link主域名,allow
+huawei.com,Huawei,IoT_core,high,华为主域名（HiLink/智能家居）,allow
+hisilicon.com,Huawei,IoT_core,medium,海思芯片相关云服务,allow
+myhuaweicloud.com,Huawei,IoT_core,high,华为云IoT域名,allow
+tmall.com,Alibaba Cloud,IoT_core,high,天猫/天猫精灵域名,allow
+tencentdevices.com,Tencent Cloud,IoT_core,high,腾讯云IoT主域名,allow
+hisense.com,Hisense (海信),IoT_core,high,海信智能设备服务,allow
+tcl.com,TCL (TCL),IoT_core,medium,TCL智能设备/电视服务,allow
+changhong.com,Changhong (长虹),IoT_core,medium,长虹智能设备服务,allow
+skyworth.com,Skyworth (创维),IoT_core,medium,创维智能设备服务,allow
+gree.com,Gree (格力),IoT_core,medium,格力智能家电服务,allow
+midea.com,Midea (美的),IoT_core,high,美的智能家电服务,allow
+roborock.com,Roborock (石头科技),IoT_core,high,石头扫地机器人服务,allow
+ecovacs.com,Ecovacs (科沃斯),IoT_core,high,科沃斯扫地机器人服务,allow
+dji.com,DJI (大疆),IoT_core,high,大疆无人机/手持设备服务,allow
+ninebot.com,Ninebot (九号),IoT_core,high,九号平衡车/滑板车服务,allow
+aqara.com,Aqara (绿米),IoT_core,high,Aqara绿米智能设备服务,allow
+yeelight.com,Yeelight (易来),IoT_core,high,Yeelight智能照明服务,allow
+viomi.com,Viomi (云米),IoT_core,high,云米智能家电服务,allow
+orvibo.com,Orvibo (欧瑞博),IoT_core,high,欧瑞博智能家居服务,allow
+jd.com,JD (京东),IoT_core,high,京东主域名,allow
+jdsmart.com,JD (京东微联),IoT_core,high,京东微联设备服务,allow
+jddc.jd.com,JD (京东微联),IoT_core,high,京东微联数据通道,allow
+suning.com,Suning (苏宁),IoT_core,medium,苏宁智能设备服务,allow
+meizu.com,Meizu (魅族),IoT_core,medium,魅族智能设备/推送服务,allow
+iflytek.com,iFlytek (科大讯飞),machine_learning,medium,讯飞语音与AI服务,block_medium,语音助手可能受限
+gdt.qq.com,Tencent (广点通),advertising_sdk,high,腾讯广点通广告,block_soft,广告停止
+ad.qq.com,Tencent,advertising_sdk,high,腾讯广告服务,block_soft,广告停止
+cpro.baidu.com,Baidu (百度联盟),advertising_sdk,high,百度联盟广告,block_soft,广告停止
+union.baidu.com,Baidu (百度联盟),advertising_sdk,high,百度联盟,block_soft,广告停止
+tanx.com,Alibaba (阿里妈妈),advertising_sdk,high,阿里妈妈tanx广告,block_soft,广告停止
+ad.360.cn,Qihoo 360 (360广告),advertising_sdk,high,360广告服务,block_soft,广告停止
+kuaishou.com,Kuaishou (快手),analytics,medium,快手统计与广告,block_soft,统计停止
+pinduoduo.com,Pinduoduo (拼多多),analytics,medium,拼多多数据上报,block_soft,统计停止
+iqiyi.com,iQiyi (爱奇艺),cdn,medium,爱奇艺内容CDN,allow
+youku.com,Youku (优酷),cdn,medium,优酷内容CDN,allow
+v.qq.com,Tencent (腾讯视频),cdn,medium,腾讯视频内容分发,allow
+github.com,GitHub (Microsoft),developer_service,high,GitHub 主站,allow
+githubusercontent.com,GitHub (Microsoft),developer_service,high,GitHub 内容托管（raw/objects/gist 子域）,allow
+githubassets.com,GitHub (Microsoft),developer_service,high,GitHub 静态资源,allow
+github.io,GitHub (Microsoft),developer_service,high,GitHub Pages,allow
+jsdelivr.net,jsDelivr,cdn,high,开源CDN（cdn/fastly/data 等子域统一归属）,allow
+ipify.org,ipify,telemetry,high,公网IP回显（DDNS/联网检查常用）,allow
+ip.sb,ip.sb,telemetry,medium,公网IP回显服务（api.ip.sb 等）,allow
+qcloud.com,Tencent (腾讯云),cloud_storage,high,腾讯云（im.qcloud.com 等子域）,allow
+ardot.tencent.com,Tencent (腾讯),developer_service,high,腾讯 Ardot 设计工具（tencent.com 子域，归属确定）,allow
+workbuddy.cn,WorkBuddy,developer_service,medium,WorkBuddy 官方域名（static 等子域为静态资源）,allow
+ipip.net,IPIP.net,telemetry,medium,公网IP回显（myip.ipip.net），IP 地理数据服务商,allow
+kspeeder.com,Linkease (iStoreOS生态),cdn,medium,Docker镜像/下载加速服务（KSpeeder，iStoreOS 团队开发）,allow
+gh.idayer.com,GitHub加速镜像（社区）,cdn,low,GitHub文件加速代理（第三方社区服务，与GitHub无隶属，归属易变）,allow
+ghfast.top,GitHub加速镜像（社区）,cdn,low,GitHub加速代理（第三方社区服务，与GitHub无隶属，归属易变）,allow
+gh-proxy.com,GitHub加速镜像（社区）,cdn,low,GitHub加速代理（gh-proxy开源项目公共实例，归属易变）,allow
+ghproxy.monkeyray.net,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+gh.monlor.com,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+gh.jasonzeng.dev,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+ghm.078465.xyz,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+git.yylx.win,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+github.tbap.top,GitHub加速镜像（社区）,cdn,low,自建GitHub加速代理（第三方，归属易变）,allow
+open.iot.10086.cn,China Mobile (中移物联网/OneNET),IoT_core,high,中移物联网OneNET开放API,allow
+api.heclouds.com,China Mobile (中移物联网/OneNET),IoT_core,high,中移物联网OneNET设备接入,allow
+iot.ctwing.cn,China Telecom (天翼物联/CTWing),IoT_core,high,天翼物联设备接入平台,allow
+ctwing.cn,China Telecom (天翼物联/CTWing),IoT_core,medium,天翼物联平台门户,allow
+dreame.tech,Dreame (追觅),IoT_core,high,追觅智能设备主域名,allow
+api.dreame.tech,Dreame (追觅),IoT_core,high,追觅智能设备服务,allow
+narwal.com,Narwal (云鲸),IoT_core,medium,云鲸智能清洁设备服务,allow
+tineco.com,Tineco (添可),IoT_core,medium,添可智能清洁设备,allow
+kaadas.com,Kaadas (凯迪仕),IoT_core,medium,凯迪仕智能门锁服务,allow
+loock.com,Loock (鹿客),IoT_core,medium,鹿客智能门锁服务,allow
+konka.com,Konka (康佳),IoT_core,medium,康佳智能设备服务,allow
+opple.com,OPPLE (欧普照明),IoT_core,medium,欧普智能照明服务,allow
+meethue.com,Signify (飞利浦 Hue),IoT_core,medium,飞利浦Hue智能照明桥接服务,allow
+bull.com.cn,BULL (公牛),IoT_core,low,公牛智能插座/开关服务,allow
+panasonic.com,Panasonic (松下),IoT_core,low,松下智能设备服务,allow
+dyson.com,Dyson (戴森),IoT_core,low,戴森智能设备服务,allow
+sony.com,Sony (索尼),IoT_core,low,索尼智能设备/电视服务,allow
+lgthinq.com,LG (LG ThinQ),IoT_core,low,LG ThinQ智能家电服务,allow
+samsung.com,Samsung (三星),IoT_core,low,三星SmartThings/家电服务,allow
+ikea.com,IKEA (宜家),IoT_core,low,宜家Tradfri智能照明,allow
+home-connect.com,BSH (博世/西门子),IoT_core,low,博世西门子Home Connect家电,allow
+yitechnology.com,Yi (小蚁),IoT_core,medium,小蚁摄像头设备服务,allow
+lenovomm.com,Lenovo (联想),IoT_core,medium,联想推送/设备服务,allow
+nubia.com,Nubia (努比亚),IoT_core,low,努比亚设备服务,allow
+honor.com,Honor (荣耀),IoT_core,medium,荣耀智能设备/账号服务,allow
+cloud.honor.com,Honor (荣耀),IoT_core,medium,荣耀云服务,allow
+restapi.amap.com,Alibaba (高德地图),developer_service,medium,高德地图API（定位/导航SDK）,allow
+apis.map.qq.com,Tencent (腾讯地图),developer_service,medium,腾讯地图API（定位SDK）,allow
+loc.map.baidu.com,Baidu (百度地图),developer_service,medium,百度地图定位SDK,allow
+api.map.baidu.com,Baidu (百度地图),developer_service,medium,百度地图API,allow
+oss-cn-hangzhou.aliyuncs.com,Alibaba Cloud (阿里云OSS),cloud_storage,medium,阿里云对象存储（设备媒体上传）,allow
+cos.ap-guangzhou.myqcloud.com,Tencent Cloud (腾讯云COS),cloud_storage,medium,腾讯云对象存储（设备媒体上传）,allow
+bcs.baidubce.com,Baidu Cloud (百度云BOS),cloud_storage,low,百度云对象存储,allow
+qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云主域名,allow
+up.qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云上传端点,allow
+ximalaya.com,Ximalaya (喜马拉雅),cdn,low,喜马拉雅音频内容（智能音箱）,allow
+music.163.com,NetEase (网易云音乐),cdn,low,网易云音乐内容（智能音箱）,allow
