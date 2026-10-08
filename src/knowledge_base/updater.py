@@ -41,7 +41,7 @@ def _version_key(version: str) -> tuple:
 class KnowledgeBaseUpdater:
     """知识库在线更新器"""
 
-    DEFAULT_REPO = "https://raw.githubusercontent.com/homeward-labs/knowledge-base/main"
+    DEFAULT_REPO = "https://<kb-source>"
 
     #: 环境变量名：自建内容源地址（覆盖默认源）
     ENV_SOURCE = "HOMEWARD_KB_SOURCE"
