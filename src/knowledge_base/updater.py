@@ -32,6 +32,8 @@ try:
         KB_PUBKEY_FILENAME,
         ED25519_MODULE_BASENAME,
         USER_AGENT_HOMEPAGE,
+        REQUIRED_DATA_FILES,
+        OPTIONAL_DATA_FILES,
     )
 except Exception:
     import importlib.util as _ilu
@@ -48,6 +50,8 @@ except Exception:
     KB_PUBKEY_FILENAME = _c_mod.KB_PUBKEY_FILENAME
     ED25519_MODULE_BASENAME = _c_mod.ED25519_MODULE_BASENAME
     USER_AGENT_HOMEPAGE = _c_mod.USER_AGENT_HOMEPAGE
+    REQUIRED_DATA_FILES = _c_mod.REQUIRED_DATA_FILES
+    OPTIONAL_DATA_FILES = _c_mod.OPTIONAL_DATA_FILES
 
 USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
 
@@ -214,9 +218,10 @@ class KnowledgeBaseUpdater:
         (self.kb_dir / VERSION_FILE).write_text(version)
 
     # 必需文件：缺任何一个就不允许替换（否则会出现「新域名库 + 旧行为库」的错配）
-    REQUIRED_FILES = ("domains.csv", "behaviors.json")
     # 可选文件：下载失败只是少一份能力，不阻塞本次更新
-    OPTIONAL_FILES = ("asn.csv",)
+    # 清单来自 constants.py（单一真相源），此处不再硬编码文件名。
+    REQUIRED_FILES = REQUIRED_DATA_FILES
+    OPTIONAL_FILES = OPTIONAL_DATA_FILES
 
     def _download_and_replace(self, version: str, url: str) -> bool:
         """下载新版本并整体替换 —— **要么全换，要么一个都不换**
