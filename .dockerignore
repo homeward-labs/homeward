@@ -14,3 +14,10 @@ hooks
 LICENSE
 .gitignore
 .dockerignore
+
+# ===== 闭源目录（标准版 / 专业版）—— 绝不进入镜像构建上下文 =====
+# 与 .gitignore 对齐：src/enforcers/ 与 src/editions/ 含闭源代码，
+# 即便被 .gitignore 挡在 git 之外，Docker 默认仍会把它们纳入构建上下文，
+# 必须在此显式排除，否则会被 Dockerfile 的 COPY src/ 烤进公开镜像。
+src/enforcers/
+src/editions/
