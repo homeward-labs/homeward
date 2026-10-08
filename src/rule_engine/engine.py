@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from knowledge_base.constants import KB_DIR_NAME, DOMAINS_CSV, BEHAVIORS_JSON
 
 logger = logging.getLogger("homeward.engine")
 
@@ -59,7 +60,7 @@ class KnowledgeBase:
 
     def __init__(self, base_dir: str = None):
         if base_dir is None:
-            base_dir = Path(__file__).parent.parent / "knowledge_base"
+            base_dir = Path(__file__).parent.parent / KB_DIR_NAME
         self.base_dir = Path(base_dir)
         self.domains: dict[str, dict] = {}
         self.patterns: list[tuple[re.Pattern, dict]] = []
@@ -67,7 +68,7 @@ class KnowledgeBase:
 
     def load(self):
         """加载 domains.csv"""
-        csv_path = self.base_dir / "domains.csv"
+        csv_path = self.base_dir / DOMAINS_CSV
         if not csv_path.exists():
             return
 
@@ -244,7 +245,7 @@ class BehaviorMatcher:
             # 目录名是**下划线** knowledge_base，不是连字符 knowledge-base。
             # 早期这里写错过，结果是默认构造时行为库静默加载为空、所有行为类判定
             # （心跳信标 / 突发上传 / DNS 隧道……）无声失效 —— 故改为显式报错。
-            behaviors_path = Path(__file__).parent.parent / "knowledge_base" / "behaviors.json"
+            behaviors_path = Path(__file__).parent.parent / KB_DIR_NAME / BEHAVIORS_JSON
         self.behaviors_path = Path(behaviors_path)
         self.rules: list[dict] = []
         self.supported_rules: list[dict] = []

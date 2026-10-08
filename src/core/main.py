@@ -24,12 +24,16 @@ logger = logging.getLogger("homeward")
 
 # 项目根目录
 SRC_DIR = Path(__file__).resolve().parent.parent  # src/ 目录（main.py 在 src/core/ 下，parent.parent = src/）
-KB_DIR = SRC_DIR / "knowledge_base"
 ROOT = SRC_DIR.parent
 
 # 导入各模块
 import sys
 sys.path.insert(0, str(SRC_DIR))
+
+from knowledge_base.constants import KB_DIR_NAME, BEHAVIORS_JSON
+
+# 知识库目录名取自常量，必须在 constants 导入之后才能使用
+KB_DIR = SRC_DIR / KB_DIR_NAME
 
 from rule_engine.engine import (
     KnowledgeBase,
@@ -129,7 +133,7 @@ class HomewardService:
         # 用 RLock：读路径内部会互相调用（如 export_report → get_stats）。
         self._state_lock = threading.RLock()
         self.kb = KnowledgeBase(str(KB_DIR))
-        self.behavior_matcher = BehaviorMatcher(str(KB_DIR / "behaviors.json"))
+        self.behavior_matcher = BehaviorMatcher(str(KB_DIR / BEHAVIORS_JSON))
         self.engine = DecisionEngine(self.kb, self.behavior_matcher)
 
         # AI 分析器（默认关闭）
