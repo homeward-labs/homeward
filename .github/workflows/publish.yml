@@ -67,6 +67,15 @@ jobs:
           build-args: |
             HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
 
+      - name: 将容器包设为公开（GHCR 默认私有，须显式改公开）
+        run: |
+          curl -sS -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/user/packages/container/package/homeward/visibility \
+            -d '{"visibility":"public"}'
+          echo "已尝试将 ghcr.io/homeward-labs/homeward 设为公开（若返回非 2xx，请到 GitHub Packages 页面手动确认可见性）"
+
   verify:
     name: 校验已发布镜像（amd64）
     needs: image
