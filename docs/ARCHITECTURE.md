@@ -167,7 +167,8 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
   block_medium / block_hard（阻断类一律需用户确认，实际下发属标准版）
 - `side_effects`：中文分号分隔的后果说明，供「阻断后果预览」使用；allow 类留空
 
-数据以 **CC BY 4.0** 发布，使用须署名，见 `src/knowledge_base/LICENSE`。
+数据**按来源分别授权**（上游公开源沿用 MIT / 家卫策展 CC BY 4.0），使用须署名，
+见 `src/knowledge_base/LICENSE` 与 `SOURCES.md`。
 
 ### 3.2 行为模式库（behaviors.json）
 

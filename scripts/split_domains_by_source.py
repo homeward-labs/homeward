@@ -11,7 +11,7 @@
 本脚本把合并产物按来源拆成两个**再分发单元**：
 
 * ``domains_public.csv``    —— 来源为公开源，沿用上游许可（MIT / free-attribution），必须署名
-* ``domains_homeward.csv``  —— 家卫策展（种子与手工补录），适用《家卫知识库许可》
+* ``domains_homeward.csv``  —— 家卫策展（种子与手工补录），**CC BY 4.0**（公开换众包）
 
 设计约束（不要改）
 ------------------

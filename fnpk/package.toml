@@ -18,7 +18,7 @@ display_name = "家卫"
 version = "0.1.0"
 description = "家庭联网设备隐私守护 — 看清家里每个联网设备（智能硬件 / 手机 / 电脑）在跟谁说话；阻断后果可预览，实际拦截属标准版能力"
 author = "Homeward Community"
-license = "MIT"
+license = "BUSL-1.1"   # BSL 1.1 的 SPDX 标识；4 年后该版本转 MPL-2.0
 homepage = "https://github.com/homeward-labs/homeward"
 
 [requirements]

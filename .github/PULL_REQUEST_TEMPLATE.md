@@ -19,7 +19,7 @@
 - [ ] 没有引入 `@closed-source` / `@standard-only` / `@pro-only` 标记
 - [ ] 没有夹带敏感资料：竞品分析、定价、合同条款、路线图、客户数据 —— 这些存维护者私有目录，**不进本仓库**
 - [ ] 没有夹带真实环境的隐私数据（设备 MAC、公网 IP、家庭内网拓扑）
-- [ ] 若改动知识库：数据可署名公开（CC BY 4.0），来源可核实
+- [ ] 若改动知识库：数据可署名公开（上游公开源沿用 MIT / 家卫策展 CC BY 4.0），来源可核实
 
 > `hooks/pre-commit` 与 `hooks/pre-push` 会自动拦截前两项；
 > `tools/check_open_boundary.py` 可本地自检：`python tools/check_open_boundary.py`
