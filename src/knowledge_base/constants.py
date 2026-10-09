@@ -33,10 +33,11 @@ ASN_CSV = "asn.csv"
 # 必需项缺失即判定更新失败；可选项下载失败只跳过、不影响更新成功。
 # 变更「更新哪些文件」只需改这两个元组，业务逻辑无需改动。
 # 注：OUI_PREFIXES_CSV 随客户端分发、体积较大(约 217KB)且变化缓慢，
-#     故默认**不**纳入更新清单（保持随包静态）。若要开启其在线更新，
-#     把它加进 OPTIONAL_DATA_FILES 即可（一处改动，两端生效）。
+#     但「设备厂商识别」依赖它，故默认纳入**可选**更新清单（一次下载、
+#     失败自动跳过，不影响其余文件更新）。若要恢复为纯静态随包，
+#     从 OPTIONAL_DATA_FILES 移除即可（一处改动，两端生效）。
 REQUIRED_DATA_FILES = (DOMAINS_CSV, BEHAVIORS_JSON)
-OPTIONAL_DATA_FILES = (ASN_CSV,)
+OPTIONAL_DATA_FILES = (ASN_CSV, OUI_PREFIXES_CSV)
 
 # 验签相关
 KB_LICENSE_DIRNAME = "license"

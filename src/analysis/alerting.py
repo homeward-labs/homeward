@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Iterable, Optional
 
 from analysis.behavior import BehaviorFinding
@@ -36,6 +36,16 @@ ACTION_LABEL = {
     "block_hard": "建议将该设备隔离到独立网段",
     "unknown": "暂不处理，可手动触发分析",
 }
+
+# 「突发大流量上传」命中这些归属类别时，不应按数据外泄处理：
+# 真实家庭网络里手机 iCloud/Google 相册备份、系统/App 更新、CDN 拉取都符合
+# 「单位时间内向单一目的地传大量数据」，直接判 high + block_medium 是误报。
+# 仅当目的地归属为下列良性大流量类别才降级为 low/warn；目的地未知（attribution 为空）
+# 仍保持原严重度 —— 未知目的地的大流量上传更可疑，宁严勿松（失败关闭）。
+_BENIGN_BULK_CATEGORIES = frozenset({
+    "cloud_storage", "cloud_backup", "os_update", "app_update",
+    "cdn", "system_update", "backup",
+})
 
 TEMPLATE_KEYS = frozenset({
     "device_name", "device_ip", "vendor", "device_type",
@@ -226,6 +236,11 @@ class AlertCenter:
             )
             rule = rule_of(finding.rule_id) if rule_of else {}
             context = build_context(finding, device_view or {}, attribution or {})
+
+            # bulk_upload 误报收敛：已知良性大流量类别（云备份/系统更新/CDN）降级为
+            # low/warn，不再当成「数据外泄」吓人；未知目的地保持原严重度。
+            if finding.rule_id == "bulk_upload" and attribution.get("category") in _BENIGN_BULK_CATEGORIES:
+                finding = replace(finding, severity="low", action="warn")
 
             summary, missing = self.renderer.render(
                 rule.get("explanation", "") or _fallback_explanation(finding), context
