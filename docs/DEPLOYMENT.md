@@ -120,7 +120,7 @@
 
 | 安装方式 | 适用平台 | 状态 | 说明 |
 |---|---|---|---|
-| **预构建镜像（GHCR · 多架构）** | amd64 / arm64 / armv7 的软路由与 NAS | 🔜 **工作流已就位，首个 `v*` tag 发布后可用** | `ghcr.io/homeward-labs/homeward`，一次构建出 `linux/amd64` + `linux/arm64` + `linux/arm/v7`。**不用本地 build**，低配软路由 / ARM NAS 尤其省事；发布流程见 `.github/workflows/publish.yml`。在此之前请用下面的源码 build |
+| **预构建镜像（GHCR · 多架构）** | amd64 / arm64 / armv7 的软路由与 NAS | ✅ **可用（首个 `v0.1.0` 已发布）** | `ghcr.io/homeward-labs/homeward`，一次构建出 `linux/amd64` + `linux/arm64` + `linux/arm/v7`。**不用本地 build**；升级只拉变动层（基础层 `python:3.12-slim` 已缓存不重下）。镜像版 compose 见 `docker/docker-compose.pull.yml`，用法：`docker compose -f docker/docker-compose.pull.yml pull && up -d`；发布流程见 `.github/workflows/publish.yml` |
 | **Docker Compose（本地 build）** | 任何能跑 Docker 的 Linux / NAS | ✅ 骨架可用 | `docker compose up -d`，端口 `9595`。首个 tag 发布前，这是最通用的路径 |
 | **源码直跑** | 开发机、Linux 主机 | ✅ 可用（开发用） | `python -m src.core.main`，零第三方依赖，用于开发与验证 |
 | **原生 Linux（systemd）** | Debian / Ubuntu / 任意 Linux 主机、旧电脑、物理机 | ⬜ **计划中** | 目标形态之一：一台旧电脑或迷你主机常驻，不走容器 |

@@ -1,0 +1,68 @@
+# 镜像版部署（从 GHCR 拉取预构建多架构镜像，设备上无需源码、无需本地构建）
+#
+# 适用：已发布版本。升级只需两行，设备上零源码文件，基础层缓存不重下：
+#   docker compose -f docker/docker-compose.pull.yml pull
+#   docker compose -f docker/docker-compose.pull.yml up -d
+#
+# 想锁定某版本可覆盖标签：HOMEWARD_IMAGE_TAG=v0.1.0 docker compose -f ... up -d
+#   （默认 :latest，即最新发布版）。
+#
+# 数据挂载沿用 HOMEWARD_DATA_HOST / HOMEWARD_LOGS_HOST 环境变量（安装脚本注入），
+# 与 docker-compose.istoreos.yml 行为一致 —— 升级不丢数据。
+#
+# iStoreOS 前置：开启系统 dnsmasq 日志到 /tmp/dnsmasq.log（见 istoreos 版注释）。
+
+services:
+  homeward:
+    image: ghcr.io/homeward-labs/homeward:${HOMEWARD_IMAGE_TAG:-latest}
+    container_name: homeward
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+          pids: 128
+        reservations:
+          cpus: "0.10"
+          memory: 32M
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; s=urllib.request.urlopen('http://127.0.0.1:9595/api/health').status; sys.exit(0 if s==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    volumes:
+      # 持久化数据目录：安装脚本用 HOMEWARD_DATA_HOST 覆盖为宿主机持久路径，
+      # 避免重装/重启丢数据（与 istoreos 版一致）。
+      - ${HOMEWARD_DATA_HOST:-./data}:/app/data
+      - ${HOMEWARD_LOGS_HOST:-./logs}:/app/logs
+      # iStoreOS / OpenWrt 系统 dnsmasq 日志（只读）。
+      - /tmp/dnsmasq.log:/tmp/dnsmasq.log:ro
+    environment:
+      - HOST=0.0.0.0
+      - PORT=9595
+      - LOG_LEVEL=info
+      - PYTHONDONTWRITEBYTECODE=1
+      - KNOWLEDGE_BASE_AUTO_UPDATE=false
+      - KNOWLEDGE_BASE_UPDATE_INTERVAL=604800
+      - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
+      # 显式指向 iStoreOS 的日志落点
+      - DNS_LOG_PATH=/tmp/dnsmasq.log
+      # 许可令牌 / 设备标识落盘目录（随 /app/data 卷持久化，容器重建不丢指纹）
+      - HOMEWARD_DATA_DIR=/app/data/homeward
+      - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
+    ports:
+      - "9595:9595"
+    command: ["python", "-m", "src.ui.server"]
