@@ -68,15 +68,27 @@ jobs:
             HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
 
       - name: 将容器包设为公开（GHCR 默认私有，须显式改公开）
-        # 注意：本仓属组织 homeward-labs，包在组织命名空间下，
+        # 本仓属组织 homeward-labs，包在组织命名空间下，
         # 必须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
+        # 主用 gh CLI（runner 自带，错误可读）；失败再回退 curl 并打印 HTTP 状态码以便诊断。
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sS -X PUT \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility \
-            -d '{"visibility":"public"}'
-          echo "已尝试将 ghcr.io/homeward-labs/homeward 设为公开（若返回非 2xx，请到 GitHub Packages 页面手动确认可见性）"
+          echo ">>> 尝试通过 gh 将包设为公开"
+          if gh api -X PUT "orgs/homeward-labs/packages/container/homeward/visibility" \
+               -f visibility=public 2>/tmp/gh_err; then
+            echo "OK: gh 已将 ghcr.io/homeward-labs/homeward 设为公开"
+          else
+            echo "gh 调用失败（详见下），回退 curl："; cat /tmp/gh_err
+            curl -sS -o /tmp/vis.json -w "curl HTTP %{http_code}\n" -X PUT \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility \
+              -d '{"visibility":"public"}'
+            cat /tmp/vis.json; echo
+            echo "若上面仍非 2xx，请到 GitHub Packages 页面手动改公开："
+            echo "  https://github.com/orgs/homeward-labs/packages/container/homeward/settings"
+          fi
 
   verify:
     name: 校验已发布镜像（amd64）
