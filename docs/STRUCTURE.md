@@ -6,7 +6,7 @@
 ```
 homeward/
 ├── README.md                        # 项目门面
-├── LICENSE                          # MIT（仅覆盖代码）
+├── LICENSE                          # BSL 1.1（仅覆盖代码；该版本 4 年后转 MPL-2.0）
 ├── requirements.txt                 # 当前零第三方依赖；Dockerfile 依赖它存在
 ├── docs/
 │   ├── README.md                    # 项目总览
@@ -41,7 +41,7 @@ homeward/
 │   │   ├── behaviors.json           # 行为模式库（8 个行为）
 │   │   ├── oui_prefixes.csv         # MAC 前缀 → 厂商（脚本生成，见 tools/build_oui_table.py）
 │   │   ├── updater.py               # 在线更新（默认关闭；无遥测回传）
-│   │   └── LICENSE                  # CC BY 4.0 许可与署名要求
+│   │   └── LICENSE                  # 分来源：上游公开源 MIT / 家卫策展 CC BY 4.0，均须署名
 │   ├── ui/                          # W4：Web UI（端口 9595，社区版只读）
 │   │   ├── server.py                # 标准库 http.server + 十个 JSON 接口 + 静态文件
 │   │   └── static/                  # 页面本体：零外部资源，图标为内联 SVG（禁用 emoji）
