@@ -4,7 +4,7 @@
 # 不管在公司还是家里，跑一次就自动处理「跨机同步卫生」：
 #   1) 把本地仓库强制对齐成远程镜像（上游已删的 tracked 文件会被删；
 #      **未跟踪的残留文件不直接删除，而是隔离到 .homeward-trash/ 防误推**）
-#   2) 校验私有目录目录完整性（verify.py）
+#   2) 校验私有目录完整性（verify.py）
 #   3) 识别当前机器 / 站点，并报告两个目录的当前状态
 #   4) 可选「受保护推送」：先隔离未跟踪残留 -> 只 add 具体文件（绝不 git add -A）
 #      -> 跑开源边界自检 -> 确认后 commit -> push
@@ -16,7 +16,7 @@
 #   * 设定保留期（默认 30 天，可用 HOMEWARD_TRASH_DAYS 覆盖），到期用 `purge` 子命令
 #     再确认删除，避免「一拉取就把本地有用文件永久删掉」。
 #
-# 本脚本是公开的（进 git 仓库），不含任何敏感信息；敏感资料只在「私有目录」目录。
+# 本脚本是公开的（进 git 仓库），不含任何敏感信息；敏感资料只在脱 git 的私有目录。
 #
 # 用法：
 #   ./homeward-sync.sh              # 默认 = 镜像拉取(隔离残留) + 私有校验 + 状态报告（推荐每次跑）
@@ -29,7 +29,7 @@
 #   ./homeward-sync.sh doctor       # 诊断当前机器 / 代理 / 路径
 #
 # 环境变量（可选）：
-#   HOMEWARD_PRIVATE_DIR   私有目录目录路径（探测不到时指定）
+#   HOMEWARD_PRIVATE_DIR   私有目录路径（探测不到时指定）
 #   HOMEWARD_REMOTE        远程名（默认 origin）
 #   HOMEWARD_BRANCH        分支名（默认 main）
 #   HOMEWARD_TRASH_DAYS    隔离文件保留天数（默认 30；到期 purge 才删）
@@ -62,13 +62,13 @@ cd "$REPO_ROOT" || exit 1
 REMOTE="${HOMEWARD_REMOTE:-origin}"
 BRANCH="${HOMEWARD_BRANCH:-main}"
 
-# ---------- 探测私有目录目录（不硬编码绝对敏感路径） ----------
+# ---------- 探测私有目录（不硬编码绝对敏感路径） ----------
 detect_private(){
   local d
   if [ -n "${HOMEWARD_PRIVATE_DIR:-}" ] && [ -d "$HOMEWARD_PRIVATE_DIR" ]; then
     echo "$HOMEWARD_PRIVATE_DIR"; return 0
   fi
-  for d in "$HOME/私有目录" "$HOME/Documents/私有目录" "$HOME/私有目录目录"; do
+  for d in "${HOMEWARD_PRIVATE_DIR:-}"; do
     if [ -d "$d" ] && [ -f "$d/verify.py" ]; then echo "$d"; return 0; fi
   done
   return 1
@@ -132,13 +132,13 @@ run_mirror_pull(){
   ok "拉取完成，当前 HEAD: $(git rev-parse --short HEAD)"
 }
 
-# ---------- 校验私有目录目录 ----------
+# ---------- 校验私有目录 ----------
 run_verify(){
   if [ -z "$PRIVATE_DIR" ]; then
-    warn "未探测到私有目录目录（可设 HOMEWARD_PRIVATE_DIR 环境变量）。跳过 verify.py。"
+    warn "未探测到私有目录（可设 HOMEWARD_PRIVATE_DIR 环境变量）。跳过 verify.py。"
     return 0
   fi
-  info "校验私有目录目录：$PRIVATE_DIR"
+  info "校验私有目录：$PRIVATE_DIR"
   if command -v python >/dev/null 2>&1; then
     ( cd "$PRIVATE_DIR" && python verify.py 2>&1 | tail -6 )
   elif command -v python3 >/dev/null 2>&1; then
@@ -163,13 +163,13 @@ do_status(){
     local cnt; cnt="$(wc -l < "$TRASH_DIR/manifest.txt" | tr -d ' ')"
     warn "  隔离区 .homeward-trash/ 有 $cnt 个被隔离文件（保留 ${TRASH_DAYS} 天；purge 清理）"
   fi
-  echo "--- 私有目录目录 ---"
+  echo "--- 私有目录 ---"
   if [ -n "$PRIVATE_DIR" ]; then
     echo "  路径 : $PRIVATE_DIR"
   else
     warn "  未探测到（可设 HOMEWARD_PRIVATE_DIR）"
   fi
-  echo "  （公司基线请对照 私有目录/CODELINE.md；家里仓库 HEAD 须独立核验，勿套用公司基线）"
+  echo "  （公司基线请对照私有目录/CODELINE.md；家里仓库 HEAD 须独立核验，勿套用公司基线）"
 }
 
 # ---------- 受保护推送 ----------
