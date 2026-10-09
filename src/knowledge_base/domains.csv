@@ -199,3 +199,12 @@ qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云主域名,allow
 up.qiniu.com,Qiniu (七牛云),cloud_storage,low,七牛云上传端点,allow
 ximalaya.com,Ximalaya (喜马拉雅),cdn,low,喜马拉雅音频内容（智能音箱）,allow
 music.163.com,NetEase (网易云音乐),cdn,low,网易云音乐内容（智能音箱）,allow
+*.icloud.com,Apple,cloud_storage,high,苹果iCloud云备份与同步,allow
+*.apple.com,Apple,os_update,high,苹果服务（系统/软件更新与iCloud）,allow
+*.googleapis.com,Google,cdn,high,谷歌API与云存储端点,allow
+*.google.com,Google,cloud_storage,medium,谷歌服务（账号/相册/云盘）,allow
+*.microsoft.com,Microsoft,os_update,high,微软服务（Windows更新与OneDrive）,allow
+*.windowsupdate.com,Microsoft,os_update,high,Windows系统更新端点,allow
+*.amazonaws.com,Amazon,cdn,high,亚马逊AWS云,allow
+*.cloudfront.net,Amazon,cdn,high,CloudFront CDN,allow
+*.cloudflare.com,Cloudflare,cdn,high,Cloudflare CDN,allow

@@ -226,7 +226,7 @@ function alertCard(a) {
           <div class="item-sub">${esc(a.device_name)} → ${esc(a.domain || a.destination)}
             （归属：${esc(a.organization || "未识别")}）· 置信度 ${esc(a.confidence)}</div>
         </div>
-        <span class="small muted">${esc(ago(a.last_seen))} · ${esc(a.episodes)} 次</span>
+        <span class="small muted">首次 ${esc(fmtTime(a.first_seen))} · 最近 ${esc(fmtTime(a.last_seen))} · ${esc(a.episodes)} 次</span>
       </div>
       <div class="item-body">${esc(a.summary)}</div>
       <div class="item-body small muted">建议动作：${esc(a.action_label)}</div>

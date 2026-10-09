@@ -208,13 +208,24 @@ class TestEachRuleFires(unittest.TestCase):
                                        domain="www.example.com", port=53, proto="udp")))
 
     def test_crypto_mining(self):
+        # 用真实矿池协议关键词 stratum（pool 关键词已为修 NTP 误报而移除，见 de845a7）
         self.assertIn("crypto_mining",
-                      hit_ids(flows(25, step=1, size=500, domain="eth.pool.example.com",
+                      hit_ids(flows(25, step=1, size=500, domain="eth.stratum.example.com",
                                     spread_dst=4)))
 
-    def test_mining_needs_pool_keywords(self):
+    def test_mining_needs_mining_keywords(self):
         self.assertNotIn("crypto_mining",
                          hit_ids(flows(25, step=1, size=500, domain="api.example.com",
+                                       spread_dst=4)))
+
+    def test_ntp_pool_not_flagged_as_mining(self):
+        """锁 de845a7 修复：NTP pool（pool.ntp.org 等）不得误报为挖矿。
+
+        多目的地下 min_connections 满足，但域名不含任何挖矿关键词，
+        故 crypto_mining 不应命中。
+        """
+        self.assertNotIn("crypto_mining",
+                         hit_ids(flows(25, step=1, size=500, domain="pool.ntp.org",
                                        spread_dst=4)))
 
 
