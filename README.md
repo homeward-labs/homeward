@@ -93,7 +93,8 @@ python -m src.core.main        # 只跑核心服务（命令行输出，不起�
 
 ## 开源协议 · 竞品隔离声明
 
-- 代码 **MIT**（见 [LICENSE](./LICENSE)）；知识库数据 **CC BY 4.0**（见 [src/knowledge\_base/LICENSE](./src/knowledge_base/LICENSE)，**使用须署名**）。
+- 代码 **BSL 1.1**（见 [LICENSE](./LICENSE)）：源码可审计，家庭 / 个人非商业使用**永久免费**，禁止未经授权的商业性服务，4 年后转为 MPL-2.0。人话解释见 [LICENSE-NOTES.md](./LICENSE-NOTES.md)。
+- 知识库数据 **按来源分别授权**：`domains_public.csv`（上游公开源）为 MIT，`domains_homeward.csv`（家卫策展）为 CC BY 4.0 —— 详见 [SOURCES.md](./src/knowledge_base/SOURCES.md)，**使用须署名**。
 - **本项目不集成、不复制任何 AGPL 或其他强 Copyleft 协议的代码。** 任何竞品源码仅作产品调研参考、隔离在仓库之外，避免许可证传染。
 
 ---
