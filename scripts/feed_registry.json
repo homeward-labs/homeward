@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "cache_dir": ".feed_cache",
+  "user_agent": "homeward-kb-feed/1.0 (+https://github.com/homeward-labs/homeward)",
+  "warning": "所有 URL 与许可以源站 LICENSE 为准；启用新源前请逐一复核其许可是否兼容。规则：MIT/CC0/公域 可进 public 层沿用上游许可（不得附加限制）；自定义但允许署名的进 homeward(CC BY 4.0) 策展层并署名。oisd、hagezi 等 GPLv3 / 非商用源严禁进入公开层。",
+  "feeds": [
+    {
+      "id": "stevenblack/hosts",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+      "format": "hosts",
+      "license": "MIT",
+      "mit_compatible": true,
+      "enabled": true,
+      "default_category": "tracker",
+      "default_action": "block_soft",
+      "default_side_effects": "广告/追踪或恶意通信被拦截；正常站点功能通常不受影响",
+      "notes": "已在库主力源（2959 中主要来源）；管道定期刷新，去重后不重复计数"
+    },
+    {
+      "id": "nocoin",
+      "url": "https://raw.githubusercontent.com/marvelousblack/NoCoin/master/hosts",
+      "format": "hosts",
+      "license": "MIT",
+      "mit_compatible": true,
+      "enabled": true,
+      "default_category": "cryptominer",
+      "default_action": "block_soft",
+      "default_side_effects": "挖矿脚本/Coinhive 类通信被拦截；正常站点功能通常不受影响",
+      "notes": "已在库（public 层 organization='nocoin'）；定期刷新"
+    },
+    {
+      "id": "anudeep/adservers",
+      "url": "https://raw.githubusercontent.com/AnudeepND/blacklist/master/adservers.txt",
+      "format": "hosts",
+      "license": "MIT",
+      "mit_compatible": true,
+      "enabled": true,
+      "default_category": "ad_server",
+      "default_action": "block_soft",
+      "default_side_effects": "广告服务器通信被拦截；正常站点功能通常不受影响",
+      "notes": "MIT 声明的广告服务器清单"
+    },
+    {
+      "id": "perflyst/smarttv",
+      "url": "https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV.txt",
+      "format": "hosts",
+      "license": "MIT",
+      "mit_compatible": true,
+      "enabled": true,
+      "default_category": "iot_telemetry",
+      "default_action": "block_soft",
+      "default_side_effects": "智能电视/机顶盒遥测与广告被拦截；本地播放正常",
+      "notes": "设备/IoT 向，贴合家卫护城河"
+    },
+    {
+      "id": "sinfonietta/social",
+      "url": "https://raw.githubusercontent.com/Sinfonietta/social-hosts/master/hosts",
+      "format": "hosts",
+      "license": "Unspecified (retain copyright)",
+      "mit_compatible": false,
+      "enabled": true,
+      "default_category": "social_tracker",
+      "default_action": "block_soft",
+      "default_side_effects": "社交平台追踪/分享组件被拦截；登录态通常需放行",
+      "notes": "无明确 LICENSE，按 CC BY 4.0 策展层署名归档"
+    },
+    {
+      "id": "blocklistproject/ads",
+      "url": "https://raw.githubusercontent.com/blocklistproject/Lists/master/ads.txt",
+      "format": "hosts",
+      "license": "Custom (attribution required)",
+      "mit_compatible": false,
+      "enabled": true,
+      "default_category": "ad_server",
+      "default_action": "block_soft",
+      "default_side_effects": "广告通信被拦截；正常站点功能通常不受影响",
+      "notes": "要求保留版权声明，按 CC BY 4.0 策展层署名归档"
+    },
+    {
+      "id": "blocklistproject/malware",
+      "url": "https://raw.githubusercontent.com/blocklistproject/Lists/master/malware.txt",
+      "format": "hosts",
+      "license": "Custom (attribution required)",
+      "mit_compatible": false,
+      "enabled": true,
+      "default_category": "malware",
+      "default_action": "block_soft",
+      "default_side_effects": "已知恶意通信被拦截",
+      "notes": "要求保留版权声明，按 CC BY 4.0 策展层署名归档"
+    }
+  ]
+}

@@ -32,6 +32,9 @@ config.local.*
 *.png.bak
 screenshots_local/
 
+# feed 管道拉取缓存（含上游原始 hosts 文本，不入库）
+scripts/.feed_cache/
+
 # ===== 闭源版本（标准版 / 专业版）—— 绝不上传公开仓库 =====
 # 整个目录本体被忽略（不只是下面的子目录）。早期版本只忽略了 src/editions/standard
 # 与 src/editions/pro 两个子目录，导致直接放在 src/editions/ 下的文件会漏过第一道防线。

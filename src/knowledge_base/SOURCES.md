@@ -53,3 +53,36 @@ python scripts/split_domains_by_source.py --apply    # 写出两个拆分文件
 
 母本与仓库版本尚未同步时，用 `--source <母本.csv>` 指定源文件
 （母本路径属私有信息，**只作运行时参数传入，绝不写进脚本**）。
+
+## 自动 Feed 管道（feed_pipeline.py）
+
+手工精选只能一次性补充；要让库**随时间自然增长**到 5000+，靠自动 feed 管道。
+
+- 源清单：`scripts/feed_registry.json`（**公开可审计**，每个源标注 `url` / `format` / `license` / `mit_compatible` / 默认 `action`）。
+- 运行：
+  ```bash
+  python scripts/feed_pipeline.py            # 联网拉取 + 合并 + 重签
+  python scripts/feed_pipeline.py --offline  # 只用本地缓存（无网 / 沙箱）
+  python scripts/feed_pipeline.py --dry      # 只统计不写文件
+  ```
+- 合规分流（不得越过）：
+  - `mit_compatible=true`（MIT / CC0 / 公域）→ 进 **public 层**（`organization=源 id`），沿用上游许可，**不附加限制**。
+  - 其余（自定义但允许署名）→ 进 **homeward 层**（CC BY 4.0 策展），署名归档。
+  - 新增 `mit_compatible` 源由管道**自动同步** `scripts/split_domains_by_source.py` 的 `PUBLIC_ORGS`，无需手改三处。
+  - **严禁**引入 oisd / hagezi 等 GPLv3 / 非商用源（见项目 MEMORY 红线）。
+- 调度（定期增长）：Linux/macOS cron 每日
+  `17 3 * * * cd /path/homeward && /usr/bin/python3 scripts/feed_pipeline.py >> /var/log/homeward-feed.log 2>&1`；
+  Windows 任务计划程序设「每日」触发器启 python 跑本脚本。
+- 缓存目录 `scripts/.feed_cache/`（已 gitignore），保存最近拉取的原始源，断网可回退。
+
+当前登记源（截至 v1.1.1）：
+
+| feed id | license | 层 | 备注 |
+|---|---|---|---|
+| `stevenblack/hosts` | MIT | public | 主力源，定期刷新去重 |
+| `nocoin` | MIT | public | 反挖矿 |
+| `anudeep/adservers` | MIT | public | 广告服务器清单 |
+| `perflyst/smarttv` | MIT | public | 智能电视 / IoT 遥测（贴合护城河） |
+| `sinfonietta/social` | 未声明（保留版权） | homeward | 社交平台追踪 |
+| `blocklistproject/ads` | 自定义（需署名） | homeward | 广告 |
+| `blocklistproject/malware` | 自定义（需署名） | homeward | 恶意通信 |
