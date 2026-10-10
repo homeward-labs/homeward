@@ -10,7 +10,9 @@ W2 —— 域名归属：回答「这条外联是发给谁的」（社区版开�
 匹配策略
 --------
 1. **精确匹配**：`ot.io.mi.com` 直接命中表里同名条目，置信度不加不减。
-2. **逐级向上**：`x.y.ot.io.mi.com` → `y.ot.io.mi.com` → `ot.io.mi.com`。
+2. **通配匹配**：表里形如 `*.gtimg.com` 的条目；`*` 只匹配**单个标签**（不跨点），
+   与 `rule_engine.engine` 的 `KnowledgeBase` 同语义。
+3. **逐级向上**：`x.y.ot.io.mi.com` → `y.ot.io.mi.com` → `ot.io.mi.com`。
    向上最多走到「可注册域名」（eTLD+1），**绝不继续匹配到 `com` 这种纯后缀** ——
    否则任何未知域名都会被归给某条恰好是短域名的规则，那是在制造假信息。
 3. **认输**：全都匹配不上就返回 unknown，不猜、不模糊匹配相似域名。
@@ -116,6 +118,16 @@ def normalize_domain(raw: str) -> str:
     return d
 
 
+def _compile_wildcard(pattern_domain: str) -> "re.Pattern":
+    """把库里的通配条目编译成正则（`*.gtimg.com` → `^[^.]*\\.gtimg\\.com$`）。
+
+    `*` 只匹配**单个标签**（`[^.]*` 不跨点），与 ``rule_engine.engine`` 的
+    ``KnowledgeBase`` 保持同一语义 —— 否则两条归属路径会给出不同答案。
+    """
+    body = pattern_domain.replace(".", r"\.").replace("*", r"[^.]*")
+    return re.compile(f"^{body}$")
+
+
 def registrable_domain(domain: str) -> str:
     """
     求可注册域名（eTLD+1），作为向上匹配的**下限**。
@@ -162,8 +174,12 @@ class DomainAttribution:
         self.csv_path = Path(csv_path) if csv_path else DEFAULT_DOMAINS_CSV
         self.cache_size = cache_size
         self._rules: dict[str, dict] = {}
+        self._patterns: list[tuple[str, re.Pattern, dict]] = []
         self._cache: dict[str, AttributionResult] = {}
-        self.stats = {"queries": 0, "cache_hits": 0, "exact": 0, "parent": 0, "miss": 0}
+        self.stats = {
+            "queries": 0, "cache_hits": 0,
+            "exact": 0, "wildcard": 0, "parent": 0, "miss": 0,
+        }
         self.load()
 
     # ---------- 加载 ----------
@@ -194,6 +210,11 @@ class DomainAttribution:
         if not rules:
             raise ValueError(f"归属知识库为空：{self.csv_path}（加载到 0 条规则）")
         self._rules = rules
+        # 通配条目单独编译：字典查不到时才走这里（319 条，线性扫可接受，
+        # 且结果进 _cache，家庭网络里同一域名会反复命中缓存）。
+        self._patterns = [
+            (d, _compile_wildcard(d), rule) for d, rule in rules.items() if "*" in d
+        ]
         self._cache.clear()
         return len(rules)
 
@@ -277,17 +298,35 @@ class DomainAttribution:
 
     # ---------- 内部 ----------
 
+    def _match_pattern(self, domain: str) -> tuple[str, dict] | None:
+        """通配匹配，返回 ``(命中的模式串, 规则)``；未命中返回 None。"""
+        for pattern_domain, pattern, rule in self._patterns:
+            if pattern.match(domain):
+                return pattern_domain, rule
+        return None
+
     def _lookup(self, domain: str) -> AttributionResult:
+        # 顺序与 rule_engine.engine.KnowledgeBase.query() 保持一致：
+        # 精确 → 通配 → 逐级父域（每级同样先精确后通配），避免两条路径给出不同答案。
         hit = self._rules.get(domain)
         if hit:
             self.stats["exact"] += 1
             return self._build(domain, hit, domain, "exact")
+
+        matched = self._match_pattern(domain)
+        if matched:
+            self.stats["wildcard"] += 1
+            return self._build(domain, matched[1], matched[0], "wildcard")
 
         for cand in _parent_candidates(domain)[1:]:
             hit = self._rules.get(cand)
             if hit:
                 self.stats["parent"] += 1
                 return self._build(domain, hit, cand, "parent")
+            matched = self._match_pattern(cand)
+            if matched:
+                self.stats["wildcard"] += 1
+                return self._build(domain, matched[1], matched[0], "wildcard")
 
         self.stats["miss"] += 1
         return self._unknown(domain)
