@@ -877,11 +877,11 @@ account.tcl.com,TCL,iot_core,medium,TCL 电视鉴权与服务通道,allow,
 track.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 log.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 ads.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-api.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
-account.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
-track.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-log.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-ads.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.hisense.com,Hisense (海信),iot_core,medium,海信电视鉴权与服务通道,allow,
+account.hisense.com,Hisense (海信),iot_core,medium,海信电视鉴权与服务通道,allow,
+track.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
 api.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
 account.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,

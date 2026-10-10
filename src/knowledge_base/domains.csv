@@ -3836,11 +3836,11 @@ account.tcl.com,TCL,iot_core,medium,TCL 电视鉴权与服务通道,allow,
 track.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 log.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 ads.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-api.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
-account.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
-track.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-log.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
-ads.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.hisense.com,Hisense (海信),iot_core,medium,海信电视鉴权与服务通道,allow,
+account.hisense.com,Hisense (海信),iot_core,medium,海信电视鉴权与服务通道,allow,
+track.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.hisense.com,Hisense (海信),analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
 roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
 api.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
 account.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
@@ -4527,3 +4527,13 @@ pushwoosh.com,Pushwoosh,analytics,medium,Pushwoosh 推送追踪,block_soft,行�
 api.pushwoosh.com,Pushwoosh,analytics,medium,Pushwoosh 推送追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
 airship.com,Airship,analytics,medium,Airship 推送/互动,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
 api.airship.com,Airship,analytics,medium,Airship 推送/互动,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+openai.com,OpenAI,ai_service,high,OpenAI 人工智能服务（ChatGPT 网页与接口）,allow,
+cloudflareinsights.com,Cloudflare,analytics,medium,Cloudflare Web Analytics 站点统计,block_soft,站点访问统计停止
+hubapi.com,HubSpot,marketing,medium,HubSpot API（表单提交与线索上报）,block_soft,表单提交失败;线索无法上报
+qianwen.com,阿里通义千问,ai_service,medium,阿里通义千问大模型服务,allow,
+immersivetranslate.com,沉浸式翻译,productivity,medium,沉浸式翻译（双语对照网页翻译扩展）,allow,
+immersivetranslate.cn,沉浸式翻译,productivity,medium,沉浸式翻译国内节点与静态资源,allow,
+tampermonkey.net,Tampermonkey,browser_extension,low,油猴脚本管理与脚本黑名单更新,allow,
+ustc.edu.cn,中国科学技术大学,education,medium,中科大开源镜像站（Linux 发行版镜像源）,allow,
+msn.cn,Microsoft,news,medium,微软 MSN 资讯内容接口,allow,
+cloudflarestream.com,Cloudflare,cdn,medium,Cloudflare Stream 视频分发,allow,

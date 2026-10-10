@@ -53,6 +53,26 @@ class Decision:
     requires_user_input: bool = False  # 是否需要用户手动触发 AI 分析
 
 
+MULTI_PUBLIC_SUFFIXES = frozenset({
+    # 中文互联网常见
+    "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "ac.cn",
+    "com.hk", "net.hk", "org.hk", "edu.hk", "gov.hk",
+    "com.tw", "net.tw", "org.tw", "edu.tw",
+    # 其它常见多段后缀
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk",
+    "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+    "co.kr", "or.kr", "ne.kr",
+    "com.au", "net.au", "org.au", "edu.au",
+    "com.br", "net.br", "org.br",
+    "com.sg", "net.sg", "org.sg",
+})
+"""多段公共后缀。
+
+父域回退必须在这里止步 —— 否则 ``ustc.edu.cn`` 若未登记，会一路退到
+``edu.cn`` 并「继承」一个根本不属于任何注册域的归属，等于认错亲。
+"""
+
+
 # ==================== 知识库加载器 ====================
 
 class KnowledgeBase:
@@ -102,11 +122,46 @@ class KnowledgeBase:
         return None
 
     def query(self, domain: str) -> Optional[dict]:
-        """查询域名归属（先精确后模式）"""
+        """查询域名归属：精确 → 通配符 → **父域回退**。
+
+        为什么要有父域回退（真机实测得来的教训）：
+        知识库里 ``github.com`` 有归属，但 ``api.github.com`` / ``alive.github.com``
+        各自并没有精确条目。没有回退时这些子域全被判「未知」，
+        实测把命中率压到了 **18.5%**（211 个目的地只认出 39 个）。
+        逐级剥最左标签，就能让子域继承已登记的父域归属。
+
+        安全边界（两条，缺一不可）：
+        1. 只按**后缀**（父域）继承。因此 ``github.com.evil.com`` 永远认不到
+           ``github.com`` —— 它的父域链是 ``evil.com``，与 GitHub 无关。
+        2. 在 eTLD+1 处止步，**绝不从公共后缀**（com / org / cn / co.uk / edu.cn 等）
+           继承，否则等于「只要后缀相同就乱认亲」。
+        """
         result = self.lookup(domain)
         if result:
             return result
-        return self.match_pattern(domain)
+        result = self.match_pattern(domain)
+        if result:
+            return result
+        return self.match_parent(domain)
+
+    def match_parent(self, domain: str) -> Optional[dict]:
+        """父域回退：逐级剥掉最左标签重试（``api.github.com → github.com``）。
+
+        命中则返回父域条目（**只读，不修改库内字典**）；一路退到 eTLD+1
+        仍未命中则返回 None。
+        """
+        labels = domain.split(".")
+        while len(labels) > 2:
+            labels = labels[1:]
+            parent = ".".join(labels)
+            # 剥到两段时：若这两段本身是多段公共后缀（如 edu.cn / co.uk），
+            # 它已不是任何人的可注册域，立即停手。
+            if len(labels) == 2 and parent.lower() in MULTI_PUBLIC_SUFFIXES:
+                break
+            result = self.lookup(parent) or self.match_pattern(parent)
+            if result:
+                return result
+        return None
 
 
 # ==================== 行为特征匹配 ====================
