@@ -524,3 +524,1047 @@ time.ntp.org,NTP,system_update,medium,NTP.org时间服务,allow,
 *.mozilla.org,Mozilla,app_update,high,Firefox/Mozilla,allow,
 *.mozilla.com,Mozilla,app_update,medium,Mozilla,allow,
 *.download.mozilla.org,Mozilla,app_update,high,Firefox下载,allow,
+account.xiaomi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+api.account.xiaomi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+auth.mi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+id.mi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+api.mi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+miui.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+update.miui.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+cdn.miui.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+mfs.miui.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+file.miui.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+i.mi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+login.mi.com,Xiaomi,iot_core,high,小米核心鉴权/更新/设备控制通道,allow,
+data.mistat.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+tracking.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+sdk.io.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+msa.xiaomi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+msaservice.xiaomi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+oms.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mab.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+c.dev.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.vip.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+global.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+cn.in.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+in.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+gallery.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+themes.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+weather.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+music.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+game.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+finder.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+bbs.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mail.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dialer.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+misc.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+vpnsdk.miui.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+jr.mi.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mibrowser.com,Xiaomi,analytics,high,小米系统/应用遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+account.huawei.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+id.huawei.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+api.huawei.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+hihonor.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+cloud.huawei.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+update.hicloud.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+ips.hicloud.com,Huawei,iot_core,high,华为/荣耀核心鉴权、云与更新通道,allow,
+logreport.hicloud.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+logreport.i.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+plogs.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+logb.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+logcat.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+t.log.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+metric.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+datacollector.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+feedback.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+suggest.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+adsapi.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+idm.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ucfg.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+midearfans.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+appgallery.cdn.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+tools.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dl.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+consumer.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+vmall.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+hwid.huawei.com,Huawei,analytics,high,华为/荣耀系统遥测、广告与体验计划上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+account.oppo.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+id.oppo.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+api.oppo.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+oppo.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+coloros.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+oneplus.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+api.oneplus.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+realme.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+account.realme.com,OPPO,iot_core,high,OPPO/一加/realme 核心鉴权与更新通道,allow,
+data.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+otp.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mcs.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ad.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dfm.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+debug.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+feedback.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+push.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+cloud.oppo.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+i.colotoros.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+phonemanager.coloros.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.coloros.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ota.coloros.com,OPPO,analytics,high,OPPO/一加/realme 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+account.vivo.com,vivo,iot_core,high,vivo/iQOO 核心鉴权与更新通道,allow,
+id.vivo.com,vivo,iot_core,high,vivo/iQOO 核心鉴权与更新通道,allow,
+api.vivo.com,vivo,iot_core,high,vivo/iQOO 核心鉴权与更新通道,allow,
+vivo.com,vivo,iot_core,high,vivo/iQOO 核心鉴权与更新通道,allow,
+iqoo.com,vivo,iot_core,high,vivo/iQOO 核心鉴权与更新通道,allow,
+data.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+stat.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ad.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mcs.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+feedback.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+push.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+cloud.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+abtest.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+config.vivo.com,vivo,analytics,high,vivo/iQOO 系统遥测、广告与推送统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+account.samsung.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+api.samsung.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+samsungcloudsolutions.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+smartthings.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+graph.api.smartthings.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+samsung-cloudfunctions.com,Samsung,iot_core,high,三星核心鉴权、云与 SmartThings 控制通道,allow,
+diag.samsungclus.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+samsungads.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+samsung-ad.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ad.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dpm.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+logcollector.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+feedback.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+metrics.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+gms.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+bif.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+vas.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+push.samsung.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+samsungtelemetry.com,Samsung,analytics,high,三星系统遥测、广告与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+appleid.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+id.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+auth.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+api.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+icloud.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+www.icloud.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+push.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+gateway.push.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+appldnld.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+mesu.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+gs.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+captive.apple.com,Apple,iot_core,high,Apple 鉴权、iCloud、推送与系统更新通道,allow,
+metrics.icloud.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+analytics.icloud.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+guzzoni.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+deviceanalytics.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ls.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+skl.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.smoot.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+e3484.b.akamaiedge.net,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+configuration.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+init.itunes.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+xp.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+covid19.apple.com,Apple,analytics,medium,Apple 系统/服务遥测与诊断上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+android.clients.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+accounts.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+api.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+clients3.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+clients4.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+connectivitycheck.gstatic.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+play.google.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+android.googleapis.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+backup.googleapis.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+fonts.googleapis.com,Google,iot_core,high,Google 鉴权、Play 与 Android 核心服务通道,allow,
+googleadservices.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pagead2.googlesyndication.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pagead.googlesyndication.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+tpc.googlesyndication.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+admob.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+firebaseio.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+firebase.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+app-measurement.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+crashlytics.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+fabric.io,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+gstatic.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ssl.gstatic.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+mtalk.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+altitude.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+clients1.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+clients2.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+clients5.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+khm.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+khmdb.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+translate.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+dl.google.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+update.googleapis.com,Google,advertising,high,Google 广告、Firebase 分析与推送遥测,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.amazon.com,Amazon,iot_core,high,Amazon Alexa/Echo 鉴权与设备控制通道,allow,
+api.echo.amazon.com,Amazon,iot_core,high,Amazon Alexa/Echo 鉴权与设备控制通道,allow,
+alexa.amazon.com,Amazon,iot_core,high,Amazon Alexa/Echo 鉴权与设备控制通道,allow,
+pitangu.amazon.com,Amazon,iot_core,high,Amazon Alexa/Echo 鉴权与设备控制通道,allow,
+device-metrics.amazon.com,Amazon,iot_core,high,Amazon Alexa/Echo 鉴权与设备控制通道,allow,
+amazon-adsystem.com,Amazon,advertising,high,Amazon 广告与设备遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+aax.amazon.com,Amazon,advertising,high,Amazon 广告与设备遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+adsystem.amazon.com,Amazon,advertising,high,Amazon 广告与设备遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ao.amazon.com,Amazon,advertising,high,Amazon 广告与设备遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+beacon.amazon.com,Amazon,advertising,high,Amazon 广告与设备遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+telemetry.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+vortex.data.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+settings-win.data.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+v10.events.data.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+v20.events.data.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mobile.events.data.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+wns.windows.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+client.wns.windows.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+choice.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ssw.live.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+activity.windows.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+storeanalytics.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+fe2.update.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+slscr.update.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+download.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+validation.sls.microsoft.com,Microsoft,telemetry,high,Windows 系统遥测、诊断与更新上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+tuyaapi.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+smartlife.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+auth.tuya.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+cn-auth.tuya.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+iot.tuya.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+portal.tuya.com,Tuya,iot_core,high,涂鸦/Tuya/Smart Life 鉴权与设备云通道,allow,
+c.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+d.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+m.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+s.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+agw.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+acn.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+r.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+u.tuya.com,Tuya,analytics,high,涂鸦平台遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.aqara.com,Aqara,iot_core,high,Aqara 绿米鉴权与设备云通道,allow,
+otec.aqara.com,Aqara,iot_core,high,Aqara 绿米鉴权与设备云通道,allow,
+app.aqara.com,Aqara,iot_core,high,Aqara 绿米鉴权与设备云通道,allow,
+aqara.net,Aqara,analytics,medium,Aqara 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.aqara.com,Aqara,analytics,medium,Aqara 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+track.aqara.com,Aqara,analytics,medium,Aqara 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.roborock.com,Roborock,iot_core,high,石头科技鉴权与设备云通道,allow,
+id.roborock.com,Roborock,iot_core,high,石头科技鉴权与设备云通道,allow,
+app.roborock.com,Roborock,iot_core,high,石头科技鉴权与设备云通道,allow,
+track.roborock.com,Roborock,analytics,medium,石头科技遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.roborock.com,Roborock,analytics,medium,石头科技遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ad.roborock.com,Roborock,analytics,medium,石头科技遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dreame.com,Dreame,iot_core,high,追觅科技鉴权与设备云通道,allow,
+api.dreame.com,Dreame,iot_core,high,追觅科技鉴权与设备云通道,allow,
+app.dreame.com,Dreame,iot_core,high,追觅科技鉴权与设备云通道,allow,
+id.dreame.com,Dreame,iot_core,high,追觅科技鉴权与设备云通道,allow,
+track.dreame.com,Dreame,analytics,medium,追觅科技遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.dreame.com,Dreame,analytics,medium,追觅科技遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+eufy.com,Eufy,iot_core,high,Eufy 安克鉴权与设备云通道,allow,
+api.eufy.com,Eufy,iot_core,high,Eufy 安克鉴权与设备云通道,allow,
+account.eufy.com,Eufy,iot_core,high,Eufy 安克鉴权与设备云通道,allow,
+myeufy.com,Eufy,iot_core,high,Eufy 安克鉴权与设备云通道,allow,
+track.eufy.com,Eufy,analytics,medium,Eufy 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.eufy.com,Eufy,analytics,medium,Eufy 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+wyze.com,Wyze,iot_core,high,Wyze 鉴权与设备云通道,allow,
+api.wyze.com,Wyze,iot_core,high,Wyze 鉴权与设备云通道,allow,
+wyze-api.com,Wyze,iot_core,high,Wyze 鉴权与设备云通道,allow,
+auth.wyze.com,Wyze,iot_core,high,Wyze 鉴权与设备云通道,allow,
+track.wyze.com,Wyze,analytics,medium,Wyze 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.wyze.com,Wyze,analytics,medium,Wyze 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+kasa.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+tapo.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+api.tplinkra.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+eu-api.tplinkra.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+cn-api.tplinkra.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+tp-link.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+id.tplink.com,TP-Link,iot_core,high,TP-Link Kasa/Tapo 鉴权与设备云通道,allow,
+track.tplink.com,TP-Link,analytics,medium,TP-Link 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.tplink.com,TP-Link,analytics,medium,TP-Link 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ad.tplink.com,TP-Link,analytics,medium,TP-Link 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+netgear.com,Netgear,iot_core,medium,Netgear 鉴权与云服务通道,allow,
+kb.netgear.com,Netgear,iot_core,medium,Netgear 鉴权与云服务通道,allow,
+readycloud.netgear.com,Netgear,iot_core,medium,Netgear 鉴权与云服务通道,allow,
+api.netgear.com,Netgear,iot_core,medium,Netgear 鉴权与云服务通道,allow,
+track.netgear.com,Netgear,analytics,medium,Netgear 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.netgear.com,Netgear,analytics,medium,Netgear 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+synology.com,Synology,iot_core,medium,群晖鉴权、更新与云服务通道,allow,
+account.synology.com,Synology,iot_core,medium,群晖鉴权、更新与云服务通道,allow,
+global.download.synology.com,Synology,iot_core,medium,群晖鉴权、更新与云服务通道,allow,
+quicksupport.synology.com,Synology,iot_core,medium,群晖鉴权、更新与云服务通道,allow,
+track.synology.com,Synology,analytics,medium,群晖遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.synology.com,Synology,analytics,medium,群晖遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+qnap.com,QNAP,iot_core,medium,威联通鉴权与云服务通道,allow,
+account.qnap.com,QNAP,iot_core,medium,威联通鉴权与云服务通道,allow,
+cloudaccess.qnap.com,QNAP,iot_core,medium,威联通鉴权与云服务通道,allow,
+track.qnap.com,QNAP,analytics,medium,威联通遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.qnap.com,QNAP,analytics,medium,威联通遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+asus.com,ASUS,iot_core,medium,华硕鉴权与路由器云通道,allow,
+api.asus.com,ASUS,iot_core,medium,华硕鉴权与路由器云通道,allow,
+account.asus.com,ASUS,iot_core,medium,华硕鉴权与路由器云通道,allow,
+router.asus.com,ASUS,iot_core,medium,华硕鉴权与路由器云通道,allow,
+track.asus.com,ASUS,analytics,medium,华硕遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.asus.com,ASUS,analytics,medium,华硕遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ui.com,Ubiquiti,iot_core,medium,Ubiquiti/UniFi 鉴权与云通道,allow,
+unifi.ui.com,Ubiquiti,iot_core,medium,Ubiquiti/UniFi 鉴权与云通道,allow,
+account.ui.com,Ubiquiti,iot_core,medium,Ubiquiti/UniFi 鉴权与云通道,allow,
+ubnt.com,Ubiquiti,iot_core,medium,Ubiquiti/UniFi 鉴权与云通道,allow,
+track.ubnt.com,Ubiquiti,analytics,medium,Ubiquiti 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.ubnt.com,Ubiquiti,analytics,medium,Ubiquiti 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+mikrotik.com,MikroTik,iot_core,medium,MikroTik 更新与云服务通道,allow,
+mksb.mikrotik.com,MikroTik,iot_core,medium,MikroTik 更新与云服务通道,allow,
+upgrade.mikrotik.com,MikroTik,iot_core,medium,MikroTik 更新与云服务通道,allow,
+sonoff.tech,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+api.sonoff.cc,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+cn-api.coolkit.cc,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+us-api.coolkit.cc,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+eu-api.coolkit.cc,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+ewelink.cc,Sonoff,iot_core,high,Sonoff/eWeLink 鉴权与设备云通道,allow,
+track.sonoff.cc,Sonoff,analytics,medium,Sonoff 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.sonoff.cc,Sonoff,analytics,medium,Sonoff 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+broadlink.com,BroadLink,iot_core,medium,BroadLink 鉴权与设备云通道,allow,
+api.broadlink.com,BroadLink,iot_core,medium,BroadLink 鉴权与设备云通道,allow,
+id.broadlink.com,BroadLink,iot_core,medium,BroadLink 鉴权与设备云通道,allow,
+track.broadlink.com,BroadLink,analytics,medium,BroadLink 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.broadlink.com,BroadLink,analytics,medium,BroadLink 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.yeelight.com,Yeelight,iot_core,medium,Yeelight 鉴权与设备云通道,allow,
+app.yeelight.com,Yeelight,iot_core,medium,Yeelight 鉴权与设备云通道,allow,
+track.yeelight.com,Yeelight,analytics,medium,Yeelight 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.yeelight.com,Yeelight,analytics,medium,Yeelight 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+shelly.cloud,Shelly,iot_core,medium,Shelly 鉴权与设备云通道,allow,
+api.shelly.cloud,Shelly,iot_core,medium,Shelly 鉴权与设备云通道,allow,
+account.shelly.cloud,Shelly,iot_core,medium,Shelly 鉴权与设备云通道,allow,
+belkin.com,Belkin,iot_core,medium,Belkin Wemo 鉴权与设备云通道,allow,
+wemo.com,Belkin,iot_core,medium,Belkin Wemo 鉴权与设备云通道,allow,
+api.wemo.com,Belkin,iot_core,medium,Belkin Wemo 鉴权与设备云通道,allow,
+arlo.com,Arlo,iot_core,medium,Arlo 鉴权与设备云通道,allow,
+api.arlo.com,Arlo,iot_core,medium,Arlo 鉴权与设备云通道,allow,
+account.arlo.com,Arlo,iot_core,medium,Arlo 鉴权与设备云通道,allow,
+track.arlo.com,Arlo,analytics,medium,Arlo 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.arlo.com,Arlo,analytics,medium,Arlo 遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ring.com,Ring,iot_core,medium,Ring 鉴权与设备云通道,allow,
+api.ring.com,Ring,iot_core,medium,Ring 鉴权与设备云通道,allow,
+account.ring.com,Ring,iot_core,medium,Ring 鉴权与设备云通道,allow,
+philips-hue.com,Philips,iot_core,medium,Philips Hue 鉴权与设备云通道,allow,
+api2.meethue.com,Philips,iot_core,medium,Philips Hue 鉴权与设备云通道,allow,
+account.meethue.com,Philips,iot_core,medium,Philips Hue 鉴权与设备云通道,allow,
+hue.com,Philips,iot_core,medium,Philips Hue 鉴权与设备云通道,allow,
+track.philips.com,Philips,analytics,medium,飞利浦遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.philips.com,Philips,analytics,medium,飞利浦遥测与统计上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+smarttv.com,SmartTV,analytics,medium,智能电视遥测与广告聚合域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+youtube.com,SmartTV,analytics,medium,智能电视遥测与广告聚合域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+tv.youtube.com,SmartTV,analytics,medium,智能电视遥测与广告聚合域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+tvheadend.org,SmartTV,analytics,medium,智能电视遥测与广告聚合域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+lg.com,LG,iot_core,medium,LG webOS 电视鉴权与服务通道,allow,
+lusvc.lg.com,LG,iot_core,medium,LG webOS 电视鉴权与服务通道,allow,
+ai-sec.lg.com,LG,iot_core,medium,LG webOS 电视鉴权与服务通道,allow,
+lgtv.com,LG,iot_core,medium,LG webOS 电视鉴权与服务通道,allow,
+track.lg.com,LG,analytics,medium,LG 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.lg.com,LG,analytics,medium,LG 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.lg.com,LG,analytics,medium,LG 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.sony.com,Sony,iot_core,medium,Sony Bravia 电视鉴权与服务通道,allow,
+bravia.com,Sony,iot_core,medium,Sony Bravia 电视鉴权与服务通道,allow,
+sonyentertainmentnetwork.com,Sony,iot_core,medium,Sony Bravia 电视鉴权与服务通道,allow,
+track.sony.com,Sony,analytics,medium,Sony 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.sony.com,Sony,analytics,medium,Sony 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.sony.com,Sony,analytics,medium,Sony 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+tv.tcl.com,TCL,iot_core,medium,TCL 电视鉴权与服务通道,allow,
+api.tcl.com,TCL,iot_core,medium,TCL 电视鉴权与服务通道,allow,
+account.tcl.com,TCL,iot_core,medium,TCL 电视鉴权与服务通道,allow,
+track.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.tcl.com,TCL,analytics,medium,TCL 电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
+account.hisense.com,Hisense,iot_core,medium,海信电视鉴权与服务通道,allow,
+track.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ads.hisense.com,Hisense,analytics,medium,海信电视遥测与广告上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
+api.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
+account.roku.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
+rokudns.com,Roku,iot_core,medium,Roku 鉴权与服务通道,allow,
+ads.roku.com,Roku,advertising,medium,Roku 广告与遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+track.roku.com,Roku,advertising,medium,Roku 广告与遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+log.roku.com,Roku,advertising,medium,Roku 广告与遥测上报,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+firetv.com,FireTV,iot_core,medium,Fire TV 鉴权与服务通道,allow,
+amazon.com,FireTV,iot_core,medium,Fire TV 鉴权与服务通道,allow,
+mixpanel.com,Mixpanel,analytics,high,Mixpanel 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.mixpanel.com,Mixpanel,analytics,high,Mixpanel 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+analytics.mixpanel.com,Mixpanel,analytics,high,Mixpanel 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+amplitude.com,Amplitude,analytics,high,Amplitude 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api2.amplitude.com,Amplitude,analytics,high,Amplitude 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.amplitude.com,Amplitude,analytics,high,Amplitude 行为分析 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+segment.io,Segment,analytics,high,Segment 数据管道 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.segment.io,Segment,analytics,high,Segment 数据管道 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+cdn.segment.com,Segment,analytics,high,Segment 数据管道 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+stats.g.doubleclick.net,Google,analytics,high,Google Analytics 站点/应用统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+google-analytics.com,Google,analytics,high,Google Analytics 站点/应用统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+ga-dev-tools.google.com,Google,analytics,high,Google Analytics 站点/应用统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+hotjar.com,Hotjar,analytics,high,Hotjar 会话热图分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+static.hotjar.com,Hotjar,analytics,high,Hotjar 会话热图分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+script.hotjar.com,Hotjar,analytics,high,Hotjar 会话热图分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+fullstory.com,FullStory,analytics,high,FullStory 会话回放分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+edge.fullstory.com,FullStory,analytics,high,FullStory 会话回放分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+rs.fullstory.com,FullStory,analytics,high,FullStory 会话回放分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+heap.io,Heap,analytics,high,Heap 自动捕获分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+heapanalytics.com,Heap,analytics,high,Heap 自动捕获分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.heapanalytics.com,Heap,analytics,high,Heap 自动捕获分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+clevertap.com,CleverTap,analytics,high,CleverTap 用户行为/推送分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.clevertap.com,CleverTap,analytics,high,CleverTap 用户行为/推送分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+localytics.com,Localytics,analytics,high,Localytics 应用分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.localytics.com,Localytics,analytics,high,Localytics 应用分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+analytics.localytics.com,Localytics,analytics,high,Localytics 应用分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+countly.com,Countly,analytics,high,Countly 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.countly.com,Countly,analytics,high,Countly 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+countly.sparkpad.io,Countly,analytics,high,Countly 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+kissmetrics.com,KISSmetrics,analytics,high,KISSmetrics 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.kissmetrics.com,KISSmetrics,analytics,high,KISSmetrics 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+trk.kissmetrics.com,KISSmetrics,analytics,high,KISSmetrics 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+keen.io,Keen,analytics,medium,Keen IO 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.keen.io,Keen,analytics,medium,Keen IO 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+keencdn.com,Keen,analytics,medium,Keen IO 事件分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+ingest.sentry.io,Sentry,analytics,high,Sentry 崩溃/异常上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+o1.ingest.sentry.io,Sentry,analytics,high,Sentry 崩溃/异常上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+bugsnag.com,Bugsnag,analytics,high,Bugsnag 稳定性监控,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.bugsnag.com,Bugsnag,analytics,high,Bugsnag 稳定性监控,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+notify.bugsnag.com,Bugsnag,analytics,high,Bugsnag 稳定性监控,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+instabug.com,Instabug,analytics,medium,Instabug 崩溃/反馈 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.instabug.com,Instabug,analytics,medium,Instabug 崩溃/反馈 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+exec.instabug.com,Instabug,analytics,medium,Instabug 崩溃/反馈 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+testfairy.com,TestFairy,analytics,medium,TestFairy 测试遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.testfairy.com,TestFairy,analytics,medium,TestFairy 测试遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+appsee.com,AppSee,analytics,medium,AppSee 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.appsee.com,AppSee,analytics,medium,AppSee 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+uxcam.com,UXCam,analytics,medium,UXCam 会话/手势分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.uxcam.com,UXCam,analytics,medium,UXCam 会话/手势分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+smartlook.com,Smartlook,analytics,medium,Smartlook 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.smartlook.com,Smartlook,analytics,medium,Smartlook 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+logrocket.com,LogRocket,analytics,medium,LogRocket 前端会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.logrocket.com,LogRocket,analytics,medium,LogRocket 前端会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+cdn.logrocket.com,LogRocket,analytics,medium,LogRocket 前端会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+posthog.com,PostHog,analytics,medium,PostHog 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+app.posthog.com,PostHog,analytics,medium,PostHog 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+e.posthog.com,PostHog,analytics,medium,PostHog 产品分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+flutter.io,Flutter,analytics,low,Flutter 框架遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+analytics.flutter.io,Flutter,analytics,low,Flutter 框架遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+appsflyer.com,AppsFlyer,analytics,high,AppsFlyer 安装归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api2.appsflyer.com,AppsFlyer,analytics,high,AppsFlyer 安装归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+appsflyer.net,AppsFlyer,analytics,high,AppsFlyer 安装归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+attribution.adjust.com,Adjust,analytics,high,Adjust 安装归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+branch.io,Branch,analytics,high,Branch 深度链接/归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+cdn.branch.io,Branch,analytics,high,Branch 深度链接/归因 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+kochava.com,Kochava,analytics,high,Kochava 归因/受众 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.kochava.com,Kochava,analytics,high,Kochava 归因/受众 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+control.kochava.com,Kochava,analytics,high,Kochava 归因/受众 SDK,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+tune.com,TUNE,analytics,high,TUNE/HasOffers 归因,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.tune.com,TUNE,analytics,high,TUNE/HasOffers 归因,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+offers.tune.com,TUNE,analytics,high,TUNE/HasOffers 归因,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+singular.net,Singular,analytics,high,Singular 归因/营销分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.singular.net,Singular,analytics,high,Singular 归因/营销分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+sngl.io,Singular,analytics,high,Singular 归因/营销分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+tapjoy.com,Tapjoy,advertising,high,Tapjoy 广告/激励 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.tapjoy.com,Tapjoy,advertising,high,Tapjoy 广告/激励 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+offers.tapjoy.com,Tapjoy,advertising,high,Tapjoy 广告/激励 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+fyber.com,Fyber,advertising,high,Fyber 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.fyber.com,Fyber,advertising,high,Fyber 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.fyber.com,Fyber,advertising,high,Fyber 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.adcolony.com,AdColony,advertising,high,AdColony 视频广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+v4.adcolony.com,AdColony,advertising,high,AdColony 视频广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+chartboost.com,Chartboost,advertising,high,Chartboost 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.chartboost.com,Chartboost,advertising,high,Chartboost 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+cdn.chartboost.com,Chartboost,advertising,high,Chartboost 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+vungle.com,Vungle,advertising,high,Vungle 视频广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.vungle.com,Vungle,advertising,high,Vungle 视频广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ads.api.vungle.com,Vungle,advertising,high,Vungle 视频广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+applovin.com,AppLovin,advertising,high,AppLovin 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.applovin.com,AppLovin,advertising,high,AppLovin 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.applovin.com,AppLovin,advertising,high,AppLovin 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+hx.applovin.com,AppLovin,advertising,high,AppLovin 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+unity3d.com,Unity,advertising,high,Unity Ads 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+unityads.unity3d.com,Unity,advertising,high,Unity Ads 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.liverail.com,Unity,advertising,high,Unity Ads 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ads.unity3d.com,Unity,advertising,high,Unity Ads 游戏广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ironsrc.com,ironSource,advertising,high,ironSource 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.ironsrc.com,ironSource,advertising,high,ironSource 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.ironsrc.com,ironSource,advertising,high,ironSource 广告变现 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+mintegral.com,Mintegral,advertising,high,Mintegral 程序化广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.mintegral.com,Mintegral,advertising,high,Mintegral 程序化广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.mintegral.com,Mintegral,advertising,high,Mintegral 程序化广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+mobvista.com,Mobvista,advertising,high,Mobvista 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.mobvista.com,Mobvista,advertising,high,Mobvista 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.mobvista.com,Mobvista,advertising,high,Mobvista 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pangle.cn,Pangle,advertising,high,Pangle/穿山甲 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pangle.io,Pangle,advertising,high,Pangle/穿山甲 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.pangle.cn,Pangle,advertising,high,Pangle/穿山甲 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ads.pangle.io,Pangle,advertising,high,Pangle/穿山甲 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+inmobi.com,InMobi,advertising,high,InMobi 移动广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.inmobi.com,InMobi,advertising,high,InMobi 移动广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+i.inmobi.com,InMobi,advertising,high,InMobi 移动广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+smaato.com,Smaato,advertising,high,Smaato 广告交换 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.smaato.com,Smaato,advertising,high,Smaato 广告交换 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+smaato.net,Smaato,advertising,high,Smaato 广告交换 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+mobfox.com,MobFox,advertising,high,MobFox/inneractive 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.mobfox.com,MobFox,advertising,high,MobFox/inneractive 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.mobfox.com,MobFox,advertising,high,MobFox/inneractive 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+inner-active.com,Inneractive,advertising,medium,Inneractive 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.inner-active.com,Inneractive,advertising,medium,Inneractive 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+millennialmedia.com,Millennial,advertising,medium,Millennial Media 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.millennialmedia.com,Millennial,advertising,medium,Millennial Media 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+startapp.com,StartApp,advertising,high,StartApp 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.startapp.com,StartApp,advertising,high,StartApp 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sdk.startapp.com,StartApp,advertising,high,StartApp 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+leadbolt.com,Leadbolt,advertising,medium,Leadbolt 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.leadbolt.com,Leadbolt,advertising,medium,Leadbolt 广告 SDK,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+doubleclick.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+ad.doubleclick.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+adx.doubleclick.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+googlesyndication.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+adnxs.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+criteo.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+criteo.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pubmatic.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+rubiconproject.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+openx.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+openx.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+indexexchange.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+spotx.tv,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+freewheel.tv,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+casalemedia.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+moatads.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+scorecardresearch.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+serving-sys.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+advertising.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+adtech.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+taboola.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+outbrain.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+revcontent.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+media.net,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+conversantmedia.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+mathtag.com,AdNetwork,advertising,high,主流广告交换/网盟域名,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+facebook.com,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+fbcdn.net,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+graph.facebook.com,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+analytics.facebook.com,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+fbsbx.com,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+facebook.net,Meta,social,high,Meta/Facebook 社交与追踪像素,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+twitter.com,Twitter,social,high,Twitter/X 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+twimg.com,Twitter,social,high,Twitter/X 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+t.co,Twitter,social,high,Twitter/X 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+analytics.twitter.com,Twitter,social,high,Twitter/X 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+ads.twitter.com,Twitter,social,high,Twitter/X 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+linkedin.com,LinkedIn,social,high,LinkedIn 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+licdn.com,LinkedIn,social,high,LinkedIn 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+ads.linkedin.com,LinkedIn,social,high,LinkedIn 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+static.licdn.com,LinkedIn,social,high,LinkedIn 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+pinterest.com,Pinterest,social,high,Pinterest 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+pinimg.com,Pinterest,social,high,Pinterest 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+analytics.pinterest.com,Pinterest,social,high,Pinterest 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+reddit.com,Reddit,social,medium,Reddit 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+redditstatic.com,Reddit,social,medium,Reddit 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+redditmedia.com,Reddit,social,medium,Reddit 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+line.me,LINE,social,medium,LINE 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+line-apps.com,LINE,social,medium,LINE 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+line-scdn.net,LINE,social,medium,LINE 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+obs.line-apps.com,LINE,social,medium,LINE 社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+wechat.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+weixin.qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+qlogo.cn,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+qzone.qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+tqq.cn,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+open.qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+connect.qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+graph.qq.com,Tencent,social,high,微信/QQ 社交与追踪/分享回调,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+weibo.com,Sina,social,high,微博社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+weibo.cn,Sina,social,high,微博社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+t.cn,Sina,social,high,微博社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+sinaimg.cn,Sina,social,high,微博社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+sina.cn,Sina,social,high,微博社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+douyin.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+ixigua.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+toutiao.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+bytedance.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+bytedanceapi.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+pstatp.com,ByteDance,social,high,字节跳动/抖音/头条社交与追踪,block_soft,社交追踪/画像与分享回调用被拦截；第三方登录可能降级，不影响主功能
+tongji.baidu.com,Baidu,analytics,high,百度统计/联盟/地图遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+pos.baidu.com,Baidu,analytics,high,百度统计/联盟/地图遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+nsclick.baidu.com,Baidu,analytics,high,百度统计/联盟/地图遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+analytics.umeng.com,Umeng,analytics,high,友盟+ 移动统计/推送分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mobile.umeng.com,Umeng,analytics,high,友盟+ 移动统计/推送分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+umeng.co,Umeng,analytics,high,友盟+ 移动统计/推送分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+uq.umeng.com,Umeng,analytics,high,友盟+ 移动统计/推送分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+appcontrol.umeng.com,Umeng,analytics,high,友盟+ 移动统计/推送分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+sensorsdata.cn,SensorsData,analytics,high,神策数据 用户行为分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.sensorsdata.cn,SensorsData,analytics,high,神策数据 用户行为分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+sa.sensorsdata.cn,SensorsData,analytics,high,神策数据 用户行为分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.talkingdata.com,TalkingData,analytics,high,TalkingData 移动分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+tdata.cn,TalkingData,analytics,high,TalkingData 移动分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+growingio.com,GrowingIO,analytics,high,GrowingIO 无埋点分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.growingio.com,GrowingIO,analytics,high,GrowingIO 无埋点分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+cdn.growingio.com,GrowingIO,analytics,high,GrowingIO 无埋点分析,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+bugly.com,Tencent,analytics,high,腾讯 Bugly 崩溃/质量监控,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.bugly.qq.com,Tencent,analytics,high,腾讯 Bugly 崩溃/质量监控,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mta.qq.com,Tencent,analytics,high,腾讯 MTA/灯塔/OpenInstall 统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+stat.qq.com,Tencent,analytics,high,腾讯 MTA/灯塔/OpenInstall 统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+beacon.qq.com,Tencent,analytics,high,腾讯 MTA/灯塔/OpenInstall 统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+openinstall.io,Tencent,analytics,high,腾讯 MTA/灯塔/OpenInstall 统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+taobao.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+alimama.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+aliyun.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+alibaba.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ad.alimama.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+afp.alimama.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+m.alimama.com,Alibaba,advertising,high,阿里/淘宝/阿里妈妈广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+360.cn,Qihoo,analytics,high,360/ CNZZ 统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+udb.360.cn,Qihoo,analytics,high,360/ CNZZ 统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.360.cn,Qihoo,analytics,high,360/ CNZZ 统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mobs.360.cn,Qihoo,analytics,high,360/ CNZZ 统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+netease.com,NetEase,analytics,medium,网易/有道统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+163.com,NetEase,analytics,medium,网易/有道统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+youdao.com,NetEase,analytics,medium,网易/有道统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+analytics.netease.com,NetEase,analytics,medium,网易/有道统计与遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+jr.jd.com,JD,advertising,medium,京东广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.jd.com,JD,advertising,medium,京东广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ad.jd.com,JD,advertising,medium,京东广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+meituan.com,Meituan,advertising,medium,美团/点评广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+dianping.com,Meituan,advertising,medium,美团/点评广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.meituan.com,Meituan,advertising,medium,美团/点评广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ad.meituan.com,Meituan,advertising,medium,美团/点评广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+didiglobal.com,Didi,analytics,medium,滴滴出行遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+xiaoju.com,Didi,analytics,medium,滴滴出行遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+didichuxing.com,Didi,analytics,medium,滴滴出行遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.didiglobal.com,Didi,analytics,medium,滴滴出行遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.kuaishou.com,Kuaishou,advertising,medium,快手广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ad.kuaishou.com,Kuaishou,advertising,medium,快手广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ksapisrv.com,Kuaishou,advertising,medium,快手广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+sogou.com,Sogou,analytics,medium,搜狗输入法/搜索遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.sogou.com,Sogou,analytics,medium,搜狗输入法/搜索遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+pinyin.sogou.com,Sogou,analytics,medium,搜狗输入法/搜索遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+stat.sogou.com,Sogou,analytics,medium,搜狗输入法/搜索遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+uc.cn,UC,analytics,medium,UC/夸克浏览器遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ucweb.com,UC,analytics,medium,UC/夸克浏览器遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.uc.cn,UC,analytics,medium,UC/夸克浏览器遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+stat.uc.cn,UC,analytics,medium,UC/夸克浏览器遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+tencent.com,Tencent,advertising,high,腾讯云/广点通广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+tencentcloud.com,Tencent,advertising,high,腾讯云/广点通广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.tencent.com,Tencent,advertising,high,腾讯云/广点通广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ad.tencent.com,Tencent,advertising,high,腾讯云/广点通广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+fastly.net,CDN,cloud_storage,low,主流 CDN（仅作遥测/指纹场景拦截参考）,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+cloudfront.net,CDN,cloud_storage,low,主流 CDN（仅作遥测/指纹场景拦截参考）,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+akamaized.net,CDN,cloud_storage,low,主流 CDN（仅作遥测/指纹场景拦截参考）,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+edgesuite.net,CDN,cloud_storage,low,主流 CDN（仅作遥测/指纹场景拦截参考）,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+edgekey.net,CDN,cloud_storage,low,主流 CDN（仅作遥测/指纹场景拦截参考）,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+app.ecovacs.com,Ecovacs,iot_core,medium,科沃斯鉴权与设备云通道,allow,
+id.ecovacs.com,Ecovacs,iot_core,medium,科沃斯鉴权与设备云通道,allow,
+api.ecovacs.com,Ecovacs,iot_core,medium,科沃斯鉴权与设备云通道,allow,
+track.ecovacs.com,Ecovacs,analytics,low,科沃斯遥测与统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.ecovacs.com,Ecovacs,analytics,low,科沃斯遥测与统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+irobot.com,iRobot,iot_core,medium,iRobot 鉴权与设备云通道,allow,
+app.irobot.com,iRobot,iot_core,medium,iRobot 鉴权与设备云通道,allow,
+api.irobot.com,iRobot,iot_core,medium,iRobot 鉴权与设备云通道,allow,
+id.irobot.com,iRobot,iot_core,medium,iRobot 鉴权与设备云通道,allow,
+track.irobot.com,iRobot,analytics,low,iRobot 遥测与统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+log.irobot.com,iRobot,analytics,low,iRobot 遥测与统计,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ecobee.com,Ecobee,iot_core,medium,Ecobee 恒温器云通道,allow,
+api.ecobee.com,Ecobee,iot_core,medium,Ecobee 恒温器云通道,allow,
+id.ecobee.com,Ecobee,iot_core,medium,Ecobee 恒温器云通道,allow,
+haier.com,Haier,iot_core,medium,海尔/U+ 鉴权与设备云通道,allow,
+uplus.haier.com,Haier,iot_core,medium,海尔/U+ 鉴权与设备云通道,allow,
+api.haier.com,Haier,iot_core,medium,海尔/U+ 鉴权与设备云通道,allow,
+midea.cn,Midea,iot_core,medium,美的鉴权与设备云通道,allow,
+api.midea.com,Midea,iot_core,medium,美的鉴权与设备云通道,allow,
+midea.net,Midea,iot_core,medium,美的鉴权与设备云通道,allow,
+api.gree.com,Gree,iot_core,low,格力设备云通道,allow,
+gree.com.cn,Gree,iot_core,low,格力设备云通道,allow,
+withings.com,Withings,iot_core,medium,Withings 健康设备云通道,allow,
+api.withings.com,Withings,iot_core,medium,Withings 健康设备云通道,allow,
+healthmate.withings.com,Withings,iot_core,medium,Withings 健康设备云通道,allow,
+fitbit.com,Fitbit,iot_core,medium,Fitbit 健康设备云通道,allow,
+api.fitbit.com,Fitbit,iot_core,medium,Fitbit 健康设备云通道,allow,
+tracker.fitbit.com,Fitbit,iot_core,medium,Fitbit 健康设备云通道,allow,
+garmin.com,Garmin,iot_core,medium,Garmin 设备/运动云通道,allow,
+connect.garmin.com,Garmin,iot_core,medium,Garmin 设备/运动云通道,allow,
+api.garmin.com,Garmin,iot_core,medium,Garmin 设备/运动云通道,allow,
+logitech.com,Logitech,iot_core,medium,罗技设备云通道,allow,
+harmonize.logitech.com,Logitech,iot_core,medium,罗技设备云通道,allow,
+api.logitech.com,Logitech,iot_core,medium,罗技设备云通道,allow,
+nanoleaf.me,Nanoleaf,iot_core,low,Nanoleaf 灯光云通道,allow,
+api.nanoleaf.me,Nanoleaf,iot_core,low,Nanoleaf 灯光云通道,allow,
+nanoleaf.com,Nanoleaf,iot_core,low,Nanoleaf 灯光云通道,allow,
+lifx.com,LIFX,iot_core,low,LIFX 灯光云通道,allow,
+api.lifx.com,LIFX,iot_core,low,LIFX 灯光云通道,allow,
+api.lifx.co,LIFX,iot_core,low,LIFX 灯光云通道,allow,
+wiz.com,Wiz,iot_core,low,Wiz 灯光云通道,allow,
+api.wiz.com,Wiz,iot_core,low,Wiz 灯光云通道,allow,
+wizlighting.com,Wiz,iot_core,low,Wiz 灯光云通道,allow,
+vesync.com,VeSync,iot_core,medium,VeSync/Levoit/Etekcity 云通道,allow,
+api.vesync.com,VeSync,iot_core,medium,VeSync/Levoit/Etekcity 云通道,allow,
+apps.vesync.com,VeSync,iot_core,medium,VeSync/Levoit/Etekcity 云通道,allow,
+netatmo.com,Netatmo,iot_core,low,Netatmo 气象/设备云通道,allow,
+api.netatmo.com,Netatmo,iot_core,low,Netatmo 气象/设备云通道,allow,
+netatmo.net,Netatmo,iot_core,low,Netatmo 气象/设备云通道,allow,
+august.com,August,iot_core,low,August 智能锁云通道,allow,
+api.august.com,August,iot_core,low,August 智能锁云通道,allow,
+augusthome.com,August,iot_core,low,August 智能锁云通道,allow,
+yalehome.com,Yale,iot_core,low,Yale 智能锁云通道,allow,
+api.yalehome.com,Yale,iot_core,low,Yale 智能锁云通道,allow,
+blinkforhome.com,Blink,iot_core,low,Blink 摄像头云通道,allow,
+api.blinkforhome.com,Blink,iot_core,low,Blink 摄像头云通道,allow,
+blink.com,Blink,iot_core,low,Blink 摄像头云通道,allow,
+rachio.com,Rachio,iot_core,low,Rachio 浇灌云通道,allow,
+api.rachio.com,Rachio,iot_core,low,Rachio 浇灌云通道,allow,
+app.rachio.com,Rachio,iot_core,low,Rachio 浇灌云通道,allow,
+vivint.com,Vivint,iot_core,low,Vivint 安防云通道,allow,
+api.vivint.com,Vivint,iot_core,low,Vivint 安防云通道,allow,
+adt.com,ADT,iot_core,low,ADT 安防云通道,allow,
+api.adt.com,ADT,iot_core,low,ADT 安防云通道,allow,
+adtpulse.com,ADT,iot_core,low,ADT 安防云通道,allow,
+govee.com,Govee,iot_core,low,Govee 灯光/传感器云通道,allow,
+api.govee.com,Govee,iot_core,low,Govee 灯光/传感器云通道,allow,
+app.govee.com,Govee,iot_core,low,Govee 灯光/传感器云通道,allow,
+govee-api.com,Govee,iot_core,low,Govee 灯光/传感器云通道,allow,
+switch-bot.com,SwitchBot,iot_core,low,SwitchBot 设备云通道,allow,
+api.switch-bot.com,SwitchBot,iot_core,low,SwitchBot 设备云通道,allow,
+app.switch-bot.com,SwitchBot,iot_core,low,SwitchBot 设备云通道,allow,
+petkit.com,Petkit,iot_core,low,Petkit 宠物设备云通道,allow,
+api.petkit.com,Petkit,iot_core,low,Petkit 宠物设备云通道,allow,
+app.petkit.com,Petkit,iot_core,low,Petkit 宠物设备云通道,allow,
+elgato.com,Elgato,iot_core,low,Elgato 摄像头/灯光云通道,allow,
+api.elgato.com,Elgato,iot_core,low,Elgato 摄像头/灯光云通道,allow,
+control4.com,Control4,iot_core,low,Control4 智能家居云通道,allow,
+api.control4.com,Control4,iot_core,low,Control4 智能家居云通道,allow,
+savant.com,Savant,iot_core,low,Savant 智能家居云通道,allow,
+api.savant.com,Savant,iot_core,low,Savant 智能家居云通道,allow,
+crestron.com,Crestron,iot_core,low,Crestron 智能控制云通道,allow,
+api.crestron.com,Crestron,iot_core,low,Crestron 智能控制云通道,allow,
+abode.com,Abode,iot_core,low,Abode 安防云通道,allow,
+goabode.com,Abode,iot_core,low,Abode 安防云通道,allow,
+api.goabode.com,Abode,iot_core,low,Abode 安防云通道,allow,
+canary.is,Canary,iot_core,low,Canary 摄像头云通道,allow,
+api.canary.is,Canary,iot_core,low,Canary 摄像头云通道,allow,
+wink.com,Wink,iot_core,low,Wink 智能家居云通道,allow,
+api.wink.com,Wink,iot_core,low,Wink 智能家居云通道,allow,
+insteon.com,Insteon,iot_core,low,Insteon 智能家居云通道,allow,
+api.insteon.com,Insteon,iot_core,low,Insteon 智能家居云通道,allow,
+eero.com,Eero,iot_core,medium,Eero 路由器云通道,allow,
+api.eero.com,Eero,iot_core,medium,Eero 路由器云通道,allow,
+eero.net,Eero,iot_core,medium,Eero 路由器云通道,allow,
+plume.com,Plume,iot_core,low,Plume 网状 WiFi 云通道,allow,
+api.plume.com,Plume,iot_core,low,Plume 网状 WiFi 云通道,allow,
+plume.technology,Plume,iot_core,low,Plume 网状 WiFi 云通道,allow,
+dlink.com,D-Link,iot_core,medium,D-Link 路由器/设备云通道,allow,
+dlink.ca,D-Link,iot_core,medium,D-Link 路由器/设备云通道,allow,
+api.dlink.com,D-Link,iot_core,medium,D-Link 路由器/设备云通道,allow,
+dlink.com.cn,D-Link,iot_core,medium,D-Link 路由器/设备云通道,allow,
+linksys.com,Linksys,iot_core,medium,Linksys 路由器云通道,allow,
+api.linksys.com,Linksys,iot_core,medium,Linksys 路由器云通道,allow,
+linksyssmartwifi.com,Linksys,iot_core,medium,Linksys 路由器云通道,allow,
+cisco.com,Cisco,iot_core,low,Cisco 网络设备云通道,allow,
+api.cisco.com,Cisco,iot_core,low,Cisco 网络设备云通道,allow,
+cisco.net,Cisco,iot_core,low,Cisco 网络设备云通道,allow,
+meraki.com,Meraki,iot_core,low,Meraki 网络设备云通道,allow,
+api.meraki.com,Meraki,iot_core,low,Meraki 网络设备云通道,allow,
+meraki-ca.com,Meraki,iot_core,low,Meraki 网络设备云通道,allow,
+arubanetworks.com,Aruba,iot_core,low,Aruba 网络设备云通道,allow,
+api.arubanetworks.com,Aruba,iot_core,low,Aruba 网络设备云通道,allow,
+zyxel.com,Zyxel,iot_core,medium,Zyxel 路由器/设备云通道,allow,
+api.zyxel.com,Zyxel,iot_core,medium,Zyxel 路由器/设备云通道,allow,
+zyxel.cn,Zyxel,iot_core,medium,Zyxel 路由器/设备云通道,allow,
+tenda.com.cn,Tenda,iot_core,medium,腾达路由器云通道,allow,
+api.tenda.com.cn,Tenda,iot_core,medium,腾达路由器云通道,allow,
+tenda.com,Tenda,iot_core,medium,腾达路由器云通道,allow,
+gl-inet.com,GL.iNet,iot_core,medium,GL.iNet 路由器云通道,allow,
+api.gl-inet.com,GL.iNet,iot_core,medium,GL.iNet 路由器云通道,allow,
+draytek.com,DrayTek,iot_core,medium,DrayTek 路由器云通道,allow,
+api.draytek.com,DrayTek,iot_core,medium,DrayTek 路由器云通道,allow,
+draytek.cn,DrayTek,iot_core,medium,DrayTek 路由器云通道,allow,
+juniper.net,Juniper,iot_core,low,Juniper 网络设备云通道,allow,
+api.juniper.net,Juniper,iot_core,low,Juniper 网络设备云通道,allow,
+fortinet.com,Fortinet,iot_core,low,Fortinet 安全设备云通道,allow,
+api.fortinet.com,Fortinet,iot_core,low,Fortinet 安全设备云通道,allow,
+fortigate.com,Fortinet,iot_core,low,Fortinet 安全设备云通道,allow,
+paloaltonetworks.com,PaloAlto,iot_core,low,Palo Alto 安全设备云通道,allow,
+api.paloaltonetworks.com,PaloAlto,iot_core,low,Palo Alto 安全设备云通道,allow,
+watchguard.com,WatchGuard,iot_core,low,WatchGuard 安全设备云通道,allow,
+api.watchguard.com,WatchGuard,iot_core,low,WatchGuard 安全设备云通道,allow,
+sonicwall.com,SonicWall,iot_core,low,SonicWall 安全设备云通道,allow,
+api.sonicwall.com,SonicWall,iot_core,low,SonicWall 安全设备云通道,allow,
+openwrt.org,OpenWrt,iot_core,low,OpenWrt 固件更新通道,allow,
+downloads.openwrt.org,OpenWrt,iot_core,low,OpenWrt 固件更新通道,allow,
+openwrt.download,OpenWrt,iot_core,low,OpenWrt 固件更新通道,allow,
+dd-wrt.com,DD-WRT,iot_core,low,DD-WRT 固件更新通道,allow,
+dd-wrt.org,DD-WRT,iot_core,low,DD-WRT 固件更新通道,allow,
+dd-wrt.download,DD-WRT,iot_core,low,DD-WRT 固件更新通道,allow,
+pfsense.org,pfSense,iot_core,low,pfSense 更新通道,allow,
+api.pfsense.org,pfSense,iot_core,low,pfSense 更新通道,allow,
+mozilla.org,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+telemetry.mozilla.org,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+incoming.telemetry.mozilla.org,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+location.services.mozilla.com,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+shield.mozilla.org,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+normandy.cdn.mozilla.net,Mozilla,telemetry,high,Firefox 遥测、定位与安全浏览上报,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+brave.com,Brave,telemetry,medium,Brave 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.brave.com,Brave,telemetry,medium,Brave 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+laptop-updates.brave.com,Brave,telemetry,medium,Brave 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+opera.com,Opera,telemetry,medium,Opera 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.opera.com,Opera,telemetry,medium,Opera 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+autoupdate.opera.com,Opera,telemetry,medium,Opera 浏览器遥测与更新,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+adobe.com,Adobe,telemetry,medium,Adobe 产品遥测与许可校验,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+oobesoftware.com,Adobe,telemetry,medium,Adobe 产品遥测与许可校验,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+ams.adobe.com,Adobe,telemetry,medium,Adobe 产品遥测与许可校验,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+macromedia.com,Adobe,telemetry,medium,Adobe 产品遥测与许可校验,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.adobe.com,Adobe,telemetry,medium,Adobe 产品遥测与许可校验,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+spotify.com,Spotify,analytics,medium,Spotify 播放遥测与推荐统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.spotify.com,Spotify,analytics,medium,Spotify 播放遥测与推荐统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+tracking.spotify.com,Spotify,analytics,medium,Spotify 播放遥测与推荐统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+spclient.ws.spotify.com,Spotify,analytics,medium,Spotify 播放遥测与推荐统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+discord.com,Discord,analytics,medium,Discord 遥测与状态上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+discord.gg,Discord,analytics,medium,Discord 遥测与状态上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.discord.com,Discord,analytics,medium,Discord 遥测与状态上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+gateway.discord.gg,Discord,analytics,medium,Discord 遥测与状态上报,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+slack.com,Slack,analytics,medium,Slack 遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.slack.com,Slack,analytics,medium,Slack 遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+slack-edge.com,Slack,analytics,medium,Slack 遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+zoom.us,Zoom,analytics,medium,Zoom 遥测与质量统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.zoom.us,Zoom,analytics,medium,Zoom 遥测与质量统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+telegram.org,Telegram,analytics,low,Telegram 遥测（较轻）,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.telegram.org,Telegram,analytics,low,Telegram 遥测（较轻）,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+web.telegram.org,Telegram,analytics,low,Telegram 遥测（较轻）,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+whatsapp.com,WhatsApp,analytics,low,WhatsApp 遥测（较轻）,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.whatsapp.com,WhatsApp,analytics,low,WhatsApp 遥测（较轻）,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+steampowered.com,Steam,analytics,medium,Steam 遥测与商店统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.steampowered.com,Steam,analytics,medium,Steam 遥测与商店统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+steamcommunity.com,Steam,analytics,medium,Steam 遥测与商店统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+store.steampowered.com,Steam,analytics,medium,Steam 遥测与商店统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+epicgames.com,Epic,analytics,medium,Epic 游戏遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.epicgames.com,Epic,analytics,medium,Epic 游戏遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+epicgames.cn,Epic,analytics,medium,Epic 游戏遥测与统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+ea.com,EA,analytics,low,EA 游戏遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.ea.com,EA,analytics,low,EA 游戏遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+blizzard.com,Blizzard,analytics,low,暴雪/Battle.net 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+battle.net,Blizzard,analytics,low,暴雪/Battle.net 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.battle.net,Blizzard,analytics,low,暴雪/Battle.net 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+nvidia.com,NVIDIA,telemetry,medium,NVIDIA 驱动/GeForce 遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+telemetry.nvidia.com,NVIDIA,telemetry,medium,NVIDIA 驱动/GeForce 遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.nvidia.com,NVIDIA,telemetry,medium,NVIDIA 驱动/GeForce 遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+amd.com,AMD,telemetry,low,AMD 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.amd.com,AMD,telemetry,low,AMD 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+radeon.com,AMD,telemetry,low,AMD 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+intel.com,Intel,telemetry,low,Intel 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.intel.com,Intel,telemetry,low,Intel 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+intel.cn,Intel,telemetry,low,Intel 驱动遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dell.com,Dell,telemetry,low,Dell 支持/遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dacs.dell.com,Dell,telemetry,low,Dell 支持/遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.dell.com,Dell,telemetry,low,Dell 支持/遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+hp.com,HP,telemetry,low,HP 设备遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+hpconnected.com,HP,telemetry,low,HP 设备遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.hp.com,HP,telemetry,low,HP 设备遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.meizu.com,Meizu,analytics,low,魅族系统遥测与推送,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+push.meizu.com,Meizu,analytics,low,魅族系统遥测与推送,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.nubia.com,Nubia,analytics,low,努比亚系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+zte.com,ZTE,analytics,low,中兴系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.zte.com,ZTE,analytics,low,中兴系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+zte.com.cn,ZTE,analytics,low,中兴系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+smartisan.com,Smartisan,analytics,low,锤子/坚果系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.smartisan.com,Smartisan,analytics,low,锤子/坚果系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+lenovo.com,Lenovo,analytics,low,联想系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+api.lenovo.com,Lenovo,analytics,low,联想系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+lenovoid.lenovo.com,Lenovo,analytics,low,联想系统遥测,block_soft,设备匿名遥测/体验计划上报停止；不影响设备核心联网与控制
+dropbox.com,Dropbox,analytics,medium,Dropbox 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.dropbox.com,Dropbox,analytics,medium,Dropbox 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+dropboxusercontent.com,Dropbox,analytics,medium,Dropbox 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+notify.dropboxapi.com,Dropbox,analytics,medium,Dropbox 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+box.com,Box,analytics,low,Box 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.box.com,Box,analytics,low,Box 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+boxcdn.net,Box,analytics,low,Box 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mega.nz,Mega,analytics,low,MEGA 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.mega.nz,Mega,analytics,low,MEGA 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mega.co.nz,Mega,analytics,low,MEGA 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+pcloud.com,pCloud,analytics,low,pCloud 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.pcloud.com,pCloud,analytics,low,pCloud 同步遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+yangkeduo.com,Pinduoduo,advertising,medium,拼多多广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.pinduoduo.com,Pinduoduo,advertising,medium,拼多多广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.yangkeduo.com,Pinduoduo,advertising,medium,拼多多广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ele.me,Eleme,advertising,medium,饿了么广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.ele.me,Eleme,advertising,medium,饿了么广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+eleme.com,Eleme,advertising,medium,饿了么广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+alipay.com,Alipay,analytics,medium,支付宝统计与风控遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.alipay.com,Alipay,analytics,medium,支付宝统计与风控遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+openapi.alipay.com,Alipay,analytics,medium,支付宝统计与风控遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mapi.alipay.com,Alipay,analytics,medium,支付宝统计与风控遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+bilibili.com,Bilibili,analytics,medium,B站统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.bilibili.com,Bilibili,analytics,medium,B站统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+biliapi.com,Bilibili,analytics,medium,B站统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+zhihu.com,Zhihu,analytics,medium,知乎统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.zhihu.com,Zhihu,analytics,medium,知乎统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+static.zhihu.com,Zhihu,analytics,medium,知乎统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+douyu.com,Douyu,analytics,low,斗鱼统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.douyu.com,Douyu,analytics,low,斗鱼统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+douyu.tv,Douyu,analytics,low,斗鱼统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+huya.com,Huya,analytics,low,虎牙统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.huya.com,Huya,analytics,low,虎牙统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+huya.tv,Huya,analytics,low,虎牙统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.iqiyi.com,iQiyi,analytics,medium,爱奇艺统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+static.iqiyi.com,iQiyi,analytics,medium,爱奇艺统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.v.qq.com,Tencent,analytics,medium,腾讯视频统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.youku.com,Youku,analytics,medium,优酷统计与推荐遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.music.163.com,NetEase,analytics,medium,网易云音乐统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+y.qq.com,Tencent,analytics,medium,QQ音乐统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.y.qq.com,Tencent,analytics,medium,QQ音乐统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+ctrip.com,Ctrip,advertising,low,携程广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.ctrip.com,Ctrip,advertising,low,携程广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+m.ctrip.com,Ctrip,advertising,low,携程广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+fliggy.com,Fliggy,advertising,low,飞猪广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.fliggy.com,Fliggy,advertising,low,飞猪广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+qunar.com,Qunar,advertising,low,去哪儿广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.qunar.com,Qunar,advertising,low,去哪儿广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+vip.com,Vipshop,advertising,low,唯品会广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.vip.com,Vipshop,advertising,low,唯品会广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.suning.com,Suning,advertising,low,苏宁广告与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+10086.cn,ChinaMobile,analytics,low,中国移动业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.10086.cn,ChinaMobile,analytics,low,中国移动业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+10010.com,ChinaUnicom,analytics,low,中国联通业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.10010.com,ChinaUnicom,analytics,low,中国联通业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+189.cn,ChinaTelecom,analytics,low,中国电信业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.189.cn,ChinaTelecom,analytics,low,中国电信业务遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+cmvideo.com,Cmvideo,analytics,low,咪咕视频统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.cmvideo.com,Cmvideo,analytics,low,咪咕视频统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+imgo.tv,MangoTV,analytics,low,芒果TV统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.mgtv.com,MangoTV,analytics,low,芒果TV统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mgtv.com,MangoTV,analytics,low,芒果TV统计与推荐,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+baidu.com,Baidu,analytics,high,百度账号/贴吧/地图遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.baidu.com,Baidu,analytics,high,百度账号/贴吧/地图遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+passport.baidu.com,Baidu,analytics,high,百度账号/贴吧/地图遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+tieba.baidu.com,Baidu,analytics,high,百度账号/贴吧/地图遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+map.baidu.com,Baidu,analytics,high,百度账号/贴吧/地图遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+sina.com.cn,Sina,analytics,medium,新浪账号/新闻遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.sina.com.cn,Sina,analytics,medium,新浪账号/新闻遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+passport.sina.com.cn,Sina,analytics,medium,新浪账号/新闻遥测与统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+360.com,Qihoo,analytics,high,360 安全/手机助手遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.360.com,Qihoo,analytics,high,360 安全/手机助手遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+safe.360.cn,Qihoo,analytics,high,360 安全/手机助手遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+shouji.360.cn,Qihoo,analytics,high,360 安全/手机助手遥测,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+mail.163.com,NetEase,analytics,medium,网易邮箱/通用统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+api.netease.com,NetEase,analytics,medium,网易邮箱/通用统计,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
+adroll.com,AdRoll,advertising,high,AdRoll/Dotomi 广告重定向,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.adroll.com,AdRoll,advertising,high,AdRoll/Dotomi 广告重定向,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+dotomi.com,AdRoll,advertising,high,AdRoll/Dotomi 广告重定向,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+thetradedesk.com,TheTradeDesk,advertising,high,The Trade Desk 程序化广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+adsystem.com,TheTradeDesk,advertising,high,The Trade Desk 程序化广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+liveramp.com,LiveRamp,advertising,high,LiveRamp 数据对接/身份图谱,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+rlcdn.com,LiveRamp,advertising,high,LiveRamp 数据对接/身份图谱,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.liveramp.com,LiveRamp,advertising,high,LiveRamp 数据对接/身份图谱,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+neustar.biz,Neustar,advertising,high,Neustar 数据/广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.neustar.biz,Neustar,advertising,high,Neustar 数据/广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+bluekai.com,BlueKai,advertising,high,Oracle BlueKai 数据云,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.bluekai.com,BlueKai,advertising,high,Oracle BlueKai 数据云,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+krxd.net,Krux,advertising,high,Salesforce Krux DMP,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.krux.net,Krux,advertising,high,Salesforce Krux DMP,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+lotame.com,Lotame,advertising,high,Lotame DMP 数据管理,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.lotame.com,Lotame,advertising,high,Lotame DMP 数据管理,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sonobi.com,Sonobi,advertising,medium,Sonobi 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.sonobi.com,Sonobi,advertising,medium,Sonobi 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+triplelift.com,TripleLift,advertising,medium,TripleLift 原生广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.triplelift.com,TripleLift,advertising,medium,TripleLift 原生广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sharethrough.com,Sharethrough,advertising,medium,Sharethrough 原生广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.sharethrough.com,Sharethrough,advertising,medium,Sharethrough 原生广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+yieldmo.com,Yieldmo,advertising,medium,Yieldmo 移动广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.yieldmo.com,Yieldmo,advertising,medium,Yieldmo 移动广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+pulsepoint.com,PulsePoint,advertising,medium,PulsePoint 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.pulsepoint.com,PulsePoint,advertising,medium,PulsePoint 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+rhythmone.com,RhythmOne,advertising,medium,RhythmOne 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.rhythmone.com,RhythmOne,advertising,medium,RhythmOne 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+districtm.io,DistrictM,advertising,medium,DistrictM 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.districtm.io,DistrictM,advertising,medium,DistrictM 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+sovrn.com,Sovrn,advertising,medium,Sovrn 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.sovrn.com,Sovrn,advertising,medium,Sovrn 广告交换,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+gumgum.com,GumGum,advertising,medium,GumGum 上下文广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.gumgum.com,GumGum,advertising,medium,GumGum 上下文广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+telaria.com,Telaria,advertising,medium,Telaria 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.telaria.com,Telaria,advertising,medium,Telaria 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+unruly.co,Unruly,advertising,medium,Unruly 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.unruly.co,Unruly,advertising,medium,Unruly 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+beachfrontmedia.com,Beachfront,advertising,medium,Beachfront 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.beachfrontmedia.com,Beachfront,advertising,medium,Beachfront 视频广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+centro.net,Centro,advertising,low,Centro 广告平台,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.centro.net,Centro,advertising,low,Centro 广告平台,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+stackadapt.com,StackAdapt,advertising,low,StackAdapt 程序化广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.stackadapt.com,StackAdapt,advertising,low,StackAdapt 程序化广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+bidtellect.com,Bidtellect,advertising,low,Bidtellect 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.bidtellect.com,Bidtellect,advertising,low,Bidtellect 广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+dataxu.com,DataXu,advertising,low,DataXu 广告平台,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.dataxu.com,DataXu,advertising,low,DataXu 广告平台,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+groundtruth.com,GroundTruth,advertising,low,GroundTruth 位置广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.groundtruth.com,GroundTruth,advertising,low,GroundTruth 位置广告,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+drawbridge.com,Drawbridge,advertising,low,Drawbridge 跨设备图谱,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.drawbridge.com,Drawbridge,advertising,low,Drawbridge 跨设备图谱,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+exelate.com,Exelate,advertising,low,Nielsen Exelate 数据,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.exelate.com,Exelate,advertising,low,Nielsen Exelate 数据,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+bizo.com,Bizo,advertising,low,Bizo B2B 数据,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+api.bizo.com,Bizo,advertising,low,Bizo B2B 数据,block_soft,广告/营销与追踪被拦截；应用内广告与推荐位停止，不影响功能
+metrica.yandex.com,Yandex,analytics,high,Yandex Metrica 统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mc.yandex.ru,Yandex,analytics,high,Yandex Metrica 统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.yandex.com,Yandex,analytics,high,Yandex Metrica 统计,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+matomo.org,Matomo,analytics,high,Matomo/Piwik 自托管分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+piwik.org,Matomo,analytics,high,Matomo/Piwik 自托管分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.matomo.org,Matomo,analytics,high,Matomo/Piwik 自托管分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+piwik.pro,Matomo,analytics,high,Matomo/Piwik 自托管分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.piwik.pro,Matomo,analytics,high,Matomo/Piwik 自托管分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+plausible.io,Plausible,analytics,medium,Plausible 隐私友好分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.plausible.io,Plausible,analytics,medium,Plausible 隐私友好分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+usefathom.com,Fathom,analytics,medium,Fathom 隐私友好分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.usefathom.com,Fathom,analytics,medium,Fathom 隐私友好分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+pendo.io,Pendo,analytics,high,Pendo 产品分析/引导,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.pendo.io,Pendo,analytics,high,Pendo 产品分析/引导,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+woopra.com,Woopra,analytics,high,Woopra 实时分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.woopra.com,Woopra,analytics,high,Woopra 实时分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+clicktale.net,Clicktale,analytics,medium,Clicktale 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.clicktale.net,Clicktale,analytics,medium,Clicktale 会话回放,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+inspectlet.com,Inspectlet,analytics,medium,Inspectlet 会话录制,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.inspectlet.com,Inspectlet,analytics,medium,Inspectlet 会话录制,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mouseflow.com,Mouseflow,analytics,medium,Mouseflow 会话录制,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.mouseflow.com,Mouseflow,analytics,medium,Mouseflow 会话录制,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+crazyegg.com,CrazyEgg,analytics,medium,Crazy Egg 热图,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.crazyegg.com,CrazyEgg,analytics,medium,Crazy Egg 热图,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+contentsquare.net,Contentsquare,analytics,high,Contentsquare 体验分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.contentsquare.net,Contentsquare,analytics,high,Contentsquare 体验分析,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+tealiumiq.com,Tealium,analytics,high,Tealium 标签管理/数据层,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+tiqcdn.com,Tealium,analytics,high,Tealium 标签管理/数据层,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.tealiumiq.com,Tealium,analytics,high,Tealium 标签管理/数据层,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mparticle.com,mParticle,analytics,high,mParticle 数据管道,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mparticlesdk.com,mParticle,analytics,high,mParticle 数据管道,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.mparticle.com,mParticle,analytics,high,mParticle 数据管道,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+snowplowanalytics.com,Snowplow,analytics,medium,Snowplow 事件数据,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.snowplowanalytics.com,Snowplow,analytics,medium,Snowplow 事件数据,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+omniture.com,Adobe,analytics,high,Adobe Analytics/Omniture,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+sc.omtrdc.net,Adobe,analytics,high,Adobe Analytics/Omniture,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.omniture.com,Adobe,analytics,high,Adobe Analytics/Omniture,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mailchimp.com,Mailchimp,analytics,medium,Mailchimp 营销遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.mailchimp.com,Mailchimp,analytics,medium,Mailchimp 营销遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+sendgrid.com,SendGrid,analytics,low,SendGrid 邮件遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.sendgrid.com,SendGrid,analytics,low,SendGrid 邮件遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+hubspot.com,HubSpot,analytics,high,HubSpot 营销/CRM 追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.hubspot.com,HubSpot,analytics,high,HubSpot 营销/CRM 追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+js.hs-scripts.com,HubSpot,analytics,high,HubSpot 营销/CRM 追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+marketo.com,Marketo,analytics,high,Marketo 营销自动化追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.marketo.com,Marketo,analytics,high,Marketo 营销自动化追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+mktostatic.com,Marketo,analytics,high,Marketo 营销自动化追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+salesforce.com,Salesforce,analytics,medium,Salesforce 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.salesforce.com,Salesforce,analytics,medium,Salesforce 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+zoho.com,Zoho,analytics,low,Zoho 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.zoho.com,Zoho,analytics,low,Zoho 遥测,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+braze.com,Braze,analytics,high,Braze 用户互动/推送,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.braze.com,Braze,analytics,high,Braze 用户互动/推送,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+iterable.com,Iterable,analytics,medium,Iterable 营销自动化,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.iterable.com,Iterable,analytics,medium,Iterable 营销自动化,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+leanplum.com,Leanplum,analytics,medium,Leanplum 移动营销,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.leanplum.com,Leanplum,analytics,medium,Leanplum 移动营销,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+onesignal.com,OneSignal,analytics,high,OneSignal 推送/订阅追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.onesignal.com,OneSignal,analytics,high,OneSignal 推送/订阅追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+pushwoosh.com,Pushwoosh,analytics,medium,Pushwoosh 推送追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.pushwoosh.com,Pushwoosh,analytics,medium,Pushwoosh 推送追踪,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+airship.com,Airship,analytics,medium,Airship 推送/互动,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
+api.airship.com,Airship,analytics,medium,Airship 推送/互动,block_soft,行为分析与崩溃统计停止；不影响应用核心功能
