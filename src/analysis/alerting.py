@@ -253,6 +253,7 @@ class AlertCenter:
         attribution_of: Optional[Callable[[str], dict]] = None,
         now: Optional[float] = None,
         rule_of: Optional[Callable[[str], dict]] = None,
+        is_self_ip: Optional[Callable[[str], bool]] = None,
     ) -> list[Alert]:
         """把本轮的行为认定收进告警列表，返回**本轮新建**的告警"""
         now = time.time() if now is None else now
@@ -269,13 +270,21 @@ class AlertCenter:
             rule = rule_of(finding.rule_id) if rule_of else {}
             context = build_context(finding, device_view or {}, attribution or {})
 
+            # 源设备是否为「跑家卫的那台设备」自身（宿主 LAN IP）。宿主自身的系统流量
+            # （系统更新 / telemetry / NTP / 包下载）天然是大流量上传，不应当成数据外泄。
+            src_is_self = bool(is_self_ip and is_self_ip(finding.src_ip))
+
             # bulk_upload 误报收敛：
             # 1) 目的地是内网控制流量（组播/广播/链路本地/私网）——
             #    SSDP/mDNS 等局域网发现协议符合「单目的大量包」特征，绝不可能是真实
             #    数据外泄，直接降级，别把路由器自身和局域网设备的正常发现流量判成高危；
             # 2) 目的地归属为良性大流量类别（云备份/系统更新/CDN）降级为 low/warn；
-            # 3) 未知公网目的地保持原严重度（未知大流量上传更可疑，宁严勿松）。
-            if finding.rule_id == "bulk_upload" and _bulk_upload_is_benign(finding, attribution):
+            # 3) 未知公网目的地保持原严重度（未知大流量上传更可疑，宁严勿松）；
+            # 4) 源是宿主自身（src_is_self）：路由器/NAS 自己更新自己，属预期行为，降级。
+            #    注意：仅降级 bulk_upload，其它规则不受影响 —— 宿主被入侵外联仍是真风险。
+            if finding.rule_id == "bulk_upload" and (
+                _bulk_upload_is_benign(finding, attribution) or src_is_self
+            ):
                 finding = replace(finding, severity="low", action="warn")
 
             summary, missing = self.renderer.render(

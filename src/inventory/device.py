@@ -343,11 +343,17 @@ class DeviceRegistry:
                  oui_table: Optional[dict] = None,
                  leases_paths: Iterable[str] = DEFAULT_LEASES_PATHS,
                  arp_path: str = ARP_PATH,
-                 oui_csv_path: Optional[Path] = None):
+                 oui_csv_path: Optional[Path] = None,
+                 self_ips: Optional[Iterable[str]] = None):
         self.oui_table = oui_table if oui_table is not None else self._load_oui(oui_csv_path)
         self.vendor_lookup_enabled = bool(self.oui_table)
         self.leases_paths = list(leases_paths)
         self.arp_path = arp_path
+        # 本机身份：跑家卫的那台设备自身占用的 IP（如软路由 LAN IP 192.168.1.254）。
+        # 这些 IP 的出现流量归并到「本机」设备，并在告警层把宿主自身的系统流量
+        # （更新 / telemetry）从高危里降级 —— 避免把路由器自己更新自己判成数据外泄。
+        # 来源：配置 homeward_self_ips + 主机名尽力解析，见 core.main._resolve_self_ips。
+        self._self_ips: set[str] = set(self_ips or set())
         self.devices: dict[str, Device] = {}
         self._ip_index: dict[str, str] = {}  # ip -> device key
 
@@ -378,6 +384,8 @@ class DeviceRegistry:
         for lh in leases:
             if lh.expired:
                 continue  # 过期租约不作为设备身份依据，但仍可能已被 observe_flow 记录为 IP
+            if lh.ip in self._self_ips:
+                continue  # 宿主自身 IP 不单独建档，归并到「本机」设备
             dev = self.devices.get(lh.mac)
             if dev is None:
                 dev = Device(key=lh.mac, mac=lh.mac, first_seen=now, last_seen=now)
@@ -396,6 +404,8 @@ class DeviceRegistry:
         now = time.time()
         n = 0
         for ip, mac in mapping.items():
+            if ip in self._self_ips:
+                continue  # 宿主自身 IP 不单独建档，归并到「本机」设备
             if mac in self.devices:
                 self.devices[mac].ips.add(ip)
                 self._ip_index[ip] = mac
@@ -436,10 +446,15 @@ class DeviceRegistry:
 
         噪声地址（回环/链路本地/组播/广播/未指定/脏串）不是局域网里可追踪的设备，
         不单独建档，统一归并到「本机」设备（见 :meth:`_observe_self`）。
+        属于「本机自身」的 IP（见 ``self_ips``，如软路由 LAN IP）同样归并到本机设备，
+        不污染设备列表、也不在告警里被当成独立设备外联。
         真实私网/公网 IP 仍按原逻辑建档。
         """
         now = ts if ts is not None else time.time()
         if is_noise_address(ip):
+            return self._observe_self(now)
+        # 本机身份的 IP（宿主自身的 LAN IP 等）也归并到「本机」设备
+        if ip in self._self_ips:
             return self._observe_self(now)
         key = self._ip_index.get(ip)
         if key and key in self.devices:
@@ -478,10 +493,21 @@ class DeviceRegistry:
         return dev
 
     def get_by_ip(self, ip: str) -> Optional[Device]:
+        if ip in self._self_ips:
+            return self.devices.get(_SELF_DEVICE_KEY)
         key = self._ip_index.get(ip)
         if key:
             return self.devices.get(key)
         return self.devices.get(ip)
+
+    def is_self_ip(self, ip: str) -> bool:
+        """该 IP 是否属于「跑家卫的那台设备」自身（宿主自身的 LAN IP 等）。
+
+        用于设备合并（observe_ip 归并到本机设备）与告警降级（宿主自身的系统流量
+        如更新 / telemetry 不按外联数据外泄处理）。不含回环/链路本地等噪声地址——
+        那些由 :func:`is_noise_address` 另走合并路径。
+        """
+        return ip in self._self_ips
 
     def list_devices(self) -> list[Device]:
         return sorted(self.devices.values(), key=lambda d: d.last_seen, reverse=True)
