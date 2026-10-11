@@ -70,25 +70,30 @@ jobs:
       - name: 将容器包设为公开（GHCR 默认私有，须显式改公开）
         # 本仓属组织 homeward-labs，包在组织命名空间下，
         # 必须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
-        # 主用 gh CLI（runner 自带，错误可读）；失败再回退 curl 并打印 HTTP 状态码以便诊断。
+        # ⚠️ 已知坑（见第 10 / 59 批）：默认 GITHUB_TOKEN 对「组织容器包」没有改可见性的
+        #   admin 权限，PUT 会静默 403/404 → 包保持私有 → 下游 verify job 拉取失败、
+        #   整个 publish 标红，但 image 推送其实成功。
+        #   根治：在仓库 Settings → Secrets 配一个对 homeward-labs 有「包管理员」角色的
+        #   PAT（名为 GHCR_PAT）；本步优先用它，失败再回退 GITHUB_TOKEN。
+        #   无论哪个 token，失败都显式 exit 1 让 job 变红（不再静默吞错）。
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
         run: |
-          echo ">>> 尝试通过 gh 将包设为公开"
-          if gh api -X PUT "orgs/homeward-labs/packages/container/homeward/visibility" \
-               -f visibility=public 2>/tmp/gh_err; then
-            echo "OK: gh 已将 ghcr.io/homeward-labs/homeward 设为公开"
-          else
-            echo "gh 调用失败（详见下），回退 curl："; cat /tmp/gh_err
-            curl -sS -o /tmp/vis.json -w "curl HTTP %{http_code}\n" -X PUT \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github+json" \
-              https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility \
-              -d '{"visibility":"public"}'
-            cat /tmp/vis.json; echo
-            echo "若上面仍非 2xx，请到 GitHub Packages 页面手动改公开："
-            echo "  https://github.com/orgs/homeward-labs/packages/container/homeward/settings"
+          set -euo pipefail
+          echo ">>> 尝试将 ghcr.io/homeward-labs/homeward 设为公开"
+          code=$(curl -sS -o /tmp/vis.json -w "%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility" \
+            -d '{"visibility":"public"}')
+          cat /tmp/vis.json; echo
+          if [ "${code:0:1}" != "2" ]; then
+            echo "::error::将包设为公开失败（HTTP ${code}）。默认 GITHUB_TOKEN 通常对组织包无 admin 权限。"
+            echo "  请二选一：(1) 在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色）；"
+            echo "  (2) 到 https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动改公开。"
+            exit 1
           fi
+          echo "OK: 已设为公开"
 
   verify:
     name: 校验已发布镜像（amd64）
