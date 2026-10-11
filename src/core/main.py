@@ -117,15 +117,40 @@ def _state_to_attr_result(st: dict) -> "AttributionResult":
     )
 
 
+# 「自有 / 局域网」域名后缀：本地网络命名，不是外部外联目的地。
+_OWN_DOMAIN_SUFFIXES = (".lan", ".local", ".localdomain", ".home.arpa",
+                        ".internal", ".intranet")
+
+
+def _is_own_domain(d: str) -> bool:
+    """是否「自有 / 局域网」域名：本地命名或反向解析，**不构成外部外联**。
+
+    典型例子：自家路由 ``istoreos.lan``、mDNS 的 ``*.local``、内网反向解析
+    ``*.in-addr.arpa`` / ``*.ip6.arpa``、``localhost``。
+
+    这些名字本就不需要、也无法在知识库里查到「组织归属」。把它们算进「未知域名」
+    只会让数字虚高、在 UI 上制造「有 N 个未知外联」的恐慌 —— 而实际上它们是
+    **你自己家里的名字**，根本不是外联。故单独归为「自有」，不计入未知。
+    """
+    if not d:
+        return False
+    dl = d.lower().rstrip(".")
+    if not dl or dl == "localhost":
+        return True
+    if dl.endswith(".arpa"):
+        return True  # 反向解析（PTR）查询，不是外联目的地
+    return any(dl.endswith(sfx) for sfx in _OWN_DOMAIN_SUFFIXES)
+
+
 def _is_observable_domain(d: str) -> bool:
-    """是否应计入覆盖率分母：必须是真正的域名，排除 IP 直连 / .lan 主机名 / 空串。
+    """是否应计入覆盖率分母：必须是真正的域名，排除 IP 直连 / 自有局域网名 / 空串。
 
     直连 IP（如 192.168.1.1、239.255.255.250）和 .lan 主机名不需要、也无法在知识库
     里查到「组织归属」，把它们算进覆盖率分母只会虚假拉低数字，故剔除。
     """
     if not d:
         return False
-    if d == "localhost" or d.endswith(".lan") or d.endswith(".local"):
+    if _is_own_domain(d):
         return False
     if is_address_like(d):
         return False
@@ -204,6 +229,12 @@ class HomewardService:
             "suggestions_pending": 0,
             "unknown_domains": set(),
         }
+
+        # F7 域名归类：用户手动标记 domain -> "own"(自有) / "benign"(良性)。
+        # 自动判定的「自有/局域网」见 _is_own_domain()，不进这张表（那是结构性的、无需存）。
+        # 落盘持久化：标记是用户的判断，重启不该丢。
+        self._domain_marks: dict[str, str] = {}
+        self._load_domain_marks()
 
         # 采集可用性：由 CollectorRunner 写入，供 /api/overview 的盲区视图
         # 如实展示「当前到底有几个采集器在干活、哪个不可用」（看不见要说清楚）
@@ -591,10 +622,109 @@ class HomewardService:
             "explain": r.explain(),
         }
 
-    def get_unknown_domains(self) -> list[str]:
-        """获取所有未识别域名"""
+    # ---------------------------------------------------------------- F7 域名归类
+
+    def _marks_path(self) -> Path:
+        """域名标记落盘路径（可用 ``marks_path`` 配置覆盖，便于测试与只读根fs）"""
+        override = self.config.get("marks_path")
+        if override:
+            return Path(override)
+        return ROOT / "data" / "domain_marks.json"
+
+    def _load_domain_marks(self) -> None:
+        """载入用户标记过的域名（own / benign）"""
+        p = self._marks_path()
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            logger.warning("读取域名标记失败（%s），本次按空标记继续", p)
+            return
+        if isinstance(data, dict):
+            self._domain_marks = {
+                str(k).lower(): v for k, v in data.items() if v in ("own", "benign")
+            }
+
+    def _save_domain_marks(self) -> None:
+        """持久化用户标记。失败只告警 —— 标记丢了不影响观测，不能因此崩掉服务。"""
+        p = self._marks_path()
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps(self._domain_marks, ensure_ascii=False, indent=2),
+                         encoding="utf-8")
+        except OSError:
+            logger.warning("保存域名标记失败（%s）：本次标记仅存在于内存", p)
+
+    def _domain_kind(self, domain: str) -> Optional[str]:
+        """域名归类：``own``（自有/局域网）| ``benign``（用户标记良性）| None（真正未知）。
+
+        ``own`` 优先走结构性判定（.lan/.local/.arpa 等，见 :func:`_is_own_domain`），
+        其次看用户是否手动标为自有；``benign`` 只来自用户显式标记 ——
+        **系统绝不自动把外部域名判为良性**（误判良性 = 漏报，比多列几个未知更危险）。
+        """
+        if not domain:
+            return None
+        if _is_own_domain(domain):
+            return "own"
+        return self._domain_marks.get(domain.lower())
+
+    def mark_domain(self, domain: str, kind: str) -> bool:
+        """把域名标记为 ``own`` / ``benign``；``kind`` 为空串表示**取消标记**。
+
+        这是 F7 的「用户可确认、可撤销」入口：家卫不替用户猜，但用户说
+        「这个是我自己的 / 这个是更新源」之后必须生效、且能随时撤回。
+        """
+        d = (domain or "").strip().lower()
+        kind = (kind or "").strip().lower()
+        if not d or kind not in ("own", "benign", ""):
+            return False
         with self._state_lock:
-            return sorted(self.stats["unknown_domains"])
+            if kind:
+                self._domain_marks[d] = kind
+            else:
+                self._domain_marks.pop(d, None)
+        self._save_domain_marks()
+        return True
+
+    def _unknown_domains_locked(self) -> list[str]:
+        """真正未知的域名（调用方须持有 ``_state_lock``）：已剔除自有与已标记良性。"""
+        return sorted(d for d in self.stats["unknown_domains"]
+                      if self._domain_kind(d) is None)
+
+    def get_classified_domains(self) -> dict:
+        """未知域名按「未知 / 自有 / 良性」分桶。
+
+        目的：**别把自家路由（istoreos.lan）也算成「未知外联」吓人**。
+        自有 = 结构性本地命名；良性 = 用户显式标记；其余才是真正需要关注的未知。
+        """
+        with self._state_lock:
+            unknown: list[str] = []
+            own: list[str] = []
+            benign: list[str] = []
+            for d in sorted(self.stats["unknown_domains"]):
+                k = self._domain_kind(d)
+                if k == "own":
+                    own.append(d)
+                elif k == "benign":
+                    benign.append(d)
+                else:
+                    unknown.append(d)
+        return {"unknown": unknown, "own": own, "benign": benign}
+
+    def get_unknown_domains(self) -> list[str]:
+        """获取所有未识别域名（已剔除自有/局域网与用户标记的良性域名）"""
+        with self._state_lock:
+            return self._unknown_domains_locked()
+
+    def get_domain_marks(self) -> dict:
+        """用户**手动**标记的域名 → ``own`` / ``benign``。
+
+        UI 用它判断某个「自有」域名是结构性自动判定的（不可取消）
+        还是用户手动标的（可取消）—— 避免给自动项摆一个点了没用的按钮。
+        """
+        with self._state_lock:
+            return dict(self._domain_marks)
 
     def get_blind_spots(self) -> list[str]:
         """当前部署形态下，家卫**看不见 / 认不出**的地方 —— UI 必须展示"""
@@ -639,11 +769,18 @@ class HomewardService:
 
     def _get_stats_locked(self) -> dict:
         """``get_stats`` 的实现体（调用方必须已持有 ``_state_lock``）。"""
+        # F7：未知域名已剔除「自有/局域网」与用户标记的良性域名 —— 避免把自家路由
+        # （istoreos.lan）当成未知外联计入，既不虚高数字、也不制造恐慌。
+        unknowns = self._unknown_domains_locked()
         return {
             **self.stats,
             "collection": self.collection_status,
-            "unknown_domains_count": len(self.stats["unknown_domains"]),
-            "unknown_domains": sorted(self.stats["unknown_domains"]),
+            "unknown_domains_count": len(unknowns),
+            "unknown_domains": unknowns,
+            "own_domains": sorted(d for d in self.stats["unknown_domains"]
+                                  if self._domain_kind(d) == "own"),
+            "benign_domains": sorted(d for d in self.stats["unknown_domains"]
+                                     if self._domain_kind(d) == "benign"),
             "devices_total": len(self.device_registry.devices),
             "vendors_resolved": sum(
                 1 for d in self.device_registry.devices.values() if d.vendor
@@ -746,7 +883,8 @@ class HomewardService:
             stats = self._get_stats_locked()
             cov = self.attribution_coverage()
             alerts = self.alert_center.active()
-            unknowns = sorted(self.stats["unknown_domains"])
+            # 已剔除自有/局域网与用户标记良性的域名（见 _unknown_domains_locked）
+            unknowns = stats["unknown_domains"]
             blind_n = len(self.get_blind_spots())
 
         high = [a for a in alerts if a.severity in ("high", "critical")]

@@ -289,23 +289,70 @@ function renderAlerts() {
 }
 
 function renderUnknown() {
-  const items = state.data.unknown?.items || [];
-  if (!items.length) return '<div class="card empty">所有观测到的域名都能在知识库里查到归属。</div>';
-  return `<div class="section">
-    <h2>未知域名 <span class="count">（${items.length} 个）</span></h2>
-    <div class="note">AI 分析默认关闭（需自备后端与 API Key）。未启用时这里只做列举 —— 家卫不会替你猜这些域名是谁的。</div>
-    <div class="list" style="margin-top:10px">
-      ${items.map((x) => `
-        <div class="item is-unknown">
-          <div class="item-head">
-            <span class="item-title mono">${esc(x)}</span>
-            <button class="btn btn-sm" type="button" disabled
-              title="需在配置中启用 AI 后端，且必须由你手动触发">帮我分析</button>
-          </div>
-          <div class="item-sub small muted">分析需你手动触发，且只在启用 AI 后端后可用；结果须经你确认才写入知识库。</div>
-        </div>`).join("")}
-    </div>
-  </div>`;
+  const d = state.data.unknown || {};
+  const items = d.items || [];
+  const own = d.own || [];
+  const benign = d.benign || [];
+  const marks = d.marks || {};
+
+  if (!items.length && !own.length && !benign.length) {
+    return '<div class="card empty">所有观测到的域名都能在知识库里查到归属。</div>';
+  }
+
+  // 「真正未知」：可让用户自己归类为自有 / 良性（家卫不替用户猜，用户说了算且可撤销）
+  const rowUnknown = (x) => `
+    <div class="item is-unknown">
+      <div class="item-head">
+        <span class="item-title mono">${esc(x)}</span>
+        <button class="btn btn-sm" type="button" disabled
+          title="需在配置中启用 AI 后端，且必须由你手动触发">帮我分析</button>
+      </div>
+      <div class="item-sub small muted">分析需你手动触发，且只在启用 AI 后端后可用；结果须经你确认才写入知识库。</div>
+      <div class="item-actions" style="margin-top:6px;display:flex;gap:6px">
+        <button class="btn btn-sm" type="button" data-mark="own" data-domain="${esc(x)}">标记为自有</button>
+        <button class="btn btn-sm" type="button" data-mark="benign" data-domain="${esc(x)}">标记为良性</button>
+      </div>
+    </div>`;
+
+  // 已归类项：只有**用户手动标记**的才可取消；结构性自动判定的自有（.lan/.local/.arpa）不可取消
+  const rowMarked = (x, label, kind, cancellable) => `
+    <div class="item">
+      <div class="item-head">
+        <span class="item-title mono">${esc(x)}</span>
+        <span class="badge">${esc(label)}</span>
+      </div>
+      <div class="item-sub small muted">${cancellable
+        ? `你标记为${esc(label)}，不计入未知域名；可随时撤销。`
+        : `自动判定为${esc(label)}（本地网络命名），不是外部外联，不计入未知域名。`}</div>
+      ${cancellable
+        ? `<div class="item-actions" style="margin-top:6px">
+             <button class="btn btn-sm" type="button" data-mark="" data-domain="${esc(x)}">取消标记</button>
+           </div>`
+        : ""}
+    </div>`;
+
+  let html = '<div class="section">';
+  html += `<h2>未知域名 <span class="count">（${items.length} 个）</span></h2>`;
+  html += '<div class="note">AI 分析默认关闭（需自备后端与 API Key）。未启用时这里只做列举 —— 家卫不会替你猜这些域名是谁的。</div>';
+  html += items.length
+    ? `<div class="list" style="margin-top:10px">${items.map(rowUnknown).join("")}</div>`
+    : '<div class="card empty" style="margin-top:10px">没有真正未知的域名了。</div>';
+
+  if (own.length) {
+    html += `<h3 style="margin-top:16px">自有 / 局域网 <span class="count">（${own.length} 个）</span></h3>
+      <div class="note">这些是你自己家里的名字（如路由 istoreos.lan、mDNS 的 .local、内网反向解析），
+      <strong>不是外部外联</strong>，已不计入未知域名。</div>
+      <div class="list" style="margin-top:8px">${
+        own.map((x) => rowMarked(x, "自有", "own", !!marks[x])).join("")}</div>`;
+  }
+  if (benign.length) {
+    html += `<h3 style="margin-top:16px">已标记为良性 <span class="count">（${benign.length} 个）</span></h3>
+      <div class="note">你手动标记为良性（如更新源、开发工具）的域名，不计入未知域名。</div>
+      <div class="list" style="margin-top:8px">${
+        benign.map((x) => rowMarked(x, "良性", "benign", true)).join("")}</div>`;
+  }
+  html += "</div>";
+  return html;
 }
 
 function renderSuggestions() {
@@ -583,6 +630,29 @@ document.getElementById("view").addEventListener("click", async (e) => {
     } catch (err) {
       dismiss.disabled = false;
       alert("忽略失败：" + (err.message || err));
+    }
+    return;
+  }
+
+  // —— F7：把域名标记为「自有 / 良性」，或取消标记 ——
+  // 家卫不替用户猜域名是谁的；但用户说了算，且必须能随时撤销（kind 传空串即取消）。
+  const markBtn = e.target.closest("[data-mark]");
+  if (markBtn) {
+    const domain = markBtn.dataset.domain || "";
+    const kind = markBtn.dataset.mark || "";
+    if (!domain) return;
+    markBtn.disabled = true;
+    try {
+      const r = await fetch("/api/domain-marks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, kind }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await loadAll();
+    } catch (err) {
+      markBtn.disabled = false;
+      alert("标记失败：" + (err.message || err));
     }
     return;
   }
