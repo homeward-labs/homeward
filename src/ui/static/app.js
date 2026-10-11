@@ -96,6 +96,39 @@ async function loadAll() {
 
 // ------------------------------------------------------------------ 各视图
 
+function renderCheckup(c) {
+  if (!c) return "";
+  const vcls = c.verdict === "基本可控" ? "low"
+            : c.verdict === "需要关注" ? "medium" : "high";
+  const top = (c.top_unknown || []).map(esc).join("、");
+  return `
+    <div class="section">
+      <h2>隐私体检 <span class="count">（结论先行）</span></h2>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span class="sev sev-${vcls}" style="font-size:15px;padding:6px 12px">${esc(c.verdict)}</span>
+          <span style="font-size:26px;font-weight:700">${esc(c.score)}<span style="font-size:14px;color:var(--muted,#888)"> /100</span></span>
+          <span class="small muted">健康分</span>
+        </div>
+        <div class="grid" style="margin-top:14px">
+          <div class="stat"><div class="k">设备</div><div class="v">${esc(c.devices_total ?? 0)}</div>
+            <div class="sub">${esc(c.vendors_resolved ?? 0)} 台识别厂商</div></div>
+          <div class="stat"><div class="k">活跃告警</div><div class="v">${esc(c.alerts_active ?? 0)}</div>
+            <div class="sub">高危 ${esc(c.alerts_high ?? 0)}</div></div>
+          <div class="stat"><div class="k">归属覆盖率</div><div class="v">${Math.round((c.coverage_rate || 0) * 100)}%</div>
+            <div class="sub">${esc(c.coverage_hit ?? 0)} / ${esc(c.coverage_total ?? 0)}</div></div>
+          <div class="stat"><div class="k">未知域名</div><div class="v">${esc(c.unknown_count ?? 0)}</div>
+            <div class="sub">盲区 ${esc(c.blind_spots ?? 0)} 项</div></div>
+        </div>
+        ${top ? `<div class="small muted" style="margin-top:10px">重点未知去向：${top}</div>` : ""}
+        <div class="item-foot" style="margin-top:12px">
+          <button class="btn btn-sm" type="button" data-report="markdown">导出完整体检报告</button>
+          <span class="small muted">社区版只看见、不建议，报告仅供你自查</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderOverview() {
   const d = state.data.overview || {};
   const s = d.stats || {};
@@ -114,6 +147,7 @@ function renderOverview() {
   const recentAlerts = (state.data.alerts?.items || []).slice(0, 3);
 
   return `
+    ${renderCheckup(d.checkup)}
     <div class="section">
       <div class="grid">
         <div class="stat"><div class="k">设备</div><div class="v">${esc(s.devices_total ?? 0)}</div>

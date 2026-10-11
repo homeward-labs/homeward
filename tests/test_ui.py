@@ -490,7 +490,9 @@ class TestImportAndReportApi(ServerTestCase):
         self.assertEqual(status, 200)
         self.assertIn("text/markdown", ctype)
         text = raw.decode("utf-8")
-        self.assertIn("家卫 Homeward · 观测报告", text)
+        # Phase A：报告改名「隐私体检报告」且结论先行（顶部含「体检结论」段）
+        self.assertIn("家卫 Homeward · 隐私体检报告", text)
+        self.assertIn("体检结论", text)
         self.assertIn("概览", text)
         self.assertIn("盲区", text)
         # 绝不出现「浏览全部已知域名」式的能力

@@ -107,6 +107,7 @@ def _report_markdown(payload: dict) -> str:
     此处**不**输出知识库全表，只呈现用户自己观测到的域名及其本地查询结论。
     """
     rep = payload.get("report", {})
+    checkup = payload.get("checkup", {}) or {}
     stats = payload.get("stats", {}) or {}
     cov = payload.get("coverage", {}) or {}
     devices = payload.get("devices", []) or []
@@ -120,12 +121,27 @@ def _report_markdown(payload: dict) -> str:
     rate_pct = f"{rate * 100:.1f}%" if isinstance(rate, (int, float)) else str(rate)
 
     L = []
-    L.append("# 家卫 Homeward · 观测报告")
+    L.append("# 家卫 Homeward · 隐私体检报告")
     L.append("")
     L.append(f"- 生成时间：{gen}")
     L.append(f"- 版本：{stats.get('version', '?')}（社区版）")
     L.append(f"- 范围：{rep.get('scope', '用户自己的观测遥测（不含知识库）')}")
     L.append("")
+
+    # —— 体检结论（结论先行）——
+    if checkup:
+        L.append("## 体检结论")
+        L.append("")
+        L.append(f"- **整体判断：{checkup.get('verdict', '?')}（健康分 {checkup.get('score', '?')}/100）**")
+        L.append(f"- 已接入设备：{checkup.get('devices_total', 0)} 台（其中 {checkup.get('vendors_resolved', 0)} 台识别出厂商）")
+        L.append(f"- 活跃告警：{checkup.get('alerts_active', 0)} 条（其中高危 {checkup.get('alerts_high', 0)} 条）")
+        L.append(f"- 域名归属覆盖率：{checkup.get('coverage_hit', 0)} / {checkup.get('coverage_total', 0)}（{rate_pct}）")
+        top = checkup.get("top_unknown") or []
+        if top:
+            L.append(f"- 主要未知去向（前 5）：{', '.join(top)}")
+        L.append(f"- 已如实列出的盲区：{checkup.get('blind_spots', 0)} 项")
+        L.append("")
+
     L.append("> 本报告仅包含你自己的观测数据（设备、去向、未知域名、告警、盲区）。"
              "知识库在服务器端，不会经此导出。")
     L.append("")
@@ -429,6 +445,7 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 "stats": stats,
                 "alerts": svc.get_alert_stats(),
                 "coverage": svc.attribution_coverage(),
+                "checkup": svc.privacy_checkup(),
                 "blind_spots": svc.get_blind_spots(),
             })
             return
