@@ -293,6 +293,8 @@ class HomewardService:
         }
         self.suggested_rules.append(rule)
         self.stats["suggestions_pending"] += 1
+        # 周期落盘：不依赖退出路径，避免"重启即清零"
+        self.maybe_save_suggestions()
         logger.info(f"[SUGGEST] {rule['domain']} → {decision.reason}（等待用户确认）")
 
     # ---------------------------------------------------------------- W3 行为与告警
@@ -664,18 +666,60 @@ class HomewardService:
 
     def _load_suggestions(self):
         """加载待确认的「建议阻断」队列"""
-        rules_file = ROOT / "data" / "suggested_rules.json"
-        if rules_file.exists():
+        rules_file = self._suggestions_path()
+        if not rules_file.exists():
+            return
+        try:
             with open(rules_file, encoding="utf-8") as f:
-                self.suggested_rules = json.load(f)
+                loaded = json.load(f)
+        except (OSError, ValueError) as e:
+            # 坏文件绝不能让整个服务起不来：建议队列是可重建的派生数据，
+            # 丢一次不影响采集与判定。记日志后当作空队列继续。
+            logger.warning("建议队列读取失败（按空队列继续）: %s", e)
+            return
+        # 历史上落过两种结构：裸list与 {"items": [...]}。两种都认。
+        if isinstance(loaded, dict):
+            loaded = loaded.get("items") or []
+        if isinstance(loaded, list):
+            self.suggested_rules = [r for r in loaded if isinstance(r, dict)]
             self.stats["suggestions_pending"] = len(self.suggested_rules)
 
+    def _suggestions_path(self) -> Path:
+        """建议队列落盘路径（可用 ``suggestions_path`` 配置覆盖，便于测试与只读根fs）"""
+        override = self.config.get("suggestions_path")
+        if override:
+            return Path(override)
+        return ROOT / "data" / "suggested_rules.json"
+
     def _save_suggestions(self):
-        """保存「建议阻断」队列"""
-        rules_file = ROOT / "data" / "suggested_rules.json"
-        rules_file.parent.mkdir(exist_ok=True)
-        with open(rules_file, "w", encoding="utf-8") as f:
-            json.dump(self.suggested_rules, f, ensure_ascii=False, indent=2)
+        """保存「建议阻断」队列
+
+        原子写（临时文件 + replace），避免进程被杀时留下半截JSON；
+        写失败只记日志不抛 —— 建议队列是派生数据，持久化失败不该拖垮主服务。
+        """
+        rules_file = self._suggestions_path()
+        try:
+            rules_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = rules_file.with_suffix(rules_file.suffix + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.suggested_rules, f, ensure_ascii=False, indent=2)
+            tmp.replace(rules_file)
+        except OSError as e:
+            logger.warning("建议队列落盘失败（本轮建议仅存内存）: %s", e)
+
+    def maybe_save_suggestions(self, force: bool = False) -> None:
+        """按 ``suggestions_save_every`` 条增量周期性落盘。
+
+        🔴 起因（2026-10-11 真机实测）：容器里SIGTERM 只置停止标志，
+        而 ``stop()`` 的调用链从未接上``run_server``，导致
+        ``suggested_rules.json`` **从未生成** —— 重启即清零，
+        历史观测在、建议不在。周期落盘让建议不再依赖"优雅退出"这一条脆弱路径。
+        """
+        every = int(self.config.get("suggestions_save_every", 20))
+        if every <= 0:
+            return
+        if force or len(self.suggested_rules) >= every:
+            self._save_suggestions()
 
     def _signal_handler(self, signum, frame):
         """信号处理器
