@@ -79,6 +79,33 @@ class TestObservationToFlow(unittest.TestCase):
         ]
         self.assertEqual(len(observations_to_flows(batch)), 1)
 
+    def test_reverse_dns_ptr_is_dropped(self):
+        """反向解析 PTR 查询（*.in-addr.arpa / *.ip6.arpa）不是设备外联，剔除出画像
+
+        实机复测出现过 7 个 .arpa 噪声；collector 层仍照常记录原始观测
+        （见 test_collectors），只在分析/入库边界剔除，保证「去向地图 /
+        覆盖率 / 未知域名 / 盲区」不再被反向查刷屏。
+        """
+        ptr_ipv4 = Observation(
+            timestamp=1000.0, kind="dns", device_id="127.0.0.1",
+            fields={"domain": "173.1.168.192.in-addr.arpa", "client_ip": "127.0.0.1"},
+        )
+        self.assertIsNone(observation_to_flow(ptr_ipv4))
+
+        ptr_ipv6 = Observation(
+            timestamp=1000.0, kind="dns", device_id="::1",
+            fields={"domain": "8.b.d.0.1.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa",
+                    "client_ip": "::1"},
+        )
+        self.assertIsNone(observation_to_flow(ptr_ipv6))
+
+        # 正常服务域名不受影响（含 .arpa 之外的所有真实域名）
+        real = Observation(
+            timestamp=1000.0, kind="dns", device_id="192.168.1.50",
+            fields={"domain": "api.example.com.", "client_ip": "192.168.1.50"},
+        )
+        self.assertIsNotNone(observation_to_flow(real))
+
 
 # ============================================================================ behavior
 
