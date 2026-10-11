@@ -498,7 +498,43 @@ class HomewardHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/unknown-domains":
-            self._json(200, {"items": svc.get_unknown_domains()})
+            # F7：分桶返回。``items`` 仍是「真正未知」（兼容既有 UI），
+            # 另把「自有/局域网」与「用户标记良性」分开，别让自家路由冒充未知外联。
+            c = svc.get_classified_domains()
+            self._json(200, {
+                "items": c["unknown"],
+                "own": c["own"],
+                "benign": c["benign"],
+                "marks": svc.get_domain_marks(),
+            })
+            return
+
+        if path == "/api/domain-marks":
+            # 用户标记域名为「自有 / 良性」（或取消标记）。家卫不替用户猜，
+            # 但用户说了算 —— 且必须能随时撤销，故 kind 传空串即取消。
+            if method == "GET":
+                self._json(200, {"items": svc.get_classified_domains()})
+                return
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed"})
+                return
+            try:
+                obj = json.loads(self._read_text_body() or "{}")
+            except ValueError:
+                obj = {}
+            obj = obj if isinstance(obj, dict) else {}
+            dom = str(obj.get("domain") or "").strip()
+            kind = str(obj.get("kind") or "").strip().lower()
+            if not dom:
+                self._json(400, {"error": "missing_domain"})
+                return
+            if kind not in ("own", "benign", ""):
+                self._json(400, {"error": "bad_kind",
+                                 "allowed": ["own", "benign", ""]})
+                return
+            ok = svc.mark_domain(dom, kind)
+            self._json(200 if ok else 400,
+                       {"ok": ok, "domain": dom, "kind": kind})
             return
 
         if path == "/api/blind-spots":

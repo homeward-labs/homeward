@@ -48,7 +48,7 @@ class _OneShotDnsCollector(Collector):
             timestamp=time.time(),
             kind="dns",
             device_id="192.168.1.50",
-            fields={"domain": "test-unknown-domain-xyz.local", "client_ip": "192.168.1.50"},
+            fields={"domain": "test-unknown-domain-xyz.example.net", "client_ip": "192.168.1.50"},
         )
 
 
@@ -87,7 +87,7 @@ class CollectorRunnerTest(unittest.TestCase):
             dev = svc.get_device("192.168.1.50")
             self.assertIn("192.168.1.50", dev.get("ips") or [])
             # 域名归属应被收录（未知域名进 unknown 集合）
-            self.assertIn("test-unknown-domain-xyz.local", svc.get_unknown_domains())
+            self.assertIn("test-unknown-domain-xyz.example.net", svc.get_unknown_domains())
             # 采集状态写入 service，供 /api/overview 盲区视图展示
             self.assertEqual(len(status), 1)
             self.assertTrue(status[0]["active"])
