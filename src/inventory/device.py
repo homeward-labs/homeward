@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
 from knowledge_base.constants import KB_DIR_NAME, OUI_PREFIXES_CSV
+from core.netclass import is_noise_address
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,11 @@ _UNKNOWN_TYPE = "unknown"
 
 # 回环地址：查询来自路由器/软路由本机的服务，不是局域网设备
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+# 噪声地址（回环/链路本地/组播/广播/未指定/脏串）不该单独建档，但其中很多是
+# 「本机（跑家卫的那台设备）」自己产生的流量（本机系统更新、DDNS 心跳、dnsmasq
+# 本地查询）。统一归并到一台「本机」设备：既保持设备列表干净，又不丢这些观测。
+_SELF_DEVICE_KEY = "__homeward_self__"
 
 # 单台设备最多记多少个去向。家庭场景一台设备通常几十个域名足够，
 # 但 DNS 隧道 / 域名生成算法会瞬间刷出海量子域 —— 没有上限的话内存会被打爆。
@@ -90,13 +96,13 @@ class Device:
 
     @property
     def display_name(self) -> str:
-        """给人看的名字：主机名 → 路由器自身 → 厂商 → IP"""
+        """给人看的名字：主机名 → 本机（路由器自身）→ 厂商 → IP"""
         if self.hostname:
             return self.hostname
-        # 回环地址上的 DNS 查询来自路由器本机的服务（iStore / DDNS / 系统自身），
-        # 不是局域网里的某台设备 —— 直接标明，别让它伪装成一台"未知设备"
-        if self.key in _LOOPBACK or (self.ips & _LOOPBACK):
-            return "路由器自身"
+        # 本机（跑家卫的设备）：回环/链路本地/未指定地址上的流量都归并到这里，
+        # 不让它们伪装成一台「未知设备」污染列表
+        if self.key == _SELF_DEVICE_KEY or self.key in _LOOPBACK or (self.ips & _LOOPBACK):
+            return "本机（路由器自身）"
         if self.vendor_cn or self.vendor:
             return self.vendor_cn or self.vendor
         ip = next(iter(sorted(self.ips)), None)
@@ -426,8 +432,15 @@ class DeviceRegistry:
     # ---------- 运行时观察 ----------
 
     def observe_ip(self, ip: str, ts: Optional[float] = None) -> Device:
-        """观察到某个 IP 在活动：更新 last_seen，没有 MAC 身份时先用 IP 兜底"""
+        """观察到某个 IP 在活动：更新 last_seen，没有 MAC 身份时先用 IP 兜底
+
+        噪声地址（回环/链路本地/组播/广播/未指定/脏串）不是局域网里可追踪的设备，
+        不单独建档，统一归并到「本机」设备（见 :meth:`_observe_self`）。
+        真实私网/公网 IP 仍按原逻辑建档。
+        """
         now = ts if ts is not None else time.time()
+        if is_noise_address(ip):
+            return self._observe_self(now)
         key = self._ip_index.get(ip)
         if key and key in self.devices:
             dev = self.devices[key]
@@ -440,6 +453,20 @@ class DeviceRegistry:
             dev = Device(key=ip, first_seen=now, last_seen=now)
             self.devices[ip] = dev
         dev.ips.add(ip)
+        dev.last_seen = now
+        return dev
+
+    def _observe_self(self, now: float) -> Device:
+        """把噪声地址（本机自身流量）归并到一台「本机」设备。
+
+        不进 ``_ip_index``（这些地址不应被当成可查询的独立设备），只维护一台共享设备，
+        既保持设备列表干净，又不丢本机自身的去向观测。
+        """
+        dev = self.devices.get(_SELF_DEVICE_KEY)
+        if dev is None:
+            dev = Device(key=_SELF_DEVICE_KEY, first_seen=now, last_seen=now)
+            dev.ips = {"127.0.0.1", "::1"}
+            self.devices[_SELF_DEVICE_KEY] = dev
         dev.last_seen = now
         return dev
 
@@ -491,11 +518,14 @@ class DeviceRegistry:
         if not self.vendor_lookup_enabled:
             spots.append("未加载 MAC 厂商库：只能靠主机名与 IP 识别设备，"
                          "厂商字段为空。生成方式见 tools/build_oui_table.py。")
-        ip_only = [d for d in self.devices.values() if not d.mac]
+        # 本机设备（噪声地址归并而来）没有 MAC 也没有主机名，那是预期的，不算盲区
+        ip_only = [d for d in self.devices.values()
+                   if not d.mac and d.key != _SELF_DEVICE_KEY]
         if ip_only:
             spots.append(f"{len(ip_only)} 台设备未拿到 MAC（静态 IP / 未走 DHCP / 未同二层），"
                          "只能按 IP 识别，换 IP 会被视为新设备。")
-        no_name = [d for d in self.devices.values() if not d.hostname and not d.vendor]
+        no_name = [d for d in self.devices.values()
+                   if not d.hostname and not d.vendor and d.key != _SELF_DEVICE_KEY]
         if no_name:
             spots.append(f"{len(no_name)} 台设备既无主机名也无厂商信息，UI 上只能显示 IP。")
         return spots

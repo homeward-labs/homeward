@@ -24,6 +24,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Iterable, Optional
 
 from analysis.behavior import BehaviorFinding
+from core.netclass import is_address_like, is_internal, is_noise_address
 
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 SEVERITY_LABEL = {"critical": "严重", "high": "高", "medium": "中", "low": "低"}
@@ -46,6 +47,37 @@ _BENIGN_BULK_CATEGORIES = frozenset({
     "cloud_storage", "cloud_backup", "os_update", "app_update",
     "cdn", "system_update", "backup",
 })
+
+
+def _dest_host(dst: str) -> str:
+    """从 finding.destination（可能是 domain 或 ip:port，IPv6 可能带 ``[ ]``）取出主机部分。"""
+    if not dst:
+        return ""
+    if dst.startswith("["):  # [fe80::1]:1900
+        end = dst.find("]")
+        if end != -1:
+            return dst[1:end]
+        return dst[1:]
+    return dst.rsplit(":", 1)[0]
+
+
+def _dest_is_internal(dst: str) -> bool:
+    """bulk_upload 的目的地是否是「内网 / 非公网可达」地址（组播/广播/链路本地/私网）。
+
+    注意：只有真的是 IP 且属内网时才算；域名（即使是 ``.lan``）走归属类别判定，
+    不在这里降级，避免把所有未知域名也误判成「内网」而漏报。
+    """
+    host = _dest_host(dst)
+    if not host or not is_address_like(host):
+        return False
+    return is_noise_address(host) or is_internal(host)
+
+
+def _bulk_upload_is_benign(finding, attribution: dict) -> bool:
+    """bulk_upload 是否应降级：目的地是内网控制流量，或归属为良性大流量类别。"""
+    if _dest_is_internal(finding.destination or ""):
+        return True
+    return bool(attribution.get("category") in _BENIGN_BULK_CATEGORIES)
 
 TEMPLATE_KEYS = frozenset({
     "device_name", "device_ip", "vendor", "device_type",
@@ -237,9 +269,13 @@ class AlertCenter:
             rule = rule_of(finding.rule_id) if rule_of else {}
             context = build_context(finding, device_view or {}, attribution or {})
 
-            # bulk_upload 误报收敛：已知良性大流量类别（云备份/系统更新/CDN）降级为
-            # low/warn，不再当成「数据外泄」吓人；未知目的地保持原严重度。
-            if finding.rule_id == "bulk_upload" and attribution.get("category") in _BENIGN_BULK_CATEGORIES:
+            # bulk_upload 误报收敛：
+            # 1) 目的地是内网控制流量（组播/广播/链路本地/私网）——
+            #    SSDP/mDNS 等局域网发现协议符合「单目的大量包」特征，绝不可能是真实
+            #    数据外泄，直接降级，别把路由器自身和局域网设备的正常发现流量判成高危；
+            # 2) 目的地归属为良性大流量类别（云备份/系统更新/CDN）降级为 low/warn；
+            # 3) 未知公网目的地保持原严重度（未知大流量上传更可疑，宁严勿松）。
+            if finding.rule_id == "bulk_upload" and _bulk_upload_is_benign(finding, attribution):
                 finding = replace(finding, severity="low", action="warn")
 
             summary, missing = self.renderer.render(

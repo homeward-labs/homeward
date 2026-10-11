@@ -44,8 +44,9 @@ from rule_engine.engine import (
 )
 from ai.analyzer import AIAnalyzer, AnalysisRequest, AnalysisResult
 from knowledge_base.updater import KnowledgeBaseUpdater
-from inventory.device import Device, DeviceRegistry
+from inventory.device import Device, DeviceRegistry, _SELF_DEVICE_KEY
 from inventory.attribution import AttributionResult, DomainAttribution
+from core.netclass import is_address_like
 from analysis.behavior import BehaviorDetector
 from analysis.alerting import Alert, AlertCenter
 from adapters.base import ActionRegistry
@@ -116,6 +117,21 @@ def _state_to_attr_result(st: dict) -> "AttributionResult":
     )
 
 
+def _is_observable_domain(d: str) -> bool:
+    """是否应计入覆盖率分母：必须是真正的域名，排除 IP 直连 / .lan 主机名 / 空串。
+
+    直连 IP（如 192.168.1.1、239.255.255.250）和 .lan 主机名不需要、也无法在知识库
+    里查到「组织归属」，把它们算进覆盖率分母只会虚假拉低数字，故剔除。
+    """
+    if not d:
+        return False
+    if d == "localhost" or d.endswith(".lan") or d.endswith(".local"):
+        return False
+    if is_address_like(d):
+        return False
+    return True
+
+
 class HomewardService:
     """家卫 主服务
 
@@ -156,6 +172,8 @@ class HomewardService:
 
         # 建议阻断队列（社区版只产出"建议"，从不产生已生效的阻断规则）
         self.suggested_rules: list[dict] = []
+        # 建议去重索引：同一「设备 + 域名」只保留一条建议，避免重复刷屏
+        self._suggestion_index: dict[str, dict] = {}
 
         # W3：行为识别 + 中文告警
         # 行为规则按自己声明的窗口/粒度跑，判定结果进告警中心做去重收敛。
@@ -274,24 +292,57 @@ class HomewardService:
 
         return decision
 
+    @staticmethod
+    def _suggestion_key(domain: str, device: str) -> str:
+        return f"{domain}|{device}"
+
+    def _rebuild_suggestion_index(self) -> None:
+        """从 ``suggested_rules`` 重建去重索引（启动加载 / 反序列化后调用）"""
+        self._suggestion_index = {
+            self._suggestion_key(r.get("domain", ""), r.get("device", "")): r
+            for r in self.suggested_rules
+            if isinstance(r, dict) and r.get("domain") and r.get("device")
+        }
+
     def _record_suggestion(self, flow: FlowRecord, decision: Decision):
         """把「建议阻断」写入待确认队列 —— 社区版到此为止，不碰任何网络配置
+
+        同一「设备 + 域名」只保留一条建议、次数累加（occurrences）：真实场景里同一信标
+        （如 ``otheve.beacon.qq.com``）会被命中几十次，若每条都追加，建议列表会刷成
+        15 条同域名，既难看又掩盖了真正不同的建议。
 
         真实下发属于**标准版（闭源付费）**，经由 ``src/adapters/base.py`` 的
         ``Enforcer.apply(action)`` + ``ActionRegistry`` 完成；本仓库不实现、也不调用
         任何 nftables / dnsmasq 写入操作。此处若出现真实下发代码，即为开源边界事故。
         """
         hit = decision.rule_hits[0] if decision.rule_hits else None
+        domain = flow.sni or flow.dns_query
+        device = flow.src_ip
+        key = self._suggestion_key(domain, device)
+        existing = self._suggestion_index.get(key)
+        if existing is not None:
+            # 同设备 + 同域名：只更新计数与结论，不新增条目
+            existing["occurrences"] = int(existing.get("occurrences", 1)) + 1
+            existing["reason"] = decision.reason
+            if hit:
+                existing["side_effects"] = hit.side_effects
+            existing["last_seen"] = getattr(flow, "timestamp", None)
+            self.maybe_save_suggestions()
+            return
         rule = {
-            "domain": flow.sni or flow.dns_query,
-            "device": flow.src_ip,
+            "domain": domain,
+            "device": device,
             "level": decision.action,
             "reason": decision.reason,
             "source": hit.rule_type if hit else "manual",
             "side_effects": hit.side_effects if hit else "",
             "status": "suggested",  # 等待用户确认；社区版不会把它变成 applied
+            "occurrences": 1,
+            "first_seen": getattr(flow, "timestamp", None),
+            "last_seen": getattr(flow, "timestamp", None),
         }
         self.suggested_rules.append(rule)
+        self._suggestion_index[key] = rule
         self.stats["suggestions_pending"] += 1
         # 周期落盘：不依赖退出路径，避免"重启即清零"
         self.maybe_save_suggestions()
@@ -526,11 +577,24 @@ class HomewardService:
         return spots
 
     def attribution_coverage(self) -> dict:
-        """归属覆盖率：衡量知识库够不够用，也是社区共建的进度指标"""
+        """归属覆盖率：衡量知识库够不够用，也是社区共建的进度指标。
+
+        口径统一为「观测到过的全部域名」：设备台账去向 ∪ 未知域名 ∪ 归属缓存，
+        三者取并集（不再混用「当前窗口」与「累计」两套分母）。
+        同时剔除内网地址 / 直连 IP / .lan 这类「不需要归属」的项，避免分母被灌水、
+        虚假拉低覆盖率（实机曾出现 5.56% 与 57% 并存）。
+        """
         with self._state_lock:
-            domains = sorted(self.stats["unknown_domains"]
-                             | self.attribution.cached_domains())
-        rep = self.attribution.coverage(domains)
+            observed = set()
+            for dev in self.device_registry.devices.values():
+                if dev.key == _SELF_DEVICE_KEY:
+                    continue
+                observed |= set(dev.domains.keys())
+            observed |= self.stats["unknown_domains"]
+            observed |= self.attribution.cached_domains()
+            # 只保留「真正的域名」：排除 IP 直连 / .lan 主机名 / 空串
+            observed = {d for d in observed if d and _is_observable_domain(d)}
+        rep = self.attribution.coverage(observed)
         return {
             "total": rep.total,
             "hit": rep.hit,
@@ -641,8 +705,53 @@ class HomewardService:
                     restored_devices, restored_alerts)
         return restored_devices + restored_alerts
 
+    def privacy_checkup(self) -> dict:
+        """一键隐私体检：结论先行，把一堆数字压成一句话结论 + 几个关键指标。
+
+        这是「看见 → 理解」的关键一步：让人一眼知道「我家现在隐私状况怎么样」，
+        而不是面对一堆原始统计发呆。打分规则刻意透明、可解释（见下方扣分逻辑），
+        不是黑箱分数 —— 每一项扣分都对应界面上能看到的具体事实。
+        """
+        with self._state_lock:
+            stats = self._get_stats_locked()
+            cov = self.attribution_coverage()
+            alerts = self.alert_center.active()
+            unknowns = sorted(self.stats["unknown_domains"])
+            blind_n = len(self.get_blind_spots())
+
+        high = [a for a in alerts if a.severity in ("high", "critical")]
+        rate = cov["hit_rate"]
+        score = 100
+        # 高危/严重告警是头号风险信号：每条扣 12 分，最多扣到 5 条封顶
+        score -= min(len(high), 5) * 12
+        # 归属覆盖率低于 50% 说明「看不懂家里一半的外联」，按比例扣分
+        if rate < 0.5:
+            score -= int((0.5 - rate) * 40)
+        # 未知域名过多：超过 30 个后每 10 个扣 1 分（最多扣 20）
+        if len(unknowns) > 30:
+            score -= min((len(unknowns) - 30) // 10, 20)
+        score = max(0, min(100, score))
+        verdict = "基本可控" if score >= 80 else ("需要关注" if score >= 50 else "风险较高")
+
+        return {
+            "score": score,
+            "verdict": verdict,
+            "devices_total": stats["devices_total"],
+            "vendors_resolved": stats["vendors_resolved"],
+            "alerts_active": len(alerts),
+            "alerts_high": len(high),
+            "coverage_hit": cov["hit"],
+            "coverage_total": cov["total"],
+            "coverage_rate": rate,
+            "unknown_count": len(unknowns),
+            "top_unknown": unknowns[:5],
+            "blind_spots": blind_n,
+        }
+
     def export_report(self) -> dict:
         """导出一份「观测报告」结构化数据 —— 只含用户自己的观测遥测。
+
+        结论先行：``checkup`` 段放在最前，一眼看到整体判断；后面才是分项明细。
 
         安全边界（见 open-core 约定）：**绝不 Dump 知识库**（不输出 ``domains.csv`` /
         ``behaviors.json`` / ``oui`` 全表），也不提供「浏览全部已知域名」接口。
@@ -655,6 +764,7 @@ class HomewardService:
                 "edition": "community",
                 "scope": "用户自己的观测遥测（不含知识库）",
             },
+            "checkup": self.privacy_checkup(),
             "stats": self.get_stats(),
             "coverage": self.attribution_coverage(),
             "devices": self.get_devices(),
@@ -683,6 +793,7 @@ class HomewardService:
         if isinstance(loaded, list):
             self.suggested_rules = [r for r in loaded if isinstance(r, dict)]
             self.stats["suggestions_pending"] = len(self.suggested_rules)
+            self._rebuild_suggestion_index()
 
     def _suggestions_path(self) -> Path:
         """建议队列落盘路径（可用 ``suggestions_path`` 配置覆盖，便于测试与只读根fs）"""
