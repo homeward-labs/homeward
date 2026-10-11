@@ -24,6 +24,7 @@ W4 —— Web UI 服务端（社区版开源范围）
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -628,6 +629,10 @@ def make_server(service: HomewardService, host: str = DEFAULT_HOST,
         {"service": service, "start_time": time.time(),
          "auth": auth, "observation_store": observation_store},
     )
+    #启动时恢复上次未确认的「建议阻断」队列。
+    # service.start() 是 async 且从未被 run_server 调用（信号注册也在那里），
+    # 故这里显式加载一次；幂等，重复调用无副作用。
+    service._load_suggestions()
     ThreadingHTTPServer.allow_reuse_address = True
     return ThreadingHTTPServer((host, port), handler_cls)
 
@@ -649,6 +654,15 @@ def run_server(service: HomewardService, host: str = DEFAULT_HOST,
     finally:
         saver.stop()
         httpd.server_close()
+        # 🔴 关闭路径必须显式落盘「建议阻断」队列。
+        # 起因（2026-10-11 真机实测）：本函数原先只停 saver/httpd，从不调
+        # service.stop()，而 _save_suggestions() 只挂在 stop() 上
+        # → suggested_rules.json 从未生成，重启即清零。
+        # 这里不 await（stop() 是 async 但内部无 await点），直接跑协程保证一定执行。
+        try:
+            asyncio.run(service.stop())
+        except Exception as e:  # 落盘失败不该影响退出
+            logger.warning("关闭时保存建议队列失败: %s", e)
 
 
 def _warn_if_exposed(host: str, auth: "WebAuth | None" = None) -> None:
