@@ -24,6 +24,25 @@ HOMEWARD = KB / "domains_homeward.csv"
 PUBLIC = KB / "domains_public.csv"
 MERGED = KB / "domains.csv"
 VERSION_FILE = KB / "VERSION"
+EXTRA_CSV = Path(__file__).resolve().parent / "kb_new_2026_10.csv"
+
+
+def load_extra_csv(path):
+    """读取外部策展批次 CSV（scripts/kb_new_*.csv），转成与 NEW 同结构的 7 元组列表。
+
+    该批次由 scripts/gen_kb_batch.py 生成（纯手搓真实域名，按厂商/类别分组），
+    与脚本内硬编码的 NEW 列表走同一去重/合并管道。
+    """
+    rows = []
+    if path.exists():
+        with path.open(encoding="utf-8", newline="") as fh:
+            for r in csv.DictReader(fh):
+                d = (r.get("domain") or "").strip().lower()
+                if d:
+                    rows.append((d, r.get("organization", ""), r.get("category", ""),
+                                 r.get("confidence", ""), r.get("description", ""),
+                                 r.get("action", ""), r.get("side_effects", "")))
+    return rows
 
 FIELDS = ["domain", "organization", "category", "confidence",
           "description", "action", "side_effects"]
@@ -830,6 +849,8 @@ NEW += mk(["airship.com", "api.airship.com"], "Airship", "analytics", "medium", 
 # =====================================================================
 #  合并 / 去重 / 写出
 # =====================================================================
+
+NEW += load_extra_csv(EXTRA_CSV)
 
 def load_existing(path: Path):
     rows = []
