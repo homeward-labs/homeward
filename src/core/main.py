@@ -191,7 +191,7 @@ class HomewardService:
         # W2：设备台账 + 域名归属
         # 两者都可能在缺少本地数据源时"识别不出东西" —— 那是预期行为，
         # 由 blind_spots() 显式告诉 UI，而不是假装认得。
-        self.device_registry = DeviceRegistry()
+        self.device_registry = DeviceRegistry(self_ips=self._resolve_self_ips())
         self.attribution = DomainAttribution()
         if self.config.get("load_system_devices", True):
             stat = self.device_registry.load_from_system()
@@ -348,6 +348,35 @@ class HomewardService:
         self.maybe_save_suggestions()
         logger.info(f"[SUGGEST] {rule['domain']} → {decision.reason}（等待用户确认）")
 
+    # ---------------------------------------------------------------- W2 本机身份
+
+    def _resolve_self_ips(self) -> set[str]:
+        """算出「跑家卫的那台设备」自身占用的 IP，用于设备合并与告警降级。
+
+        优先级：配置 ``homeward_self_ips``（显式、最可靠）> 主机名尽力解析（含 LAN IP，
+        避免每次都靠手配）。只取非回环地址；回环/链路本地等噪声地址由 netclass 另走合并。
+
+        注意：容器内无法 100% 可靠判定哪个私网 IP 是宿主（见 FEATURE-EVOLUTION §5.3），
+        故显式配置仍是推荐路径；这里做尽力而为的自动兜底。
+        """
+        ips: set[str] = set()
+        cfg = self.config.get("homeward_self_ips")
+        if isinstance(cfg, str) and cfg.strip():
+            for part in cfg.split(","):
+                p = part.strip()
+                if p:
+                    ips.add(p)
+        try:
+            import socket
+            host = socket.gethostname()
+            for info in socket.getaddrinfo(host, None):
+                ip = info[4][0]
+                if ip and ip not in ("127.0.0.1", "::1", "0.0.0.0"):
+                    ips.add(ip)
+        except Exception:  # 解析失败不应阻断启动
+            pass
+        return ips
+
     # ---------------------------------------------------------------- W3 行为与告警
 
     def run_behavior_scan(self, now: Optional[float] = None) -> list:
@@ -363,6 +392,7 @@ class HomewardService:
                 device_view_of=self.get_device,
                 attribution_of=self.describe_domain,
                 rule_of=lambda rid: self._rules_by_id.get(rid, {}),
+                is_self_ip=self.device_registry.is_self_ip,
                 now=now,
             )
         for alert in new_alerts:

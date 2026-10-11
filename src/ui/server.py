@@ -747,6 +747,7 @@ def main(argv=None) -> int:
     env_dns_log = os.environ.get("DNS_LOG_PATH") or None
     env_dns_source = os.environ.get("DNS_SOURCE") or "dnsmasq"
     env_syslog_path = os.environ.get("SYSLOG_PATH") or None
+    env_self_ips = os.environ.get("HOMEWARD_SELF_IPS") or None
 
     ap = argparse.ArgumentParser(description="家卫 Web UI（社区版：只读）")
     ap.add_argument("--host", default=env_host,
@@ -766,6 +767,11 @@ def main(argv=None) -> int:
     ap.add_argument("--syslog-path", default=env_syslog_path,
                     help="dns_source=syslog 时指定 syslog 文件路径（默认按 /var/log/messages 等探测，"
                          "或由环境变量 SYSLOG_PATH 指定）")
+    ap.add_argument("--self-ips", default=env_self_ips,
+                    help="「本机身份」IP 列表（逗号分隔）：跑家卫的那台设备自身占用的 IP，"
+                         "如软路由 LAN IP 192.168.1.254。这些 IP 的流量归并到「本机」设备，"
+                         "且其自身的大流量上传（系统更新 / telemetry）不再按数据外泄告警。"
+                         "也可由环境变量 HOMEWARD_SELF_IPS 提供；不填则尽力用主机名自动判定")
     ap.add_argument("--auth-token", default=None,
                     help="Web UI 登录口令；不填则默认无鉴权（浏览器直开）。"
                          "也可由环境变量 HOMEWARD_AUTH_TOKEN 提供")
@@ -803,6 +809,8 @@ def main(argv=None) -> int:
     service = HomewardService(config={
         "load_system_devices": not args.demo,
         "actions_db_path": None if args.demo else (ROOT / "data" / "actions.db"),
+        # 本机身份：宿主自身 IP。不填则 _resolve_self_ips 会尽力用主机名自动判定。
+        "homeward_self_ips": args.self_ips,
     })
 
     # 观测状态持久化：生产模式默认开启（重启不丢设备/告警），演示模式默认关闭
