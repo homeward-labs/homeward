@@ -232,7 +232,8 @@ def main() -> int:
                     choices=sorted(DOWNLOAD_SOURCES),
                     help="在线来源：wireshark（默认，可直接下载）/ ieee（可能 418 反爬）")
     ap.add_argument("--out", default=str(DEFAULT_OUT), help="输出 CSV 路径")
-    ap.add_argument("--all", action="store_true", help="不做白名单过滤（导出全量，体积大）")
+    ap.add_argument("--all", action="store_true",
+                    help="不做白名单过滤（导出全量，体积大）；白名单厂商仍带中文名与品类提示")
     ap.add_argument("--include-chip-vendors", action="store_true",
                     help="额外收录芯片方案商（Realtek/MediaTek 等），会显著增大表体")
     args = ap.parse_args()
@@ -266,7 +267,11 @@ def main() -> int:
     for prefix, vendor in raw.items():
         hit = match_wanted(vendor, include_chip=args.include_chip_vendors)
         if args.all:
-            cn, hint = "", ""
+            # 全量导出，但**白名单命中者仍保留中文名与品类提示**：
+            # 全量表解决"查得到厂商"（覆盖率），白名单解决"看得懂是谁"（中文名 + 品类）。
+            # 两者是互补而不是二选一 —— 早期版本这里粗暴置空，结果 8c:8e:0d 从"中兴"
+            # 退化成光秃秃的 "zte"，反而把品类推断也一起打掉了。
+            cn, hint = hit if hit else ("", "")
             rows.append((prefix, vendor, cn, hint))
         elif hit:
             cn, hint = hit
@@ -276,7 +281,7 @@ def main() -> int:
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8", newline="") as f:
-        f.write("# 家卫 · MAC 厂商（OUI）精简表\n")
+        f.write("# 家卫 · MAC 厂商（OUI）表\n")
         f.write(f"# 生成方式: python tools/build_oui_table.py"
                 f" {'--source ' + used if args.source else '--from ' + args.origin}"
                 f"{' --all' if args.all else ''}\n")

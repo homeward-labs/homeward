@@ -31,7 +31,9 @@ services:
       resources:
         limits:
           cpus: "0.50"
-          memory: 128M
+          # 192M：OUI 厂商表改为全量（4 万条）后常驻内存约 +12MB，
+          # 原 128M 下实测已用到 50%，留给观测缓存的余量偏紧，故上调。
+          memory: 192M
           pids: 128
         reservations:
           cpus: "0.10"

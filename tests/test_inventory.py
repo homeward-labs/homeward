@@ -237,8 +237,10 @@ class TestDeviceRegistry(unittest.TestCase):
         self.assertTrue(any("未拿到 MAC" in s for s in reg.blind_spots()))
 
     def test_no_blind_spot_when_fully_resolved(self):
+        # 用 dd:ee:ff（真实 OUI 前缀）而非 aa:bb:cc：后者 U/L 位为 1，属本地管理地址
+        # （随机 MAC），按 F6 的语义它本身就该被列为盲区 —— 不能拿它当"完全识别"的样例
         reg = self.build()
-        reg.load_leases(f"{SOON_FN} aa:bb:cc:00:11:22 192.168.1.10 Cam\n")
+        reg.load_leases(f"{SOON_FN} dd:ee:ff:00:00:01 192.168.1.10 Cam\n")
         self.assertEqual(reg.blind_spots(), [])
 
 
