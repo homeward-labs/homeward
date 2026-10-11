@@ -68,6 +68,13 @@ def observation_to_flow(
         client_ip = fields.get("client_ip") or obs.device_id or ""
         if not domain or not client_ip:
             return None
+        # 反向解析噪声：*.in-addr.arpa / *.ip6.arpa 是 PTR 查询，不是「设备主动访问了谁」。
+        # 它们来自路由器/系统自己做的连接反查（DDNS、日志回放等），混进画像会被当成
+        # 陌生外联域名刷屏（实机复测出现过 7 个 .arpa）。.arpa 是 RFC 3172 保留的
+        # 基础设施 TLD，不存在正常服务域名，整类丢弃安全。collector 层仍按原始观测记录
+        # （见 test_collectors），此处只在「画像/未知外联」边界剔除。
+        if domain.lower().endswith(".arpa"):
+            return None
         return FlowRecord(
             timestamp=ts,
             src_ip=client_ip,
