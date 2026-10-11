@@ -58,6 +58,17 @@ function typeText(d) {
   return s ? `${t}（${s}）` : t;
 }
 
+// 设备风险分级（F6）：等级 + 触发理由。理由由服务端逐条给出，
+// 前端原样展示 —— 用户看到的每一档风险都能追溯到具体观测数字，不做二次加工。
+const RISK_LABEL = { high: "高风险", medium: "需关注", low: "未见异常" };
+function riskCell(d) {
+  const lv = ["high", "medium", "low"].includes(d.risk_level) ? d.risk_level : "low";
+  const reasons = (d.risk_reasons || []).filter(Boolean);
+  const tip = reasons.length ? ` title="${esc(reasons.join("；"))}"` : "";
+  return `<span class="sev sev-${lv}"${tip}>${esc(RISK_LABEL[lv])}</span>`
+    + (reasons.length ? `<div class="small muted">${reasons.map(esc).join("；")}</div>` : "");
+}
+
 async function api(path, options) {
   const res = await fetch(path, options);
   if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
@@ -191,10 +202,15 @@ function renderDevices() {
       <td>
         <strong>${esc(d.name)}</strong>
         <div class="small muted">${esc(typeText(d))}</div>
+        <div class="small muted">观测 ${esc(d.observations ?? 0)} 次 / ${esc(d.domain_count ?? 0)} 个域名</div>
       </td>
       <td class="mono">${(d.ips || []).map(esc).join("<br>") || "—"}</td>
-      <td class="mono">${esc(d.mac || "—")}</td>
+      <td class="mono">${esc(d.mac || "—")}${
+        d.random_mac
+          ? '<div><span class="tag" title="该设备使用随机 MAC（手机/平板/电脑的隐私保护特性）：MAC 由设备临时生成，查不到厂商、重连后还会变。这是协议层面的盲区，不是家卫没识别出来。">随机 MAC</span></div>'
+          : ""}</td>
       <td>${esc(d.vendor || "—")}</td>
+      <td>${riskCell(d)}</td>
       <td class="small muted">${esc(ago(d.last_seen))}</td>
       <td>
         <div class="tags">
@@ -205,12 +221,15 @@ function renderDevices() {
       </td>
     </tr>`).join("");
 
+  const high = items.filter((d) => d.risk_level === "high").length;
+  const mid = items.filter((d) => d.risk_level === "medium").length;
+
   return `<div class="section">
-    <h2>设备台账 <span class="count">（${items.length} 台，按最近活跃排序）</span></h2>
+    <h2>设备画像 <span class="count">（${items.length} 台，按风险排序；高风险 ${high} 台、需关注 ${mid} 台）</span></h2>
     <div class="card scroll-x">
       <table>
         <thead><tr>
-          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>最近活跃</th><th>主要去向</th>
+          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>风险</th><th>最近活跃</th><th>主要去向</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>

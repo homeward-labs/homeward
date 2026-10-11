@@ -49,6 +49,7 @@ from inventory.attribution import AttributionResult, DomainAttribution
 from core.netclass import is_address_like
 from analysis.behavior import BehaviorDetector
 from analysis.alerting import Alert, AlertCenter
+from analysis.profiler import build_profiles
 from adapters.base import ActionRegistry
 from adapters.sqlite_registry import SqliteActionRegistry, SqliteObservationStore
 
@@ -229,6 +230,11 @@ class HomewardService:
             "suggestions_pending": 0,
             "unknown_domains": set(),
         }
+
+        # F6 设备画像缓存：None 表示尚未计算过（首次访问时才算）
+        self._profiles = None
+        self._profiles_ts = 0.0
+        self._profile_ttl = float(self.config.get("profile_ttl_seconds", 15))
 
         # F7 域名归类：用户手动标记 domain -> "own"(自有) / "benign"(良性)。
         # 自动判定的「自有/局域网」见 _is_own_domain()，不进这张表（那是结构性的、无需存）。
@@ -561,10 +567,42 @@ class HomewardService:
         }
 
     def get_devices(self) -> list[dict]:
-        """设备台账视图（按最近活跃排序）"""
+        """
+        设备台账视图 + F6 设备画像 / 风险分级。
+
+        排序按「风险高的在前，同级按观测次数」—— 用户打开设备页第一眼看到的
+        应该是**最值得看一眼的那台**，而不是最近碰巧发了条查询的那台。
+
+        画像要逐域名查归属，代价随域名数线性增长；UI 轮询没必要每次重算，
+        故带 TTL 缓存（默认 15 秒）。告警/归属变化最多延迟一个 TTL 反映，
+        这对「画像」这种概览视图是可接受的（告警页本身是实时的）。
+        """
         with self._state_lock:
             devices = list(self.device_registry.list_devices())
-        return [d.to_dict() for d in devices]
+            now = time.time()
+            if self._profiles is None or now - self._profiles_ts >= self._profile_ttl:
+                alert_dicts = [a.to_dict() for a in self.alert_center.active()]
+                self._profiles = build_profiles(
+                    devices, self.attribution.resolve, alert_dicts)
+                self._profiles_ts = now
+            profiles = self._profiles
+
+            # 台账与画像都在锁内取：采集线程可能正在插入新设备，
+            # 锁外遍历 devices dict 有 RuntimeError 风险
+            by_key = {d.key: d for d in devices}
+            items: list[dict] = []
+            covered: set[str] = set()
+            for p in profiles:
+                dev = by_key.get(p.key)
+                if dev is None:
+                    continue
+                covered.add(p.key)
+                items.append({**dev.to_dict(), **p.to_dict()})
+            # 极少数情况下台账里可能有画像没覆盖到的设备（并发插入），补在末尾，不丢数据
+            for dev in devices:
+                if dev.key not in covered:
+                    items.append(dev.to_dict())
+        return items
 
     def get_destinations(self) -> dict:
         """去向地图：域名 → 组织 → 哪些设备在跟它说话

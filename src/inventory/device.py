@@ -88,6 +88,9 @@ class Device:
     vendor_cn: Optional[str] = None
     device_type: str = _UNKNOWN_TYPE
     type_source: str = "unknown"        # hostname / vendor / none
+    # 该 MAC 是否由设备临时生成（随机 MAC / 私有 Wi-Fi 地址）。True 时查厂商必然失败，
+    # 这是设备侧的隐私保护特性而非家卫的缺陷 —— UI 必须照实说，见 :func:`is_random_mac`。
+    random_mac: bool = False
     first_seen: float = 0.0
     last_seen: float = 0.0
     # 域名 → 观测次数。UI 的「去向地图」画的就是「这台设备在跟谁说话」，
@@ -136,6 +139,7 @@ class Device:
             "vendor": self.vendor_cn or self.vendor,
             "device_type": self.device_type,
             "type_source": self.type_source,
+            "random_mac": self.random_mac,
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "domain_count": len(self.domains),
@@ -171,6 +175,30 @@ def oui_of(mac: str) -> str:
     """取 MAC 的厂商前缀（前三字节）。非法输入返回空串。"""
     n = normalize_mac(mac)
     return n[:8] if n else ""
+
+
+def is_random_mac(mac: str) -> bool:
+    """
+    判定 MAC 是否为「本地管理地址」—— 也就是俗称的**随机 MAC**。
+
+    依据是 IEEE 802 定义的第一字节 U/L 位（Universal/Local，从低位算第 2 位）：
+    置 1 表示地址由设备自己临时生成，而非厂商烧录的全局唯一地址。
+    Android / iOS / Windows 默认的"私有 Wi-Fi 地址"就是这一类。
+
+    为什么必须单独识别出来
+    ----------------------
+    这类地址**永远查不到厂商**，而且设备重连后可能变一个 —— 如果 UI 只是显示
+    "未知厂商"，用户会以为家卫没查到；真实原因是设备出于隐私保护主动隐藏了身份。
+    这是协议层面的结构性盲区，按家卫「不猜 + 盲区明示」的红线，必须说清楚。
+    """
+    n = normalize_mac(mac)
+    if not n:
+        return False
+    try:
+        first = int(n.split(":", 1)[0], 16)
+    except ValueError:  # normalize_mac 已保证是十六进制，这里只是防御
+        return False
+    return bool((first >> 1) & 1)
 
 
 # ---------------------------------------------------------------- 纯函数：租约 / ARP
@@ -554,12 +582,22 @@ class DeviceRegistry:
                    if not d.hostname and not d.vendor and d.key != _SELF_DEVICE_KEY]
         if no_name:
             spots.append(f"{len(no_name)} 台设备既无主机名也无厂商信息，UI 上只能显示 IP。")
+        # 随机 MAC：设备主动隐藏身份，查厂商是**必然失败**，不是家卫没查 —— 必须说清
+        rand = [d for d in self.devices.values() if d.random_mac]
+        if rand:
+            spots.append(
+                f"{len(rand)} 台设备使用随机 MAC（手机/平板/电脑的「隐私保护地址」特性）："
+                "MAC 由设备临时生成，查不到厂商、重连后还会变。这是协议层面的盲区，"
+                "不是家卫没识别出来；要看清它是谁，得靠主机名或用户自己备注。"
+            )
         return spots
 
     # ---------- 内部 ----------
 
     def _resolve_identity(self, dev: Device) -> None:
         """按「厂商 → 主机名」补全设备的厂商与品类，互不覆盖已有值"""
+        if dev.mac:
+            dev.random_mac = is_random_mac(dev.mac)
         if self.vendor_lookup_enabled and dev.mac and not dev.vendor:
             v, vc, hint = lookup_vendor(dev.mac, self.oui_table)
             dev.vendor, dev.vendor_cn = v, vc
