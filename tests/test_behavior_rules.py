@@ -31,6 +31,7 @@ from rule_engine.engine import (  # noqa: E402
     SUPPORTED_PATTERN_KEYS,
 )
 from analysis.alerting import TEMPLATE_KEYS, extract_placeholders  # noqa: E402
+from inventory.attribution import DomainAttribution  # noqa: E402
 
 BEHAVIORS = SRC_DIR / "knowledge_base" / "behaviors.json"
 
@@ -68,7 +69,10 @@ def flows(
 
 
 def hit_ids(sample: list[FlowRecord]) -> set[str]:
-    return {r["id"] for r in BehaviorMatcher().match(sample)}
+    # 接上真实归属解析器：crypto_mining 等规则用 destination_categories 证据键，
+    # 需要它把目标域名归到知识库类别（与生产运行时一致）。没接会失败关闭。
+    matcher = BehaviorMatcher(attribution=DomainAttribution())
+    return {r["id"] for r in matcher.match(sample)}
 
 
 class TestFailClosed(unittest.TestCase):
@@ -208,9 +212,10 @@ class TestEachRuleFires(unittest.TestCase):
                                        domain="www.example.com", port=53, proto="udp")))
 
     def test_crypto_mining(self):
-        # 用真实矿池协议关键词 stratum（pool 关键词已为修 NTP 误报而移除，见 de845a7）
+        # crypto_mining 现在靠知识库 crypto_mining 类别命中（NoCoin 精选 + 主流矿池），
+        # 不再靠裸词子串。用真实矿池域名 xmr.nanopool.org 验证仍能检出。
         self.assertIn("crypto_mining",
-                      hit_ids(flows(25, step=1, size=500, domain="eth.stratum.example.com",
+                      hit_ids(flows(25, step=1, size=500, domain="xmr.nanopool.org",
                                     spread_dst=4)))
 
     def test_mining_needs_mining_keywords(self):
@@ -219,10 +224,11 @@ class TestEachRuleFires(unittest.TestCase):
                                        spread_dst=4)))
 
     def test_ntp_pool_not_flagged_as_mining(self):
-        """锁 de845a7 修复：NTP pool（pool.ntp.org 等）不得误报为挖矿。
+        """锁 NTP pool 误报修复：pool.ntp.org 归入 system_update，不是 crypto_mining。
 
-        多目的地下 min_connections 满足，但域名不含任何挖矿关键词，
-        故 crypto_mining 不应命中。
+        crypto_mining 仅命中知识库 crypto_mining 类别；NTP pool 归到 system_update，
+        即使多目的地满足 min_connections，也不应被误判为挖矿（历史误报见 commit 2b73562
+        与后续迁到 destination_categories 的改动）。
         """
         self.assertNotIn("crypto_mining",
                          hit_ids(flows(25, step=1, size=500, domain="pool.ntp.org",

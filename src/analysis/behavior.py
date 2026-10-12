@@ -23,7 +23,12 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
-from rule_engine.engine import BehaviorMatcher, FlowRecord
+from rule_engine.engine import (
+    BehaviorMatcher,
+    FlowRecord,
+    _as_list,
+    _dest_matches_keywords,
+)
 
 DEFAULT_WINDOW_SECONDS = 3600.0
 
@@ -107,9 +112,15 @@ class BehaviorDetector:
     def __init__(
         self,
         matcher: Optional[BehaviorMatcher] = None,
+        attribution=None,
         max_records: int = 2000,
     ):
-        self.matcher = matcher or BehaviorMatcher()
+        self.matcher = matcher or BehaviorMatcher(attribution=attribution)
+        # 归因解析器：优先用传入值；否则沿用 matcher 上已接的（main 里先建好 attribution
+        # 再传给 BehaviorMatcher 时就是这条路径）。供 _build 挑出"真正命中"的展示域名。
+        self.attribution = attribution or getattr(self.matcher, "attribution", None)
+        if self.attribution is not None and self.matcher.attribution is None:
+            self.matcher.attribution = self.attribution
         self.max_records = int(max_records)
         self.rules = list(self.matcher.supported_rules)
 
@@ -205,11 +216,10 @@ class BehaviorDetector:
         scope: str,
     ) -> BehaviorFinding:
         evidence = summarize(records)
-        domain: Optional[str] = None
-        for f in records:
-            domain = f.sni or f.dns_query or None
-            if domain:
-                break
+        # 展示域名挑「真正命中规则证据」的那条连接，而不是窗口里第一条任意域名。
+        # 旧逻辑取第一条 SNI/DNS，会把 GitHub CDN / NTP pool 当成矿池域名展示，
+        # 既误导又难复核。这里按规则证据类型回退：KB 类别命中 > 关键词命中 > 兜底首条。
+        domain: Optional[str] = self._pick_evidence_domain(rule, records)
         return BehaviorFinding(
             rule_id=rule["id"],
             rule_name=rule.get("name", rule["id"]),
@@ -226,6 +236,33 @@ class BehaviorDetector:
             end_ts=evidence.get("end_ts", 0.0),
             evidence=evidence,
         )
+
+    def _pick_evidence_domain(self, rule: dict, records: list[FlowRecord]) -> Optional[str]:
+        """从窗口记录里挑一条能代表「为什么命中」的域名用于展示。"""
+        pattern = rule.get("pattern") or {}
+
+        # 1) KB 类别命中：挑第一条目标域名归到规则指定类别的连接
+        cats = pattern.get("destination_categories")
+        if cats and self.attribution is not None:
+            wanted = {str(c).strip().lower() for c in _as_list(cats)}
+            for f in records:
+                dom = f.sni or f.dns_query or ""
+                if dom and (self.attribution.resolve(dom).category or "").lower() in wanted:
+                    return dom
+
+        # 2) 关键词命中：挑第一条匹配关键词的连接
+        kws = pattern.get("destination_keywords")
+        if kws:
+            for f in records:
+                if _dest_matches_keywords(f, kws):
+                    return f.sni or f.dns_query or None
+
+        # 3) 兜底：第一条带域名的连接
+        for f in records:
+            dom = f.sni or f.dns_query or None
+            if dom:
+                return dom
+        return None
 
     # ---------------------------------------------------------------- 运维
 

@@ -2958,3 +2958,21 @@ www.verifier.live,NoCoin,crypto_mining,high,nocoin 聚合拦截域名,block_medi
 xmr.cool,NoCoin,crypto_mining,high,nocoin 聚合拦截域名,block_medium,广告/追踪或恶意通信被拦截；正常站点功能通常不受影响
 xmr.2miners.com,NoCoin,crypto_mining,high,nocoin 聚合拦截域名,block_medium,广告/追踪或恶意通信被拦截；正常站点功能通常不受影响
 zymerget.win,NoCoin,crypto_mining,high,nocoin 聚合拦截域名,block_medium,广告/追踪或恶意通信被拦截；正常站点功能通常不受影响
+nanopool.org,Nanopool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+f2pool.com,F2Pool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+ethermine.org,Ethermine,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+nicehash.com,NiceHash,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+supportxmr.com,SupportXMR,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+minexmr.com,MineXMR,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+2miners.com,2Miners,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+moneropool.com,MoneroPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+flexpool.io,Flexpool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+woolypooly.com,WoolyPooly,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+herominers.com,HeroMiners,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+hashvault.pro,HashVault,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+uupool.cn,UUPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+bsod.pw,BSOD,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+zergpool.com,ZergPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+cruxpool.com,CruxPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+p2pool.io,P2Pool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+unminable.com,UnMineable,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败

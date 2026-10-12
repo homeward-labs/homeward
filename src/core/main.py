@@ -175,7 +175,12 @@ class HomewardService:
         # 用 RLock：读路径内部会互相调用（如 export_report → get_stats）。
         self._state_lock = threading.RLock()
         self.kb = KnowledgeBase(str(KB_DIR))
-        self.behavior_matcher = BehaviorMatcher(str(KB_DIR / BEHAVIORS_JSON))
+        # 域名归属解析器须在行为匹配器之前建好：crypto_mining 等规则用
+        # destination_categories 证据键，需要它把每条流的目标域名归到 KB 类别。
+        self.attribution = DomainAttribution()
+        self.behavior_matcher = BehaviorMatcher(
+            str(KB_DIR / BEHAVIORS_JSON), attribution=self.attribution
+        )
         self.engine = DecisionEngine(self.kb, self.behavior_matcher)
 
         # AI 分析器（默认关闭）
@@ -218,7 +223,6 @@ class HomewardService:
         # 两者都可能在缺少本地数据源时"识别不出东西" —— 那是预期行为，
         # 由 blind_spots() 显式告诉 UI，而不是假装认得。
         self.device_registry = DeviceRegistry(self_ips=self._resolve_self_ips())
-        self.attribution = DomainAttribution()
         if self.config.get("load_system_devices", True):
             stat = self.device_registry.load_from_system()
             logger.info(f"devices loaded: leases={stat['leases']} arp={stat['arp']}")

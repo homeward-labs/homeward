@@ -109,13 +109,13 @@
     "window_seconds": 600,
     "pattern": {
       "direction": "out",
-      "destination_keywords": ["mining", "stratum", "xmr", "monero", "nanopool", "f2pool", "ethermine", "nicehash"],
+      "destination_categories": ["crypto_mining"],
       "min_connections": 3,
       "min_occurrences": 20,
       "total_bytes_min": 1
     },
     "action": "block_hard",
-    "explanation": "设备 {device_name} 在 {window_minutes} 分钟内连接了 {connections} 个疑似矿池地址（如 {destination}，归属 {organization}），累计 {occurrences} 次连接。IoT 设备算力低、防护弱，是僵尸网络招募挖矿的常见目标，典型症状还有设备发烫、变卡。",
+    "explanation": "设备 {device_name} 在 {window_minutes} 分钟内连接了 {connections} 个矿池地址（如 {destination}，归属 {organization}），累计 {occurrences} 次连接。这些域名均已归入知识库 crypto_mining 类别（NoCoin 精选矿池 + 主流矿池），判定不靠裸词子串匹配，不会再把 NTP / 正常站点误判成矿机。IoT 设备算力低、防护弱，是僵尸网络招募挖矿的常见目标，典型症状还有设备发烫、变卡。",
     "side_effects": "隔离后设备无法访问外网；建议同步检查固件版本，必要时恢复出厂设置重配"
   },
 
