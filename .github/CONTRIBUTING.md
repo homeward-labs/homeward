@@ -89,7 +89,7 @@ git push                            # pre-push 自动运行，命中闭源即终
 
 - 请提交到 `domains_homeward.csv`，默认以 **CC BY 4.0** 并入；
 - 提交即表示你授权家卫在其上加工、聚合，并对外商业授权**加工后的产物**
-  （正式 CLA 发布前，以 `src/knowledge_base/LICENSE` 第四节为准）；
+  （以 `src/knowledge_base/LICENSE` 第四节，即 CLA 公开摘要为准）；
 - 请提交真实观测到的设备域名归属，**不要**提交来自闭源数据库或带 license 限制的数据；
 - 署名通过 git 历史体现，使用方须按要求署名。
 
