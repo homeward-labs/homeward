@@ -76,6 +76,9 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 可选：显式指定 dnsmasq 日志路径（覆盖自动探测）；留空走自动探测。
       - DNS_LOG_PATH=${DNS_LOG_PATH:-}
+      # 本机身份（F6）：NAS/宿主自身 LAN IP。填了之后宿主设备归并「本机」、
+      # 自身系统流量（更新/备份）不再被误判为「突发大流量外传」。逗号分隔可多个。
+      - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
       # 许可令牌 / 设备标识落盘目录。**必须持久**：容器重建时若丢失，
       # 设备指纹会漂移 → 已激活的许可显示「设备不符」，用户被迫重新激活。
       # 这里指向已挂载的 ./data 卷内，随宿主机目录一起持久化。

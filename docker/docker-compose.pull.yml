@@ -7,6 +7,14 @@
 # 想锁定某版本可覆盖标签：HOMEWARD_IMAGE_TAG=v0.1.0 docker compose -f ... up -d
 #   （默认 :latest，即最新发布版）。
 #
+# 网络模式：默认 bridge + ports 映射（NAS / 通用 Linux）。软路由（iStoreOS / OpenWrt）
+#   建议 host 模式 —— bridge 下容器看不到宿主 ARP 表，设备 MAC / OUI 厂商识别会落空：
+#   HOMEWARD_NETWORK_MODE=host docker compose -f docker/docker-compose.pull.yml up -d
+#   （host 模式下 ports 映射被 Docker 忽略，端口由进程直接监听宿主，无需关心）
+#
+# 软路由/NAS 部署建议同时声明宿主自身 IP（F6 本机身份，防宿主自身流量被误判外传）：
+#   HOMEWARD_SELF_IPS=192.168.1.254 docker compose -f ... up -d
+#
 # 数据挂载沿用 HOMEWARD_DATA_HOST / HOMEWARD_LOGS_HOST 环境变量（安装脚本注入），
 # 与 docker-compose.istoreos.yml 行为一致 —— 升级不丢数据。
 #
@@ -17,6 +25,10 @@ services:
     image: ghcr.io/homeward-labs/homeward:${HOMEWARD_IMAGE_TAG:-latest}
     container_name: homeward
     restart: unless-stopped
+
+    # 默认 bridge（通用平台）。软路由设备用 host 模式见文件头注释（ARP 真实 MAC）。
+    # host 模式下 Docker 会忽略 ports 映射（仅打告警），不影响使用。
+    network_mode: ${HOMEWARD_NETWORK_MODE:-bridge}
 
     deploy:
       resources:
@@ -61,6 +73,8 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 显式指向 iStoreOS 的日志落点
       - DNS_LOG_PATH=/tmp/dnsmasq.log
+      # 本机身份（F6）：宿主自身 LAN IP。宿主设备归并「本机」+ 自身系统流量不误判外传。
+      - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
       # 许可令牌 / 设备标识落盘目录（随 /app/data 卷持久化，容器重建不丢指纹）
       - HOMEWARD_DATA_DIR=/app/data/homeward
       - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
