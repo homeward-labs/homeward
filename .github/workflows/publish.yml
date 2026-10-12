@@ -6,10 +6,16 @@ name: publish
 # 大量 ARM 开发板与 ARM NAS 是 arm64，部分老 NAS 是 armv7。只发 amd64 镜像，
 # 等于把一大半目标设备挡在门外（只能本地 build，对普通用户等于不可用）。
 #
-# 触发：打 v* tag 发布；也支持手动 workflow_dispatch。
+# 触发：
+#   1) push 到 main —— 只打 :latest（跟进开发主线，真机/用户随时拉到最新）；
+#   2) 打 v* tag   —— 打 :latest + 语义化版本号（正式发布）；
+#   3) 手动 workflow_dispatch。
+# ⚠️ 教训（2026-10-12 真机测试）：原先只在 v* tag 触发，push main 后 GHCR :latest
+#   停在旧版，真机拉「latest」拉到的一直是旧 UI —— 排查半天才发现是触发条件问题。
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 

@@ -27,6 +27,12 @@ services:
     container_name: homeward
     restart: unless-stopped
 
+    # host 网络（2026-10-11 真机实测定稿）：bridge 模式下容器有自己的网络栈，
+    # 看不到宿主 ARP 表 → 设备 MAC / OUI 厂商识别全部落空；host 模式直接共享
+    # 宿主网络栈，ARP 可见真实 MAC（见私有 CHANGELOG 第 64 批）。
+    # 端口由进程直接监听宿主 9595（HOST=0.0.0.0），无需 ports 映射。
+    network_mode: host
+
     deploy:
       resources:
         limits:
@@ -72,9 +78,12 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 显式指向 iStoreOS 的日志落点（也可靠代码自动探测，这里写死最稳）
       - DNS_LOG_PATH=/tmp/dnsmasq.log
+      # 本机身份（F6）：宿主自身 LAN IP，逗号分隔可多个。填了之后——
+      #   ① 宿主设备归并进「本机」，不再单列一台；
+      #   ② 路由器/NAS 自身的系统更新流量不再被误判为「突发大流量外传」。
+      # 不填则尽力用主机名自动判定（host 模式下通常也能解析到，显式最稳）。
+      - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
       # 许可令牌 / 设备标识落盘目录（随 ./data 卷持久化，容器重建不丢指纹）
       - HOMEWARD_DATA_DIR=/app/data/homeward
       - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
-    ports:
-      - "9595:9595"
     command: ["python", "-m", "src.ui.server"]

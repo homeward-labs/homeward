@@ -89,6 +89,8 @@ services:
       - HOMEWARD_AUTH_TOKEN=${HOMEWARD_AUTH_TOKEN:-}
       # 双容器里日志就在 /var/log/dnsmasq.log（dnsmasq 容器写、家卫读同一卷）
       - DNS_LOG_PATH=/var/log/dnsmasq.log
+      # 本机身份（F6）：宿主自身 LAN IP，防宿主自身流量被误判外传（详见 istoreos 版注释）
+      - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
     ports:
       - "9595:9595"
     command: ["python", "-m", "src.ui.server"]
