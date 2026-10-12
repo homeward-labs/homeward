@@ -181,6 +181,7 @@ EVIDENCE_KEYS = frozenset({
     "min_connections",        # 窗口内不同目的地数量
     "destination_pattern",    # 目标域名正则
     "destination_keywords",   # 目标域名关键词（要求落在标签边界）
+    "destination_categories",  # 目标域名必须命中知识库指定类别（如 crypto_mining）
     "subdomain_length_min",   # 最长标签长度（DNS 隧道）
     "dns_rate_min",           # DNS 查询速率（次/秒）
 })
@@ -270,6 +271,21 @@ def _dest_matches_keywords(flow: FlowRecord, keywords) -> bool:
     return False
 
 
+def _flow_category(flow: FlowRecord, resolver) -> Optional[str]:
+    """把一条流的目标域名归到知识库类别，归不到返回 None。
+
+    ``resolver`` 约定有 ``resolve(domain) -> 含 .category 属性的对象``（即
+    ``DomainAttribution``）。解析失败一律当未知，宁可漏报不能乱报。
+    """
+    domain = (flow.sni or flow.dns_query or "").strip().rstrip(".")
+    if not domain or resolver is None:
+        return None
+    try:
+        return getattr(resolver.resolve(domain), "category", None) or None
+    except Exception:  # 解析器任何异常都不该让判定崩，归为未知即可
+        return None
+
+
 class BehaviorMatcher:
     """行为特征规则匹配
 
@@ -295,13 +311,16 @@ class BehaviorMatcher:
       · ``_matches`` 自身对未知键一律返回 False —— 宁可漏报，不能乱报。
     """
 
-    def __init__(self, behaviors_path: str = None):
+    def __init__(self, behaviors_path: str = None, attribution=None):
         if behaviors_path is None:
             # 目录名是**下划线** knowledge_base，不是连字符 knowledge-base。
             # 早期这里写错过，结果是默认构造时行为库静默加载为空、所有行为类判定
             # （心跳信标 / 突发上传 / DNS 隧道……）无声失效 —— 故改为显式报错。
             behaviors_path = Path(__file__).parent.parent / KB_DIR_NAME / BEHAVIORS_JSON
         self.behaviors_path = Path(behaviors_path)
+        # 域名归属解析器（DomainAttribution 实例）：供 destination_categories 证据键
+        # 把每条流的目标域名归到知识库类别。没接就失败关闭——绝不靠关键词兜底。
+        self.attribution = attribution
         self.rules: list[dict] = []
         self.supported_rules: list[dict] = []
         self.unsupported_rules: list[dict] = []
@@ -495,6 +514,22 @@ class BehaviorMatcher:
         keywords = pattern.get("destination_keywords")
         if keywords:
             if not any(_dest_matches_keywords(f, keywords) for f in relevant):
+                return False
+
+        # 目标域名归类：必须命中知识库里的指定类别（如 crypto_mining）。
+        # 比 destination_keywords 子串匹配稳得多——不会再因 "pool"/"xmr" 等裸词
+        # 把 NTP、正常站点误判成矿池（见 2b73562 修的 NTP pool 误报，以及后续
+        # 把 crypto_mining 整体迁到 KB 类别的改动）。没接归因器时失败关闭，
+        # 绝不靠关键词兜底。
+        cats = pattern.get("destination_categories")
+        if cats:
+            if self.attribution is None:
+                return False
+            wanted = {str(c).strip().lower() for c in _as_list(cats)}
+            if not any(
+                ( _flow_category(f, self.attribution) or "" ).lower() in wanted
+                for f in relevant
+            ):
                 return False
 
         # DNS 隧道特征一：超长子域标签
