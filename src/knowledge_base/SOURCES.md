@@ -75,7 +75,7 @@ python scripts/split_domains_by_source.py --apply    # 写出两个拆分文件
   Windows 任务计划程序设「每日」触发器启 python 跑本脚本。
 - 缓存目录 `scripts/.feed_cache/`（已 gitignore），保存最近拉取的原始源，断网可回退。
 
-当前登记源（截至 v1.1.1）：
+当前登记源（feed 管道就绪，首次真实运行将 bump VERSION）：
 
 | feed id | license | 层 | 备注 |
 |---|---|---|---|
@@ -86,3 +86,28 @@ python scripts/split_domains_by_source.py --apply    # 写出两个拆分文件
 | `sinfonietta/social` | 未声明（保留版权） | homeward | 社交平台追踪 |
 | `blocklistproject/ads` | 自定义（需署名） | homeward | 广告 |
 | `blocklistproject/malware` | 自定义（需署名） | homeward | 恶意通信 |
+
+## 发布到内容源（publish_kb_source.py）
+
+feed 管道 / 手工改完 `domains_homeward.csv` 后，必须把最新、已签名的 bundle 推到内容源，
+客户端（默认源 `homeward-kb.782238788.workers.dev`）才能拉到。
+
+- 脚本：`scripts/publish_kb_source.py`
+- 本地先预览会发哪些文件（不联网）：
+  ```bash
+  python scripts/publish_kb_source.py --dry
+  ```
+- 真实发布到 Cloudflare KV（推荐）：
+  ```bash
+  export CF_ACCOUNT_ID=<你的账户ID>
+  export CF_API_TOKEN=<具有 KV 编辑权限的 Token>
+  export HOMEWARD_KB_SIGN_SEED=<kb_sign_seed.bin 的 hex>
+  python scripts/publish_kb_source.py --target kv --namespace-id <KV命名空间ID> --bump patch
+  # 发完回源验证
+  python scripts/publish_kb_source.py --verify-url https://homeward-kb.782238788.workers.dev
+  ```
+- 备选 R2：`--target r2 --bucket <桶名>`（走本机 `wrangler r2 object put`）。
+- Worker 模板：`workers/kb-source.js` + `workers/wrangler.toml`（`wrangler deploy` 即用）。
+- **密钥只走环境变量 / 参数**（CF_API_TOKEN、HOMEWARD_KB_SIGN_SEED），脚本内不写任何密钥。
+- 被发布的 bundle 白名单：`VERSION` / `domains.csv` / `behaviors.json` / `oui_prefixes.csv` /
+  `CHECKSUM` / `SIGNATURE` / `LICENSE`（与 `updater.py` 的 REQUIRED/OPTIONAL 清单一致）。

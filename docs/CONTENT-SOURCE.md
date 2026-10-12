@@ -126,8 +126,8 @@ sha256sum domains.csv behaviors.json > CHECKSUM
 
 1. **它是唯一「改一次、全网生效」的地方。** 客户端改动要等用户拉新镜像 / 升级包才生效；
    服务端改一行知识库，所有在线客户端下一轮就拿到。
-2. **它是当前最大的能力缺口。** 首发知识库仅 143 行，且默认内容源仓库尚未创建 —— 更新链路目前是 404，
-   客户端知识库会永远停在首发版。**这条链路不通，客户端做得再漂亮也只是静态快照。**
+2. **它是知识库生命线的总开关。** 首发知识库仅 143 行；内容源未打通时，客户端知识库会永远停在首发版——
+   **链路不通，客户端做得再漂亮也只是静态快照**（内容源现已打通，见下方「当前状态」）。
 3. **它是众包回路的入口。** 用户提交「某个域名归谁」→ PR 合并 → 自动成为新版本 → 全网下发。
    知识库能不能滚雪球，取决于这条回路，而不是取决于客户端 UI。
 4. **客户端刻意不存放、不展示**，所以服务端是内容唯一出口，优先级天然更高。
@@ -140,7 +140,7 @@ sha256sum domains.csv behaviors.json > CHECKSUM
 
 | 优先级 | 事项 | 说明 |
 |---|---|---|
-| **P0** | **内容源仓库**（`homeward-labs/knowledge-base`） | 数据文件 + `VERSION` + `CHECKSUM` + 签名 + 众包 Issue/PR 模板 + 自动生成校验和的 CI |
+| **P0** | **内容源（Cloudflare Worker）** | 数据文件 + `VERSION` + `CHECKSUM` + Ed25519 签名；发布脚本 `scripts/publish_kb_source.py` + Worker 模板 `workers/`；客户端默认源 `homeward-kb.782238788.workers.dev` 即由它喂数据 |
 | **P1** | 客户端消费侧加固 | 可配置源地址、签名校验（不只 checksum）、更新失败在 UI 上可见（不静默） |
 | **P2** | 分发渠道 | iStoreOS 商店包 `.ipk` / GHCR 预构建镜像 / 飞牛 `.fpk` |
 
@@ -152,8 +152,21 @@ sha256sum domains.csv behaviors.json > CHECKSUM
 
 ## 当前状态（如实）
 
-- ⬜ 内容源仓库 `homeward-labs/knowledge-base`：**尚未创建**（客户端默认指向它，当前返回 404，已按「失败即保持原状」降级）
+- 🟡 **内容源（Cloudflare Worker）**：现网已上线**静态资产型** Worker（`homeward-kb.782238788.workers.dev`，客户端默认源已配置；改库需重新 `wrangler deploy`）。
+  另备**KV 型**工具链已就绪——发布脚本 `scripts/publish_kb_source.py` + Worker 模板 `workers/kb-source.js` + `workers/wrangler.toml`；
+  启用后改库只推 KV、无需重部署 Worker。**待你执行**（若切 KV 型）：`wrangler deploy` 部署该 Worker（绑定 KV 命名空间）→ 跑发布脚本把 bundle 推进 KV。
 - ✅ 客户端更新器：已实现（版本比较 / 全或无替换 / checksum 校验 / 后台线程 / 7 天间隔）
 - ✅ 许可信任根：Ed25519 离线验签已实现；正式公钥通过 `HOMEWARD_LICENSE_PUBLIC_KEY_B64` 注入构建
-- ⬜ 签名校验（Ed25519）：尚未实现，当前仅 sha256 checksum
+- ✅ **签名校验（Ed25519）已实现**：`updater._verify_signature` 对内容源 `SIGNATURE` 验签；
+  设 `HOMEWARD_KB_REQUIRE_SIGNATURE=1` 即进入强制模式（无签名 / 验签失败一律拒绝更新），当前默认降级模式
 - ✅ 零遥测：更新器内无任何上报方法，已在代码注释中固化为红线
+
+### 自动发布（CI / 手动）
+
+- 改完知识库（`scripts/feed_pipeline.py` 拉源 或 手工改 `domains_homeward.csv`）→ 重算校验和并签名
+  （`scripts/make_kb_source.py --sign` 或统一走 `scripts/publish_kb_source.py`）；
+- `publish_kb_source.py` 组装分发 bundle（VERSION / domains.csv / behaviors.json / oui_prefixes.csv /
+  CHECKSUM / SIGNATURE / LICENSE）并上传到 Cloudflare KV（或 R2）；
+- 客户端下一轮（≤7 天）自动拉到新版本；源不可达则保持原状。
+- 密钥约定：签名种子经 `HOMEWARD_KB_SIGN_SEED`、Cloudflare Token 经 `CF_API_TOKEN` 等环境变量传入，
+  **绝不硬编码进脚本或仓库**。

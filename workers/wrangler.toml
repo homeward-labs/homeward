@@ -1,0 +1,28 @@
+# 家卫知识库内容源 · Cloudflare Worker 配置模板
+#
+# 用法：
+#   1. 把 account_id 换成你的 Cloudflare 账户 ID（dashboard 右下角）
+#   2. 在 Cloudflare 控制台建一个 KV 命名空间（如 homeward-kb），把它的 ID 填到下面的 id
+#   3. wrangler deploy
+#   4. 用 scripts/publish_kb_source.py --target kv --namespace-id <上面这个ID>
+#      把知识库 bundle 推进去；客户端（默认源 homeward-kb.<subdomain>.workers.dev）即可拉到
+#
+# 若你已有 homeward-kb.782238788.workers.dev 这个 Worker，只需让它绑定同一个 KV 命名空间，
+# 或把本文件 main 指向你的现有脚本，再跑发布脚本即可。
+
+name = "homeward-kb"
+main = "kb-source.js"
+compatibility_date = "2024-09-23"
+
+# 你的 Cloudflare 账户 ID
+account_id = "<YOUR_ACCOUNT_ID>"
+
+# KV 绑定：Worker 从这里读文件；发布脚本也往这里写
+kv_namespaces = [
+  { binding = "KB", id = "<YOUR_KV_NAMESPACE_ID>" }
+]
+
+# 可选：自定义域（需 Cloudflare 托管的域名）；不配则使用 *.workers.dev 默认子域
+# routes = [
+#   { pattern = "kb.homeward-labs.com", custom_domain = true }
+# ]
