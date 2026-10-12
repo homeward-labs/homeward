@@ -36,6 +36,7 @@
     },
     "action": "block_medium",
     "explanation": "设备 {device_name} 在 {start_time} 至 {end_time} 的 {duration_min} 分钟内，向 {destination}（{organization}）持续上传了约 {total_mb}MB 数据，共 {occurrences} 次传输。对一台只需偶尔上报状态的设备来说，这个量级更接近音视频或录像上传。建议先核对设备的云存储/云录像开关是否真的关掉了。",
+    "explain_routine": "设备 {device_name} 在 {start_time} 至 {end_time} 的 {duration_min} 分钟内，向 {destination}（{organization}）累计上传了约 {total_mb}MB（{occurrences} 次传输）。这条被判定为「常规大流量形态」：单终点、持续、大包，更像云同步 / 备份 / 视频串流这类正常行为，**不是典型数据泄露**。**置信度低**——仅凭流量形态无法排除「单终点持续外传」的可能，若你近期并未进行云同步、备份或视频通话等操作，仍建议核查该去向。",
     "side_effects": "阻断后该设备的云功能（云录像、远程查看）会失效；局域网本地画面不受影响"
   },
 

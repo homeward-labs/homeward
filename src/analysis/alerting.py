@@ -79,6 +79,38 @@ def _bulk_upload_is_benign(finding, attribution: dict) -> bool:
         return True
     return bool(attribution.get("category") in _BENIGN_BULK_CATEGORIES)
 
+
+# 方案 B：未知公网 bulk_upload 形态分级阈值。详见 docs/01-规划进度/误报诊断与未决清单。
+_BULK_ROUTINE_MIN_AVG_PACKET = 800.0   # 接近 MTU 的批量传输（云同步/备份/串流），非碎包心跳/C2
+_BULK_ROUTINE_MIN_SPAN_RATIO = 0.3     # 持续覆盖窗口相当比例，而非一瞬间突发
+
+
+def _bulk_upload_shape(finding) -> str:
+    """把**未知公网**的 bulk_upload 按流量形状分档（方案 B 核心）。
+
+    - ``routine``：单终点、持续、大包 —— 更像云同步 / 备份 / 视频串流等正常行为；
+    - ``suspicious``：突发 / 碎包 / 不规则 —— 更像数据泄露（或扫描）。
+
+    仅作置信度下调依据，**不替代**「目的地已知恶意类别」的判定（那由 crypto_mining /
+    c2_beacon / firmware_backdoor 等规则负责）。
+
+    局限（刻意的）：单终点持续大包的真外泄也会被判 ``routine`` —— 被动元数据无法
+    100% 区分，故 routine 档只降为低危并**声明弱证据**，而非静音。要彻底区分需
+    主动载荷检测，超出社区版范围。
+    """
+    ev = finding.evidence or {}
+    avg_packet = float(ev.get("avg_packet", 0) or 0)
+    span = float(ev.get("span_seconds", 0) or 0)
+    window = float(getattr(finding, "window_seconds", 600) or 600)
+    occurrences = int(ev.get("occurrences", 0) or 0)
+    if (
+        avg_packet >= _BULK_ROUTINE_MIN_AVG_PACKET
+        and span >= _BULK_ROUTINE_MIN_SPAN_RATIO * window
+        and occurrences >= 5
+    ):
+        return "routine"
+    return "suspicious"
+
 TEMPLATE_KEYS = frozenset({
     "device_name", "device_ip", "vendor", "device_type",
     "destination", "domain", "organization",
@@ -274,22 +306,33 @@ class AlertCenter:
             # （系统更新 / telemetry / NTP / 包下载）天然是大流量上传，不应当成数据外泄。
             src_is_self = bool(is_self_ip and is_self_ip(finding.src_ip))
 
-            # bulk_upload 误报收敛：
+            explanation_template = rule.get("explanation", "") or _fallback_explanation(finding)
+
+            # bulk_upload 误报收敛（方案 B 扩展）：
             # 1) 目的地是内网控制流量（组播/广播/链路本地/私网）——
             #    SSDP/mDNS 等局域网发现协议符合「单目的大量包」特征，绝不可能是真实
             #    数据外泄，直接降级，别把路由器自身和局域网设备的正常发现流量判成高危；
             # 2) 目的地归属为良性大流量类别（云备份/系统更新/CDN）降级为 low/warn；
-            # 3) 未知公网目的地保持原严重度（未知大流量上传更可疑，宁严勿松）；
-            # 4) 源是宿主自身（src_is_self）：路由器/NAS 自己更新自己，属预期行为，降级。
-            #    注意：仅降级 bulk_upload，其它规则不受影响 —— 宿主被入侵外联仍是真风险。
-            if finding.rule_id == "bulk_upload" and (
-                _bulk_upload_is_benign(finding, attribution) or src_is_self
-            ):
-                finding = replace(finding, severity="low", action="warn")
+            # 3) 源是宿主自身（src_is_self）：路由器/NAS 自己更新自己，属预期行为，降级；
+            # 4) 未知公网目的地 —— 方案 B 新增：**不靠信任豁免**，按流量形状分级：
+            #      · routine（单终点·持续·大包，像云同步/备份/串流）→ 降为 low/warn、
+            #        置信度 low，并改用「常规大流量」诚实文案（声明弱证据）；
+            #      · suspicious（突发/碎包/不规则）→ 保留原 high，不降级（更像泄露）。
+            #    仅降级 bulk_upload，其它规则不受影响；目的地已知恶意类别仍由其它规则覆盖。
+            if finding.rule_id == "bulk_upload":
+                if _bulk_upload_is_benign(finding, attribution) or src_is_self:
+                    finding = replace(finding, severity="low", action="warn")
+                else:
+                    shape = _bulk_upload_shape(finding)
+                    if shape == "routine":
+                        finding = replace(
+                            finding, severity="low", action="warn", confidence="low"
+                        )
+                        explanation_template = (
+                            rule.get("explain_routine") or explanation_template
+                        )
 
-            summary, missing = self.renderer.render(
-                rule.get("explanation", "") or _fallback_explanation(finding), context
-            )
+            summary, missing = self.renderer.render(explanation_template, context)
 
             key = f"{finding.rule_id}@{finding.src_ip}#{finding.destination}"
             existing = self._alerts.get(key)
