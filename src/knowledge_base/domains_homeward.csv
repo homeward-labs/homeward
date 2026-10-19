@@ -2092,3 +2092,29 @@ billboard.com,Billboard,news,low,Billboard 新闻门户,allow,
 rollingstone.com,Rolling Stone,news,low,Rolling Stone 新闻门户,allow,
 variety.com,Variety,news,low,Variety 新闻门户,allow,
 huajiao.com,花椒直播,ott,low,花椒直播 视频/OTT,allow,
+nanopool.org,Nanopool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+f2pool.com,F2Pool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+ethermine.org,Ethermine,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+nicehash.com,NiceHash,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+supportxmr.com,SupportXMR,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+minexmr.com,MineXMR,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+2miners.com,2Miners,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+moneropool.com,MoneroPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+flexpool.io,Flexpool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+woolypooly.com,WoolyPooly,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+herominers.com,HeroMiners,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+hashvault.pro,HashVault,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+uupool.cn,UUPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+bsod.pw,BSOD,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+zergpool.com,ZergPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+cruxpool.com,CruxPool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+p2pool.io,P2Pool,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+unminable.com,UnMineable,crypto_mining,high,主流加密货币矿池（补充 NoCoin 精选列表）,block_medium,矿池通信被拦截；设备对该矿池的挖矿/代理访问将失败
+easytier.cn,EasyTier,developer_service,high,EasyTier 去中心化组网官网,allow,
+easytier.top,EasyTier,developer_service,high,EasyTier 去中心化组网官网/公共节点,allow,
+public.easytier.top,EasyTier,developer_service,high,EasyTier 公共服务器（共享节点）,allow,
+linkease.com,Linkease (贝锐),developer_service,medium,贝锐 Linkease 异地组网服务,allow,
+tunnel.linkease.com,Linkease (贝锐),developer_service,medium,Linkease 隧道/中继服务,allow,
+126.net,NetEase,email,high,网易邮箱/126 邮箱服务域,allow,
+*.126.net,NetEase,email,medium,网易 126 邮箱子域,allow,
+xiaoba001.com,动想信息 (阿里文娱),analytics,medium,阿里文娱旗下动想信息服务域名（官网 quarkdrive.cn，用途待真机流量确认）,block_soft,国内服务遥测/统计与广告被拦截；不影响核心业务功能
