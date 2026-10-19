@@ -225,6 +225,75 @@ class TestDeviceRegistry(unittest.TestCase):
         self.assertEqual(dev.mac, "dd:ee:ff:00:00:20")
         self.assertEqual(dev.vendor_cn, "小米")
 
+    # ---- IP 兜底设备的 MAC 回填（2026-10-19 修复：运行期观测先于租约/ARP 到达）----
+
+    def test_arp_backfills_mac_for_ip_only_device(self):
+        """先 observe_ip 建 IP 兜底设备，再 load_arp 应回填 MAC + 厂商并迁移主键"""
+        reg = self.build()
+        reg.observe_ip("192.168.1.20", ts=1000.0)
+        self.assertIsNone(reg.get_by_ip("192.168.1.20").mac)
+        reg.load_arp(SAMPLE_ARP)
+        dev = reg.get_by_ip("192.168.1.20")
+        self.assertEqual(dev.key, "dd:ee:ff:00:00:20")
+        self.assertEqual(dev.mac, "dd:ee:ff:00:00:20")
+        self.assertEqual(dev.vendor_cn, "小米")
+        # 同一台设备不能拆成两台：IP 兜底条目必须撤销
+        self.assertNotIn("192.168.1.20", reg.devices)
+        # SAMPLE_ARP 里 .10 是另一台（aa:bb:cc），共两台
+        self.assertEqual(len(reg.list_devices()), 2)
+
+    def test_arp_upgrade_keeps_domain_observations(self):
+        """IP 兜底设备攒下的域名观测，升级 MAC 主键后必须还在（不丢证据）"""
+        reg = self.build()
+        ip_dev = reg.observe_ip("192.168.1.20", ts=1000.0)
+        ip_dev.observe_domain("track.io.mi.com")
+        reg.load_arp(SAMPLE_ARP)
+        dev = reg.get_by_ip("192.168.1.20")
+        self.assertEqual(dev.domains.get("track.io.mi.com"), 1)
+
+    def test_arp_merges_ip_device_into_existing_mac_device(self):
+        """同 MAC 设备已在台账时，IP 兜底设备的观测要并进去，而不是各立一台"""
+        reg = self.build()
+        reg.load_leases(SAMPLE_LEASES)  # aa:bb:cc:00:11:22 ↔ 192.168.1.10
+        ip_dev = reg.observe_ip("192.168.1.30", ts=1000.0)
+        ip_dev.observe_domain("abc.example.com")
+        reg.load_arp(
+            "IP address       HW type     Flags       HW address            Mask     Device\n"
+            "192.168.1.30     0x1         0x2         aa:bb:cc:00:11:22     *        br-lan\n")
+        dev = reg.get_by_ip("192.168.1.30")
+        self.assertEqual(dev.key, "aa:bb:cc:00:11:22")
+        self.assertEqual(dev.domains.get("abc.example.com"), 1)
+        self.assertNotIn("192.168.1.30", reg.devices)
+        self.assertEqual(sorted(dev.ips), ["192.168.1.10", "192.168.1.30"])
+
+    def test_lease_backfills_mac_for_ip_only_device(self):
+        """租约路径同样要回收 IP 兜底设备（DHCP 设备是家庭网络主体）"""
+        reg = self.build()
+        reg.observe_ip("192.168.1.10", ts=1000.0)
+        reg.load_leases(SAMPLE_LEASES)
+        dev = reg.get_by_ip("192.168.1.10")
+        self.assertEqual(dev.key, "aa:bb:cc:00:11:22")
+        self.assertEqual(dev.hostname, "Bedroom-Cam")
+        self.assertEqual(dev.vendor_cn, "海康威视")
+        self.assertNotIn("192.168.1.10", reg.devices)
+
+    def test_repeated_refresh_is_idempotent(self):
+        """周期刷新必须幂等：重复加载不重复建档、不丢身份、不改结构"""
+        reg = self.build()
+        reg.observe_ip("192.168.1.20", ts=1000.0)
+        reg.load_arp(SAMPLE_ARP)
+        reg.load_leases(SAMPLE_LEASES)
+
+        def snapshot():
+            return {d.key: (sorted(d.ips), d.mac, d.vendor_cn, d.hostname)
+                    for d in reg.list_devices()}
+
+        first = snapshot()
+        # 模拟 30s 后的又一轮刷新
+        reg.load_arp(SAMPLE_ARP)
+        reg.load_leases(SAMPLE_LEASES)
+        self.assertEqual(first, snapshot())
+
     def test_blind_spot_when_no_oui_table(self):
         reg = device.DeviceRegistry(oui_table={}, leases_paths=[], arp_path="")
         reg.load_leases(SAMPLE_LEASES)

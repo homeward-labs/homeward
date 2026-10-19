@@ -416,8 +416,14 @@ class DeviceRegistry:
                 continue  # 宿主自身 IP 不单独建档，归并到「本机」设备
             dev = self.devices.get(lh.mac)
             if dev is None:
-                dev = Device(key=lh.mac, mac=lh.mac, first_seen=now, last_seen=now)
-                self.devices[lh.mac] = dev
+                # 该 IP 可能先被 observe_ip 按「IP 兜底」建档（运行期观测早于本次加载）——
+                # 必须升级回 MAC 主键，否则同一台设备被拆成两台，换 IP 后更对不上。
+                ip_dev = self._ip_keyed_device(lh.ip)
+                if ip_dev is not None:
+                    dev = self._attach_mac(ip_dev, lh.mac)
+                else:
+                    dev = Device(key=lh.mac, mac=lh.mac, first_seen=now, last_seen=now)
+                    self.devices[lh.mac] = dev
             if lh.hostname:
                 dev.hostname = lh.hostname
             dev.ips.add(lh.ip)
@@ -434,9 +440,19 @@ class DeviceRegistry:
         for ip, mac in mapping.items():
             if ip in self._self_ips:
                 continue  # 宿主自身 IP 不单独建档，归并到「本机」设备
+            # 该 IP 可能先被 observe_ip 按「IP 兜底」建档（运行期观测早于本次加载）
+            ip_dev = self._ip_keyed_device(ip)
             if mac in self.devices:
-                self.devices[mac].ips.add(ip)
+                if ip_dev is not None:
+                    self._attach_mac(ip_dev, mac)
+                else:
+                    self.devices[mac].ips.add(ip)
                 self._ip_index[ip] = mac
+                continue
+            if ip_dev is not None:
+                # ARP 给了 MAC：就地迁移主键（或并入既有同 MAC 设备），观测历史不丢
+                self._attach_mac(ip_dev, mac)
+                n += 1
                 continue
             # ARP 里出现的设备未必有租约（静态 IP / 未走 DHCP），也建台账
             dev = Device(key=mac, mac=mac, first_seen=now, last_seen=now)
@@ -495,6 +511,9 @@ class DeviceRegistry:
         if dev is None:
             dev = Device(key=ip, first_seen=now, last_seen=now)
             self.devices[ip] = dev
+            # IP 兜底设备也要进索引：_ip_index 的约定是「每个已知 IP → 其设备主键」，
+            # 漏写会让后续按索引查找（如租约/ARP 刷新时的身份升级）看不到它。
+            self._ip_index[ip] = ip
         dev.ips.add(ip)
         dev.last_seen = now
         return dev
@@ -593,6 +612,72 @@ class DeviceRegistry:
         return spots
 
     # ---------- 内部 ----------
+
+    def _ip_keyed_device(self, ip: str) -> Optional[Device]:
+        """取某个 IP 当前对应的「IP 兜底」设备（无 MAC 身份），没有则返回 None。
+
+        用于租约 / ARP 刷新时，把运行期先按 IP 建档的设备升级回 MAC 主键。
+        """
+        key = self._ip_index.get(ip)
+        if key:
+            dev = self.devices.get(key)
+            if dev is not None and dev.mac is None and dev.key != _SELF_DEVICE_KEY:
+                return dev
+            # 索引指向有 MAC 身份的正式设备（或本机）—— 没有可升级的兜底条目
+            return None
+        # 索引缺失时按 IP 直接键兜底（observe_ip 的建档路径；防御索引被外部清空）
+        dev = self.devices.get(ip)
+        if dev is not None and dev.mac is None and dev.key != _SELF_DEVICE_KEY:
+            return dev
+        return None
+
+    def _attach_mac(self, ip_dev: Device, mac: str) -> Device:
+        """给一台「IP 兜底」设备补上 MAC 身份：能合并则合并，否则就地迁移主键。
+
+        为什么需要这一步
+        ----------------
+        采集线程随时可能把一个新 IP 写进台账（observe_ip / observe_flow），
+        而 DHCP 租约 / ARP 是**周期性刷新**的。若不把「先按 IP 建档」的设备
+        升级回 MAC 主键，同一台设备会被拆成两台（一台有厂商主机名、一台裸 IP），
+        域名观测也裂成两半 —— 真机上表现为「设备列表一片裸 IP、厂商不显示」。
+
+        合并语义（与既有 MAC 设备相遇时）：IP 集合取并集、域名计数相加、
+        主机名择旧补缺、first_seen 取早、last_seen 取晚；域名总数仍受
+        MAX_DOMAINS_PER_DEVICE 约束（保老观测，新域名不进）。
+
+        返回承载该设备的最终对象（MAC 主键）。
+        """
+        target = self.devices.get(mac)
+        if target is not None and target is not ip_dev:
+            # 已有同 MAC 的正式设备：把 IP 兜底设备的观测并进去，再撤掉兜底条目
+            target.ips |= ip_dev.ips
+            for d, c in ip_dev.domains.items():
+                if d not in target.domains and len(target.domains) >= MAX_DOMAINS_PER_DEVICE:
+                    continue  # 已满：保老观测，新域名不进（内存有界）
+                target.domains[d] = target.domains.get(d, 0) + c
+            if not target.hostname and ip_dev.hostname:
+                target.hostname = ip_dev.hostname
+            if ip_dev.first_seen and (not target.first_seen
+                                      or ip_dev.first_seen < target.first_seen):
+                target.first_seen = ip_dev.first_seen
+            if ip_dev.last_seen > target.last_seen:
+                target.last_seen = ip_dev.last_seen
+            if ip_dev.key in self.devices:
+                del self.devices[ip_dev.key]
+            for ip in target.ips:
+                self._ip_index[ip] = target.key
+            self._resolve_identity(target)
+            return target
+        # 没有同 MAC 的正式设备：就地迁移主键 IP → MAC，观测原样保留
+        if ip_dev.key in self.devices:
+            del self.devices[ip_dev.key]
+        ip_dev.key = mac
+        ip_dev.mac = mac
+        self.devices[mac] = ip_dev
+        for ip in ip_dev.ips:
+            self._ip_index[ip] = mac
+        self._resolve_identity(ip_dev)
+        return ip_dev
 
     def _resolve_identity(self, dev: Device) -> None:
         """按「厂商 → 主机名」补全设备的厂商与品类，互不覆盖已有值"""
