@@ -68,6 +68,12 @@ services:
       # iStoreOS / OpenWrt 系统 dnsmasq 日志（只读）。默认 /tmp/dnsmasq.log；
       # 若你改过 logfacility，把这里的源路径一并改掉。
       - /tmp/dnsmasq.log:/tmp/dnsmasq.log:ro
+      # iStoreOS / OpenWrt dnsmasq DHCP 租约（只读）：设备发现「MAC + IP + 主机名」
+      # 三件套的主要来源（DEFAULT_LEASES_PATHS 的第一个路径）。
+      # 不挂它，容器里只剩 ARP 一条路 —— 没主动通信过的设备永远停在「裸 IP」，
+      # 厂商 / 品类识别全部落空。租约写在别处的话，改这里的源路径即可
+      # （文件不存在时 Docker 会建一个空目录占位，代码按读失败静默跳过，无害）。
+      - /tmp/dhcp.leases:/tmp/dhcp.leases:ro
     environment:
       - HOST=0.0.0.0
       - PORT=9595

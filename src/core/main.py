@@ -227,6 +227,28 @@ class HomewardService:
             stat = self.device_registry.load_from_system()
             logger.info(f"devices loaded: leases={stat['leases']} arp={stat['arp']}")
 
+        # 设备身份周期刷新（W2 修复，2026-10-19 真机教训）：
+        # DHCP 租约 / ARP 表在运行期持续变化（新设备接入、静态 IP 设备首次通信、
+        # 租约续期换 IP），而身份数据原先只在 __init__ 读过一次 —— 先被
+        # observe_ip 按 IP 兜底建档的设备永远拿不到 MAC，厂商 / 品类识别全部落空
+        # （真机表现：设备列表一片裸 IP，UI 只能显示 IP）。
+        # 这里起一个低频刷新线程重读租约 + ARP：既补全新接入设备的身份，也给
+        # IP 兜底设备回填 MAC（device.py 的 load_arp / load_leases 已支持
+        # 「主键迁移 + 观测合并」，重复刷新幂等）。
+        # 🔴 为什么不起在 async start() 里：run_server 的生产路径从不调用 start()
+        # （见 ui/server.py 与 test_suggestion_persistence.py 的同款注释 ——
+        # 「service.start() 从未被调用」正是 suggested_rules 重启清零事故的根因），
+        # 挂在从未被调用的方法上 = 刷新永远不生效。故在此直接起，可显式停止。
+        self._device_refresh_interval = float(
+            self.config.get("device_refresh_interval", 30))
+        self._device_refresh_stop = threading.Event()
+        self._device_refresh_thread: Optional[threading.Thread] = None
+        # 上次刷新时的「台账结构签名」（总台数, 已识别 MAC 台数）：只在变化时打日志，
+        # 否则 30s 一行会把路由器的 syslog 淹掉。
+        self._device_refresh_sig: Optional[tuple[int, int]] = None
+        if self.config.get("load_system_devices", True):
+            self.start_device_refresh()
+
         # 统计
         self.stats = {
             "flows_processed": 0,
@@ -288,8 +310,58 @@ class HomewardService:
         """停止服务"""
         logger.info("Stopping 家卫...")
         self.kb_updater.stop()
+        self.stop_device_refresh()
         self._save_suggestions()
         logger.info("家卫 stopped")
+
+    # ---------------------------------------------------------------- W2 设备身份刷新
+
+    def start_device_refresh(self) -> None:
+        """启动设备身份周期刷新线程（幂等）。
+
+        interval <= 0 表示关闭刷新（测试 / 演示可用）；已在跑则直接返回。
+        """
+        if self._device_refresh_interval <= 0:
+            return
+        if self._device_refresh_thread is not None and self._device_refresh_thread.is_alive():
+            return
+        self._device_refresh_stop.clear()
+        t = threading.Thread(target=self._device_refresh_loop,
+                             name="homeward-device-refresh", daemon=True)
+        self._device_refresh_thread = t
+        t.start()
+        logger.info("设备身份刷新已启动（每 %.0fs 重读 DHCP 租约 / ARP）",
+                    self._device_refresh_interval)
+
+    def stop_device_refresh(self) -> None:
+        """停止设备身份刷新线程（幂等；未启动也安全）。"""
+        self._device_refresh_stop.set()
+        t = self._device_refresh_thread
+        if t is not None and t.is_alive():
+            t.join(timeout=5)
+        self._device_refresh_thread = None
+
+    def _device_refresh_loop(self) -> None:
+        """周期重读租约 / ARP：补全新设备身份，把 IP 兜底设备升级回 MAC 主键。
+
+        失败不退出线程：采集文件可能暂时不可读（路由器重启中、leases 被清空），
+        下个周期再试即可。单次失败不应演变成「从此再不识别设备」。
+        """
+        while not self._device_refresh_stop.wait(self._device_refresh_interval):
+            try:
+                with self._state_lock:
+                    stat = self.device_registry.load_from_system()
+                    devices = self.device_registry.devices
+                    total = len(devices)
+                    with_mac = sum(1 for d in devices.values() if d.mac)
+                sig = (total, with_mac)
+                if sig != self._device_refresh_sig:
+                    logger.info(
+                        "设备身份刷新：租约 %d / ARP %d → 台账 %d 台（%d 台已识别 MAC）",
+                        stat["leases"], stat["arp"], total, with_mac)
+                    self._device_refresh_sig = sig
+            except Exception:
+                logger.exception("设备身份刷新失败（下个周期重试）")
 
     def process_flow(self, flow: FlowRecord) -> Decision:
         """
