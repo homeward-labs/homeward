@@ -507,12 +507,13 @@ function renderUpgrade() {
   if (valid) {
     const until = fmtTime(status.valid_until);
     const days = status.days_remaining;
+    const isTrial = !!status.is_trial;
     const warn = days <= 7
-      ? `<div class="note">订阅将在 ${days} 天后到期，记得续费。</div>` : "";
+      ? `<div class="note">${isTrial ? "试用" : "订阅"}将在 ${days} 天后到期${isTrial ? "，到期后拦截停用、观测不受影响" : ""}，记得续费。</div>` : "";
     statusCard = `<div class="card">
       <div class="item-head">
         <span class="sev" style="background:var(--ok)">已激活</span>
-        <span class="item-title">${esc(status.edition === "pro" ? "专业版" : "标准版")}</span>
+        <span class="item-title">${esc(status.edition === "pro" ? "专业版" : "标准版")}${isTrial ? " · 30 天试用中" : ""}</span>
         <span class="small muted">订单 ${esc(status.order_id || "—")}</span>
       </div>
       <div class="kv" style="margin-top:8px"><span class="k">有效期至</span>
@@ -527,9 +528,12 @@ function renderUpgrade() {
       </div>
     </div>`;
   } else {
+    const isTrial = !!status.is_trial;
     const reasonText = {
       none: "当前为社区版：只做「看见」，实际拦截属标准版能力。",
-      expired: "许可已过期，请续费后重新导入新令牌。",
+      expired: isTrial
+        ? "试用已到期：拦截已停用，观测与解释不受影响。续费后导入新令牌即可恢复。"
+        : "订阅已过期，请续费后重新导入新令牌。",
       invalid: "本地许可无效（可能被篡改或签发密钥不匹配）。",
       revoked: "该许可已被吊销（如已退款）。如有疑问请联系支持。",
     }[reason] || "当前为社区版。";
@@ -540,6 +544,8 @@ function renderUpgrade() {
       </div>
       <div class="item-body small muted">${esc(reasonText)}</div>
       <div class="item-foot">
+        ${reason === "expired"
+          ? '<button class="btn btn-sm" type="button" data-goto-pay>续费解锁</button>' : ""}
         <button class="btn btn-sm" type="button" disabled
           title="标准版许可服务上线后启用；本期仅预埋占位与接口契约（见防伪设计 §4.7）">备份许可</button>
       </div>
@@ -700,6 +706,14 @@ document.getElementById("view").addEventListener("click", async (e) => {
   }
 
   // —— 升级面板 ——
+  const gotoPayBtn = e.target.closest("[data-goto-pay]");
+  if (gotoPayBtn) {
+    // 到期回落的「续费解锁」（EDITIONS 试用条款 3）：滚到付款码区，不跳外部链接
+    const box = document.getElementById("qr-box");
+    if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
   const qrBtn = e.target.closest("[data-qr-gen]");
   if (qrBtn) {
     const url = (document.getElementById("order-url").value || "").trim();
@@ -731,7 +745,7 @@ document.getElementById("view").addEventListener("click", async (e) => {
       if (!res.ok || !d.saved) throw new Error(d.error || "导入失败");
       const s = d.status || {};
       state.flash = s.valid
-        ? `许可已导入：${s.edition === "pro" ? "专业版" : "标准版"}（剩余 ${s.days_remaining} 天）`
+        ? `许可已导入：${s.edition === "pro" ? "专业版" : "标准版"}${s.is_trial ? " · 30 天试用" : ""}（剩余 ${s.days_remaining} 天）`
         : "令牌已保存但校验未通过，请确认是否过期或被吊销。";
       await loadAll();
     } catch (err) {
