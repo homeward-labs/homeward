@@ -37,7 +37,8 @@ def _sign_token(seed: bytes, payload: dict) -> str:
     return f"{head}.{base64.b64encode(sig).decode()}"
 
 
-def _payload(valid_days: int = 365, device_fp: str = "fp-test-001") -> dict:
+def _payload(valid_days: int = 365, device_fp: str = "fp-test-001",
+             order_id: str = "TEST-S0-3") -> dict:
     now = int(time.time())
     return {
         "kid": "2026-10",
@@ -46,7 +47,7 @@ def _payload(valid_days: int = 365, device_fp: str = "fp-test-001") -> dict:
         "features": ["dns_block"],
         "issued_at": now,
         "valid_until": now + valid_days * 86400,
-        "order_id": "TEST-S0-3",
+        "order_id": order_id,
         "nonce": os.urandom(8).hex(),
     }
 
@@ -149,6 +150,41 @@ class TestLicenseApi(unittest.TestCase):
         self.assertFalse(lic["valid"])
         self.assertEqual(lic["reason"], "expired")
         self.assertEqual(lic["days_remaining"], 0)
+
+    # ---- S1-2 试用链路（EDITIONS 试用条款：order_id=trial-* 的时间受限标准版许可）----
+
+    def test_trial_token_recognized(self):
+        """条款1：试用令牌 → is_trial=True、edition=standard、≈30 天。"""
+        token = _sign_token(self._seed, _payload(
+            valid_days=30, device_fp=self._fp, order_id="trial-abc123"))
+        st, body = self._post_form("/api/activate", {"token": token})
+        self.assertEqual(st, 200)
+        lic = self._license_status()
+        self.assertTrue(lic["valid"], f"试用令牌未通过: {lic}")
+        self.assertTrue(lic["is_trial"], f"试用令牌未被识别: {lic}")
+        self.assertEqual(lic["edition"], "standard")
+        self.assertGreaterEqual(lic["days_remaining"], 29)
+        self.assertLessEqual(lic["days_remaining"], 30)
+
+    def test_expired_trial_keeps_trial_marker(self):
+        """条款3：到期回落时 UI 要区分「试用已到期」与「订阅已过期」
+        → 无效分支也必须带 is_trial。"""
+        token = _sign_token(self._seed, _payload(
+            valid_days=-1, device_fp=self._fp, order_id="trial-xyz789"))
+        self._post_form("/api/activate", {"token": token})
+        lic = self._license_status()
+        self.assertFalse(lic["valid"])
+        self.assertEqual(lic["reason"], "expired")
+        self.assertTrue(lic["is_trial"], f"过期试用令牌丢失试用标记: {lic}")
+
+    def test_paid_token_is_not_trial(self):
+        """付费令牌（order_id 非 trial-*）→ is_trial=False。"""
+        token = _sign_token(self._seed, _payload(
+            device_fp=self._fp, order_id="WX-PAID-20261020"))
+        self._post_form("/api/activate", {"token": token})
+        lic = self._license_status()
+        self.assertTrue(lic["valid"])
+        self.assertFalse(lic["is_trial"], f"付费令牌被误标为试用: {lic}")
 
     # ---- 边界 ----
 

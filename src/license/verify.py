@@ -165,6 +165,16 @@ def days_remaining(payload: dict) -> int:
         return 0
 
 
+def is_trial(payload: dict) -> bool:
+    """试用许可标记（EDITIONS 试用条款 1：试用 = ``order_id=trial-*`` 的时间受限标准版许可）。
+
+    为什么无效分支也要带这个标记：到期回落时 UI 必须区分「试用已到期」
+    （条款 3：拦截停用、观测不受影响、引导续费）与「订阅已过期」，
+    所以 status_summary 的两个分支都要输出 is_trial。
+    """
+    return str((payload or {}).get("order_id") or "").startswith("trial-")
+
+
 def status_summary(token: str, expected_device_fp: str = None) -> dict:
     """给 UI 用的摘要：是否有效、版本、剩余天数、吊销/过期原因。"""
     payload = verify_token(token, expected_device_fp=expected_device_fp)
@@ -175,13 +185,15 @@ def status_summary(token: str, expected_device_fp: str = None) -> dict:
         if p is not None:
             if int(p.get("valid_until", 0)) < int(time.time()):
                 reason = "expired"
-        return {"valid": False, "reason": reason, "edition": None, "days_remaining": 0}
+        return {"valid": False, "reason": reason, "edition": None,
+                "days_remaining": 0, "is_trial": is_trial(p)}
     return {
         "valid": True,
         "reason": "ok",
         "edition": payload.get("edition"),
         "features": payload.get("features", []),
         "order_id": payload.get("order_id"),
+        "is_trial": is_trial(payload),
         "days_remaining": days_remaining(payload),
         "valid_until": payload.get("valid_until"),
     }
