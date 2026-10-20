@@ -151,6 +151,16 @@ class TestLicenseApi(unittest.TestCase):
         self.assertEqual(lic["reason"], "expired")
         self.assertEqual(lic["days_remaining"], 0)
 
+    # ---- S1-1 手动签发链路：设备指纹可达（客户→作者的绑定依据）----
+
+    def test_status_includes_device_fp(self):
+        """手动签发时客户需要把设备指纹发给作者（EDITIONS 试用条款 2）——
+        status 响应必须带 device_fp，且为 64 位 sha256 十六进制（非原始硬件信息）。"""
+        _st, body = self._get_json("/api/license/status")
+        fp = body.get("device_fp") or ""
+        self.assertEqual(len(fp), 64, f"device_fp 应为 64 位 sha256: {fp!r}")
+        int(fp, 16)  # 非十六进制会抛错
+
     # ---- S1-2 试用链路（EDITIONS 试用条款：order_id=trial-* 的时间受限标准版许可）----
 
     def test_trial_token_recognized(self):

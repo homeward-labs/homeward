@@ -16,7 +16,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 
 from license.ed25519 import sign_message, derive_public, verify_signature  # noqa: E402
-from license.verify import canonical, verify_token, is_revoked, days_remaining  # noqa: E402
+from license.verify import (  # noqa: E402
+    _DEV_PUBLIC_KEY,
+    canonical,
+    verify_token,
+    is_revoked,
+    days_remaining,
+)
 
 
 def _sign_token(seed: bytes, payload: dict) -> str:
@@ -48,6 +54,36 @@ def test_ed25519_basic():
         assert verify_signature(sig, msg, pub)
         bad = bytearray(sig); bad[0] ^= 0xFF
         assert not verify_signature(bytes(bad), msg, pub)
+
+
+# ── 跨实现互操作（签发端 cryptography ↔ 客户端纯 stdlib）──
+# 金样向量：由私有目录 license/dev_private_key.bin（Ed25519 Raw 32B 种子）经
+# cryptography 库签出，客户端用本仓库纯 stdlib 的 verify_signature 验。
+# 意义：真实签发器（sign_manual.py，cryptography）与社区版客户端（零第三方依赖）
+# 必须走同一条 canonical 约定——S1-1 手动签发链路的根基，本向量把它固化为回归。
+_GOLDEN_PAYLOAD = {
+    "kid": "2026-10",
+    "edition": "standard",
+    "device_fp": "golden-vector-fp-001",
+    "features": ["dns_block"],
+    "issued_at": 1760937600,
+    "valid_until": 1792473600,
+    "order_id": "GOLDEN-VECTOR-001",
+    "nonce": "a1b2c3d4e5f60718",
+}
+_GOLDEN_SIG_B64 = (
+    "WIefzBjPcEn09/kzRPRuZ31LijaWBOm6GDINMhONlD7tO7K6jIyq7t07"
+    "qEBsDpOKD1H4SAqVL1xF1FoWdsPyDw=="
+)
+
+
+def test_golden_vector_interop():
+    """cryptography 签发的令牌必须能被纯 stdlib 客户端验过（S1-1 手动签发链路）。"""
+    sig = base64.b64decode(_GOLDEN_SIG_B64)
+    assert verify_signature(sig, canonical(_GOLDEN_PAYLOAD), _DEV_PUBLIC_KEY)
+    # 防呆：payload 改一个字段（edition 抬级）必须验不过——证明不是「怎么签都过」
+    tampered = dict(_GOLDEN_PAYLOAD, edition="pro")
+    assert not verify_signature(sig, canonical(tampered), _DEV_PUBLIC_KEY)
 
 
 def test_token_roundtrip():
