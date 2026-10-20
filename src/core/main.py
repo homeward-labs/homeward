@@ -725,16 +725,22 @@ class HomewardService:
 
     def describe_domain(self, domain: str) -> dict:
         """域名归属视图；未知时 organization 为 None，上层应把它交给未知域名列表"""
-        r = self.attribution.resolve(domain or "")
-        return {
-            "domain": r.domain,
-            "organization": r.organization,
-            "category": r.category,
-            "confidence": r.confidence,
-            "known": r.known,
-            "side_effects": r.side_effects,
-            "explain": r.explain(),
-        }
+        # attribution 无自有锁，resolve() 会写 _cache 字典、缓存满（4096）时整体 clear()
+        # —— 无锁调用方（/api/domain）与持锁读方（get_destinations 的 resolved_view、
+        # attribution_coverage 的 cached_domains、snapshot_observations 的 cached_results）
+        # 并发时，clear() 撞上迭代会抛 "dictionary changed size during iteration"。
+        # 包上主锁后 _cache 的读写即被序列化（RLock，嵌套调用安全）。
+        with self._state_lock:
+            r = self.attribution.resolve(domain or "")
+            return {
+                "domain": r.domain,
+                "organization": r.organization,
+                "category": r.category,
+                "confidence": r.confidence,
+                "known": r.known,
+                "side_effects": r.side_effects,
+                "explain": r.explain(),
+            }
 
     # ---------------------------------------------------------------- F7 域名归类
 
@@ -842,13 +848,18 @@ class HomewardService:
 
     def get_blind_spots(self) -> list[str]:
         """当前部署形态下，家卫**看不见 / 认不出**的地方 —— UI 必须展示"""
-        spots = list(self.device_registry.blind_spots())
-        cov = self.attribution_coverage()
-        if cov["total"] and cov["hit_rate"] < 0.8:
-            spots.append(f"域名归属覆盖偏低：观测到的 {cov['total']} 个域名里 "
-                         f"只有 {cov['hit']} 个能在知识库中查到组织，"
-                         f"其余 {cov['total'] - cov['hit']} 个仍属未知（可手动触发 AI 分析）。")
-        return spots
+        # device_registry.blind_spots() 要遍历设备台账，而采集线程（process_flow /
+        # 租约刷新）会并发增删设备 —— 不持锁遍历可能抛
+        # "dictionary changed size during iteration"（export_report 读路径实测复现）。
+        # _state_lock 是 RLock，下方 attribution_coverage() 再取锁嵌套安全。
+        with self._state_lock:
+            spots = list(self.device_registry.blind_spots())
+            cov = self.attribution_coverage()
+            if cov["total"] and cov["hit_rate"] < 0.8:
+                spots.append(f"域名归属覆盖偏低：观测到的 {cov['total']} 个域名里 "
+                             f"只有 {cov['hit']} 个能在知识库中查到组织，"
+                             f"其余 {cov['total'] - cov['hit']} 个仍属未知（可手动触发 AI 分析）。")
+            return spots
 
     def attribution_coverage(self) -> dict:
         """归属覆盖率：衡量知识库够不够用，也是社区共建的进度指标。
@@ -868,12 +879,65 @@ class HomewardService:
             observed |= self.attribution.cached_domains()
             # 只保留「真正的域名」：排除 IP 直连 / .lan 主机名 / 空串
             observed = {d for d in observed if d and _is_observable_domain(d)}
-        rep = self.attribution.coverage(observed)
+            # coverage() 内部会对首见域名 resolve 并写 attribution._cache（无自有锁）——
+            # 与上面的台账遍历同属共享状态，必须在锁内序列化。曾经的疏漏：该调用在
+            # with 块外执行，CPython 上因读方 C 原子而观测不到，free-threaded 下会相撞。
+            rep = self.attribution.coverage(observed)
         return {
             "total": rep.total,
             "hit": rep.hit,
             "hit_rate": rep.rate,
             "by_parent": rep.by_parent,
+        }
+
+    def visibility_coverage(self) -> dict:
+        """设备观测覆盖比：衡量「看得见」—— 已发现设备里有多少留下过域名级观测。
+
+        与 :func:`attribution_coverage`（知识库厚度，衡量「看得懂」）是两件事，
+        分母不同、不可互相替代：归属命中率的分母只是「我们已经看见的域名」，
+        而这个指标的分母是「已经发现的设备」。
+
+        口径（快照语义，随台账实时变化）：
+            可见 X         = 在册设备中 domains 非空的台数（剔除「本机」设备）
+            疑似不可见 Y   = domains 为空的台数（剔除「本机」设备）
+            分母           = X + Y = 当前在册设备总数
+        分母诚实性：只含 DHCP 租约 / ARP / 流量兜底能发现的设备；
+        「从未被发现的设备」不在分母，比例只是下界。
+
+        no_mac / random_mac / no_identity 只统计 Y 集合，用于解释 Y 的可能构成
+        （三类互相重叠，且 Y 也包含「当期闲置」这种非盲区），不进比例算术。
+
+        注意：Y 叫「疑似」不可见而不是「不可见」—— domains 为空只说明没观测到
+        域名级外联，可能是设备当期没发任何查询（闲置），现有数据无法区分成因，
+        UI 必须把四种可能成因列清楚，不能让用户以为 Y 台全是盲区。
+        """
+        with self._state_lock:
+            visible = suspected = no_mac = random_mac = no_identity = 0
+            for dev in self.device_registry.devices.values():
+                if dev.key == _SELF_DEVICE_KEY:
+                    continue
+                if dev.domains:
+                    visible += 1
+                    continue
+                suspected += 1
+                if not dev.mac:
+                    no_mac += 1
+                if dev.random_mac:
+                    random_mac += 1
+                if not dev.hostname and not dev.vendor:
+                    no_identity += 1
+            total = visible + suspected
+            rate = round(visible / total, 4) if total else 0.0
+        return {
+            "visible": visible,
+            "suspected_invisible": suspected,
+            "total": total,
+            "rate": rate,
+            "no_mac": no_mac,
+            "random_mac": random_mac,
+            "no_identity": no_identity,
+            "denominator_note": "仅统计已发现设备（DHCP 租约/ARP/流量兜底）；"
+                                "从未被发现的设备不在分母，比例为当前快照",
         }
 
     def get_stats(self) -> dict:
@@ -996,6 +1060,10 @@ class HomewardService:
         with self._state_lock:
             stats = self._get_stats_locked()
             cov = self.attribution_coverage()
+            # 设备观测覆盖（「看得见」）：与归属命中率（「看得懂」）分开展示。
+            # 刻意不计入 score 扣分 —— 低可见性往往是部署形态（旁路 / 单播 DNS）
+            # 的结构性上限，不是用户的隐私失误，用它扣分等于用部署形态惩罚用户。
+            vis = self.visibility_coverage()
             alerts = self.alert_center.active()
             # 已剔除自有/局域网与用户标记良性的域名（见 _unknown_domains_locked）
             unknowns = stats["unknown_domains"]
@@ -1025,6 +1093,8 @@ class HomewardService:
             "coverage_hit": cov["hit"],
             "coverage_total": cov["total"],
             "coverage_rate": rate,
+            "visible_devices": vis["visible"],
+            "suspected_invisible_devices": vis["suspected_invisible"],
             "unknown_count": len(unknowns),
             "top_unknown": unknowns[:5],
             "blind_spots": blind_n,

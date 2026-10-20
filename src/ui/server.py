@@ -119,6 +119,13 @@ def _report_markdown(payload: dict) -> str:
     gen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rep.get("generated_at", 0) or 0))
     rate = cov.get("hit_rate", 0.0)
     rate_pct = f"{rate * 100:.1f}%" if isinstance(rate, (int, float)) else str(rate)
+    # 设备观测覆盖（「看得见」）与域名归属命中率（「看得懂」）分开展示：
+    # 两者分母不同，并排摆放必须各叫各的名字，不能让读者把命中率当成覆盖率。
+    # 值取自 checkup 新键（纯新增，不动既有键语义），保证 JSON 与 Markdown 双端一致。
+    vis_v = checkup.get("visible_devices", 0) or 0
+    vis_y = checkup.get("suspected_invisible_devices", 0) or 0
+    vis_total = vis_v + vis_y
+    vis_pct = f"{vis_v / vis_total * 100:.1f}%" if vis_total else "0.0%"
 
     L = []
     L.append("# 家卫 Homeward · 隐私体检报告")
@@ -136,6 +143,7 @@ def _report_markdown(payload: dict) -> str:
         L.append(f"- 已接入设备：{checkup.get('devices_total', 0)} 台（其中 {checkup.get('vendors_resolved', 0)} 台识别出厂商）")
         L.append(f"- 活跃告警：{checkup.get('alerts_active', 0)} 条（其中高危 {checkup.get('alerts_high', 0)} 条）")
         L.append(f"- 域名归属覆盖率：{checkup.get('coverage_hit', 0)} / {checkup.get('coverage_total', 0)}（{rate_pct}）")
+        L.append(f"- 设备观测覆盖：可见 {vis_v} / 疑似不可见 {vis_y}（{vis_pct}）")
         top = checkup.get("top_unknown") or []
         if top:
             L.append(f"- 主要未知去向（前 5）：{', '.join(top)}")
@@ -151,6 +159,7 @@ def _report_markdown(payload: dict) -> str:
     L.append(f"- 观测记录：{stats.get('flows_processed', 0)} 条，决策 {stats.get('decisions_made', 0)} 条")
     L.append(f"- 活跃告警：{stats.get('alerts_active', 0)} 条")
     L.append(f"- 域名归属覆盖率：{cov.get('hit', 0)} / {cov.get('total', 0)}（{rate_pct}）")
+    L.append(f"- 设备观测覆盖：可见 {vis_v} / 疑似不可见 {vis_y}（{vis_pct}）")
     L.append("")
     L.append("## 设备台账")
     L.append("")
@@ -445,6 +454,7 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 "stats": stats,
                 "alerts": svc.get_alert_stats(),
                 "coverage": svc.attribution_coverage(),
+                "visibility": svc.visibility_coverage(),
                 "checkup": svc.privacy_checkup(),
                 "blind_spots": svc.get_blind_spots(),
             })

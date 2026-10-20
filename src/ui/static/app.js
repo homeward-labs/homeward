@@ -131,6 +131,7 @@ function renderCheckup(c) {
           <div class="stat"><div class="k">未知域名</div><div class="v">${esc(c.unknown_count ?? 0)}</div>
             <div class="sub">盲区 ${esc(c.blind_spots ?? 0)} 项</div></div>
         </div>
+        <div class="small muted" style="margin-top:10px">可见设备 ${esc(c.visible_devices ?? 0)} · 疑似不可见 ${esc(c.suspected_invisible_devices ?? 0)}（设备观测覆盖口径，与「盲区 ${esc(c.blind_spots ?? 0)} 项」的消息条数不是一回事）</div>
         ${top ? `<div class="small muted" style="margin-top:10px">重点未知去向：${top}</div>` : ""}
         <div class="item-foot" style="margin-top:12px">
           <button class="btn btn-sm" type="button" data-report="markdown">导出完整体检报告</button>
@@ -144,9 +145,11 @@ function renderOverview() {
   const d = state.data.overview || {};
   const s = d.stats || {};
   const cov = d.coverage || {};
+  const vis = d.visibility || {};
   const as = d.alerts || {};
   const spots = d.blind_spots || [];
   const rate = Math.round((cov.hit_rate || 0) * 100);
+  const visRate = Math.round((vis.rate || 0) * 100);
 
   const counts = as.by_severity || {};
   const sevLine = ["critical", "high", "medium", "low"]
@@ -170,11 +173,15 @@ function renderOverview() {
         <div class="stat"><div class="k">域名归属覆盖率</div><div class="v">${rate}%</div>
           <div class="sub">${esc(cov.hit ?? 0)} / ${esc(cov.total ?? 0)} 个域名认得出来</div>
           <div class="bar" style="margin-top:6px"><i style="width:${rate}%"></i></div></div>
+        <div class="stat"><div class="k">设备观测覆盖</div><div class="v">${esc(vis.visible ?? 0)} / ${esc(vis.suspected_invisible ?? 0)}</div>
+          <div class="sub">可见 / 疑似不可见</div>
+          <div class="bar" style="margin-top:6px"><i style="width:${visRate}%"></i></div></div>
       </div>
     </div>
 
     ${spots.length ? `<div class="section">
       <h2>当前看不到的地方 <span class="count">（${spots.length} 项）</span></h2>
+      <div class="note">设备观测覆盖：可见 ${esc(vis.visible ?? 0)} / 疑似不可见 ${esc(vis.suspected_invisible ?? 0)}（在册 ${esc(vis.total ?? 0)} 台，${visRate}%）——「疑似不可见」不都是盲区，四种可能成因见「盲区」页。</div>
       ${spots.slice(0, 3).map((x) => `<div class="note">${esc(x)}</div>`).join("")}
       ${spots.length > 3 ? `<div class="small muted" style="margin-top:6px">其余 ${spots.length - 3} 项见「盲区」页</div>` : ""}
     </div>` : ""}
@@ -410,7 +417,42 @@ function renderSuggestions() {
 function renderBlind() {
   const items = state.data.blind?.items || [];
   const cov = state.data.overview?.coverage || {};
+  const vis = state.data.overview?.visibility || {};
+  const visRate = Math.round((vis.rate || 0) * 100);
+  const collection = state.data.overview?.stats?.collection || [];
+  // 「疑似不可见」的四种可能成因 —— 现有数据无法区分，必须照实列出，
+  // 不能让用户以为「疑似不可见 Y 台」等于「Y 台设备都是盲区」
+  const causes = [
+    "当期闲置，没发任何查询——不是盲区",
+    "DNS 单播直连光猫、不经旁路",
+    "加密 DNS（DoH/DoT）",
+    "只直连 IP、无域名查询",
+  ];
   return `<div class="section">
+    <h2>可见性 <span class="count">（设备观测覆盖）</span></h2>
+    <div class="card">
+      <div class="kv"><span class="k">比例</span><span>可见 ${esc(vis.visible ?? 0)} / 疑似不可见 ${esc(vis.suspected_invisible ?? 0)}（在册 ${esc(vis.total ?? 0)} 台，${visRate}%）</span></div>
+      <div class="bar" style="margin-top:8px"><i style="width:${visRate}%"></i></div>
+      <div class="small muted" style="margin-top:8px">${esc(vis.denominator_note || "")}</div>
+      <div class="item-body" style="margin-top:14px">疑似不可见的四种可能成因（现有数据无法区分）：</div>
+      <div class="list" style="margin-top:8px">
+        ${causes.map((x, i) => `<div class="item"><div class="item-body">${"①②③④"[i]} ${esc(x)}</div></div>`).join("")}
+      </div>
+      <div class="item-body" style="margin-top:14px">为什么旁路天然有上限：家卫以旁路方式工作：只被动接收广播与发给自己的流量。其他设备的 DNS 查询走单播、不经过这里——这是部署形态的结构性上限，不是故障。当前能力 = L1 被动发现（谁在家）+ L3 自愿设备（它的外联）；L2 端口镜像验证中、未启用。已知盲区：加密 DNS（DoH/DoT）、设备硬编码的公网 DNS、只直连 IP 的连接、直连光猫 LAN 口的有线设备。</div>
+      <div class="item-body" style="margin-top:14px">采集通道状态：</div>
+      ${collection.length
+        ? `<table style="margin-top:8px">
+          <thead><tr><th>采集通道</th><th>状态</th><th>原因</th></tr></thead>
+          <tbody>${collection.map((c) => `<tr>
+            <td>${esc(c.collector || "")}</td>
+            <td>${c.active ? "可用" : "不可用"}</td>
+            <td>${esc(c.reason || "")}</td>
+          </tr>`).join("")}</tbody>
+        </table>`
+        : '<div class="small muted" style="margin-top:8px">暂无采集通道信息</div>'}
+    </div>
+  </div>
+  <div class="section">
     <h2>盲区 <span class="count">（${items.length} 项）</span></h2>
     <div class="note">家卫的承诺是「看不到的地方要写出来」。下面这些是当前部署形态下确实做不到 / 没做到的事，不是故障。</div>
     <div class="list" style="margin-top:10px">
@@ -420,7 +462,7 @@ function renderBlind() {
     </div>
   </div>
   <div class="section">
-    <h2>知识库覆盖</h2>
+    <h2>域名归属命中率（知识库）</h2>
     <div class="card">
       <div class="kv"><span class="k">域名</span><span>${esc(cov.hit || 0)} / ${esc(cov.total || 0)} 认得出来</span></div>
       <div class="bar" style="margin-top:8px"><i style="width:${Math.round((cov.hit_rate || 0) * 100)}%"></i></div>
