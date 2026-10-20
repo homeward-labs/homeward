@@ -566,6 +566,10 @@ class HomewardHandler(BaseHTTPRequestHandler):
             self._json(200, {
                 "edition": EDITION_INFO,
                 "license": license_status(expected_device_fp=fp),
+                # 设备指纹（sha256 十六进制）：手动签发许可时客户需把它发给作者用于
+                # 令牌绑定（EDITIONS 试用条款 2「只上送设备指纹哈希」）。仅哈希，
+                # 不含任何原始硬件信息；与服务端通信时才会上送（本条响应只回本机）。
+                "device_fp": fp,
                 # 付款/订单页 URL 由服务端下发（可经 HOMEWARD_ORDER_URL 配置），
                 # 前端不硬编码任何外部 URL，便于私有化部署改写。
                 "order_url": os.environ.get(

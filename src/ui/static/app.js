@@ -543,6 +543,9 @@ function renderUpgrade() {
         <span class="item-title">未激活付费版本</span>
       </div>
       <div class="item-body small muted">${esc(reasonText)}</div>
+      <div class="kv" style="margin-top:8px"><span class="k">设备指纹</span>
+        <span><code>${esc(lic.device_fp || "—")}</code></span></div>
+      <div class="small muted" style="margin-top:4px">手动签发许可时，需把此指纹发给作者用于令牌绑定（仅 sha256 哈希，不含任何原始硬件信息）。</div>
       <div class="item-foot">
         ${reason === "expired"
           ? '<button class="btn btn-sm" type="button" data-goto-pay>续费解锁</button>' : ""}
