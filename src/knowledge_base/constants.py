@@ -16,6 +16,18 @@ from __future__ import annotations
 # 客户端知识库更新器的兜底源；可用环境变量 HOMEWARD_KB_SOURCE 覆盖。
 KB_SOURCE_DEFAULT_URL = "https://<kb-source>"
 
+# 国内备源清单（内容源多源降级的第二跳，FEAT-01）。
+# 背景：主源 workers.dev 在国内部分地区被干扰，而客户端几乎全在国内；更新器已支持
+#       多源逐个尝试、任一成功即停（见 updater._resolve_sources / check_and_update），
+#       这里只需列出「国内可达的备源」，主源取不到时即可按序自动降级。
+# 选型（见 服务端架构文档 §四）：Gitee 仓库 raw（免费/国内快，有访问与大小限制）、
+#       国内对象存储 OSS/COS（稳定/有免费额度，需实名）、自建内网镜像（完全可控）。
+# 隐私：备源与主源同属家卫第一方，只分发公开知识库静态文件、零遥测；且 kb_auto_update
+#       默认关闭，用户显式开启前客户端不向任何源发起连接。
+# 维护：默认空 tuple（不擅自改变开箱联网目标）；由维护者 Provision 好国内镜像后，
+#       把可达 URL 按优先级填到这里（填几个走几个，全部失败才保持原状）。
+KB_SOURCE_BACKUP_URLS: tuple[str, ...] = ()
+
 # 知识库在客户端本地所处的目录名（相对 src 根）。
 KB_DIR_NAME = "knowledge_base"
 

@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 try:
     from knowledge_base.constants import (
         KB_SOURCE_DEFAULT_URL,
+        KB_SOURCE_BACKUP_URLS,
         VERSION_FILE,
         CHECKSUM_FILE,
         SIGNATURE_FILE,
@@ -43,6 +44,7 @@ except Exception:
     _c_mod = _ilu.module_from_spec(_c_spec)
     _c_spec.loader.exec_module(_c_mod)
     KB_SOURCE_DEFAULT_URL = _c_mod.KB_SOURCE_DEFAULT_URL
+    KB_SOURCE_BACKUP_URLS = _c_mod.KB_SOURCE_BACKUP_URLS
     VERSION_FILE = _c_mod.VERSION_FILE
     CHECKSUM_FILE = _c_mod.CHECKSUM_FILE
     SIGNATURE_FILE = _c_mod.SIGNATURE_FILE
@@ -176,12 +178,31 @@ class KnowledgeBaseUpdater:
             return True
         return False
 
+    def _default_sources(self) -> list[str]:
+        """默认源清单 = 主源（Cloudflare Worker）+ 内置国内备源（constants.KB_SOURCE_BACKUP_URLS）。
+
+        主源 workers.dev 在国内部分地区被干扰，客户端几乎全在国内 —— 故默认清单在
+        主源之后带上国内可达备源，主源取不到时按序自动降级（机制见 check_and_update）。
+        备源清单默认空 tuple：不擅自改变开箱联网目标，由维护者 Provision 好国内镜像
+        （Gitee raw / OSS / COS / 自建内网镜像，选型见服务端架构文档 §四）后填入。
+        隐私：备源同属家卫第一方，只分发公开知识库静态文件、零遥测；且 kb_auto_update
+        默认关闭，用户显式开启前客户端不向任何源发起连接。
+        """
+        out = [self.DEFAULT_REPO]
+        for u in KB_SOURCE_BACKUP_URLS:
+            u = (u or "").strip()
+            if u and u not in out:
+                out.append(u)
+        return out
+
     def _resolve_sources(
         self, repo_urls: list[str] | None, repo_url: str | None
     ) -> list[str]:
         """把多种传入形式归一为去重保序的源列表。
 
         优先级：显式列表 > 显式单串 > 环境变量(逗号分隔) > 默认源。
+        默认源 = 主源 + 内置国内备源（见 _default_sources）；环境变量 / 显式传入视为
+        用户自定义清单，整体替换默认（不再附加内置备源）。
         """
         if repo_urls:
             urls = list(repo_urls)
@@ -189,7 +210,7 @@ class KnowledgeBaseUpdater:
             urls = [repo_url]
         else:
             env = os.environ.get(self.ENV_SOURCE, "").strip()
-            urls = [u.strip() for u in env.split(",") if u.strip()] or [self.DEFAULT_REPO]
+            urls = [u.strip() for u in env.split(",") if u.strip()] or self._default_sources()
         seen: set[str] = set()
         out: list[str] = []
         for u in urls:

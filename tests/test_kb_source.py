@@ -267,6 +267,85 @@ class TestUpdateLoop(unittest.TestCase):
         self.assertEqual((kb / "VERSION").read_text().strip(), "1.0.0")
 
 
+class TestDomesticBackup(unittest.TestCase):
+    """FEAT-01：内置国内备源 + 主源不可达时自动降级。
+
+    背景：主源为 Cloudflare Worker（workers.dev），国内部分地区被干扰；客户端几乎
+    全在国内。更新器已支持多源逐个尝试（见 TestUpdateLoop），这里补的是「默认清单
+    内置国内备源」这一跳：constants.KB_SOURCE_BACKUP_URLS 非空时，默认源 = 主源 + 备源，
+    主源取不到自动降级到备源。默认空 tuple 时不改变既有开箱联网目标（隐私：
+    kb_auto_update 默认关闭，未开启不联网）。
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.servers: list[_Server] = []
+        self._old_env = os.environ.get(ENV)
+        os.environ.pop(ENV, None)
+        import knowledge_base.updater as _upd
+
+        self._upd = _upd
+        self._old_backups = _upd.KB_SOURCE_BACKUP_URLS
+        self._old_default_repo = KnowledgeBaseUpdater.DEFAULT_REPO
+        _upd.KB_SOURCE_BACKUP_URLS = ()
+
+    def tearDown(self):
+        for s in self.servers:
+            s.stop()
+        os.environ.pop(ENV, None)
+        if self._old_env is not None:
+            os.environ[ENV] = self._old_env
+        self._upd.KB_SOURCE_BACKUP_URLS = self._old_backups
+        KnowledgeBaseUpdater.DEFAULT_REPO = self._old_default_repo
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _serve(self, directory: Path) -> str:
+        s = _Server(directory)
+        self.servers.append(s)
+        return s.base
+
+    def test_empty_backups_keeps_single_default(self):
+        """备源为空（出厂默认）→ 默认清单仍是单一主源，不改变开箱联网目标"""
+        self.assertEqual(
+            KnowledgeBaseUpdater(kb_dir=str(self.root)).repo_urls, [DEFAULT_REPO]
+        )
+
+    def test_configured_backups_appended_after_main(self):
+        """配置了国内备源 → 默认清单 = 主源在前、备源按序追加"""
+        self._upd.KB_SOURCE_BACKUP_URLS = ("http://gitee.local/kb", "http://oss.local/kb")
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root))
+        self.assertEqual(
+            u.repo_urls,
+            [DEFAULT_REPO, "http://gitee.local/kb", "http://oss.local/kb"],
+        )
+
+    def test_backups_dedup_against_main(self):
+        """备源与主源重复 → 去重，不重复尝试同一地址"""
+        self._upd.KB_SOURCE_BACKUP_URLS = (DEFAULT_REPO, "http://oss.local/kb")
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root))
+        self.assertEqual(u.repo_urls, [DEFAULT_REPO, "http://oss.local/kb"])
+
+    def test_env_still_overrides_builtin_backups(self):
+        """用户显式设 HOMEWARD_KB_SOURCE → 视为自定义清单，整体替换（不再附加内置备源）"""
+        self._upd.KB_SOURCE_BACKUP_URLS = ("http://oss.local/kb",)
+        os.environ[ENV] = "http://selfhosted.local/kb"
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root))
+        self.assertEqual(u.repo_urls, ["http://selfhosted.local/kb"])
+
+    def test_main_down_degrades_to_backup(self):
+        """主源不可达 → 自动降级到国内备源完成更新（FEAT-01 核心）"""
+        src = make_source(self.root / "src", version="2.0.0")
+        kb = make_kb(self.root / "kb", version="1.0.0")
+        backup_base = self._serve(src)
+        # 主源指到一个必挂地址；内置备源指向本地可用源
+        KnowledgeBaseUpdater.DEFAULT_REPO = "http://127.0.0.1:1/dead-main"
+        self._upd.KB_SOURCE_BACKUP_URLS = (backup_base,)
+        u = KnowledgeBaseUpdater(kb_dir=str(kb))  # 无 env/无显式 → 走默认清单
+        self.assertTrue(u.check_and_update())
+        self.assertEqual((kb / "VERSION").read_text().strip(), "2.0.0")
+        self.assertEqual(sha(kb / "domains.csv"), sha(src / "domains.csv"))
+
+
 class TestBundledVersion(unittest.TestCase):
     """C1：内置知识库必须自带 VERSION，否则 UI 恒显示 0.0.0（P1）"""
 
