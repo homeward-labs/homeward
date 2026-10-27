@@ -14,6 +14,7 @@ const state = {
   error: null,
   timer: null,
   flash: null,   // 升级面板的一次性提示（导入/清除后反馈），渲染后清空
+  loaded: false,  // 首屏加载态：首次 render 时为 false，loadAll() 结束后置 true
 };
 
 // ------------------------------------------------------------------ 工具
@@ -78,6 +79,7 @@ async function api(path, options) {
 // ------------------------------------------------------------------ 载入
 
 async function loadAll() {
+  state.loaded = false;   // 加载中，render() 显示骨架
   // 许可状态单独拉取：即便主面板接口异常，升级面板也能独立工作；反之亦然。
   let lic = state.data.license || {};
   try {
@@ -114,6 +116,7 @@ async function loadAll() {
   } catch {
     state.data.config = {};
   }
+  state.loaded = true;    // 全部拉完（无论中间哪些报错）
   render();
 }
 
@@ -854,8 +857,13 @@ function render() {
     ? `<div class="section"><div class="note">读取接口失败：${esc(state.error)}。服务可能刚启动，或端口不是 9595。</div></div>`
     : "";
 
+  // 首屏加载态：服务刚起来时 fetch 还没回来，显示骨架而非全零值
+  const loading = (!state.loaded && !state.error)
+    ? `<div class="section"><div class="card empty">加载中… 正在拉取设备清单、观测记录与告警。服务首次启动约 5–15 秒完成采集器协商。</div></div>`
+    : "";
+
   const body = state.error ? "" : (RENDERERS[state.view] || renderOverview)();
-  view.innerHTML = err + body;
+  view.innerHTML = err + loading + body;
   state.flash = null;   // 一次性提示已渲染，清掉避免下次重复
 
   document.getElementById("updated-at").textContent = "更新于 " + fmtTime(Date.now() / 1000);
