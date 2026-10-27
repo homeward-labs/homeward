@@ -64,12 +64,13 @@
 | **Phase 3** | 标准版（闭源付费） | 真实阻断三级执行器 + 撤销契约闭环 + 深度抓包/DPI | 2027-H2 |
 | **Phase 4** | 专业版 | 高级治理能力（待定义） | 规划中 |
 
-> Phase 1.1 三个 commit 的交付明细见 [CHANGELOG.md](./CHANGELOG.md)。
+> Phase 1.1 四个 commit 的交付明细见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ### Phase 1.1 交付清单
 
 | 项 | Commit | 说明 |
 | --- | --- | --- |
+| P1-2 AI 辅助分析 | `727c625` | AI 后端接入（设置 tab + unknown tab 手动触发 + config.json 持久化） |
 | P1-3 行为识别增强 | `b92c13f` | 作息节律推断 + 跨设备身份追踪（新增 2 条行为规则，BehaviorDetector scope=cross 扩展） |
 | P1-4 数据持久化与趋势 | `bd87ebb` | TrendStore 独立 SQLite + 小时采样 + 前端 div-bar 趋势面板（不引 D3/Chart.js） |
 | P1-5 导出报告扩展 | `e841bd2` | `/api/report` JSON + Markdown 纳入趋势段（handler 层追加，零侵入 HomewardService） |

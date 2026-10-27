@@ -6,9 +6,25 @@
 
 ---
 
-## 2026-10-27.10 — Phase 1.1 成长期三连发
+## 2026-10-27.10 — Phase 1.1 成长期四连发
 
-> 主线已闭环（Phase 1 MVP 五工作包），本批次三个 commit 是 Phase 1.1 成长期的首批交付：行为识别增强 + 数据持久化 + 导出报告扩展。
+> 主线已闭环（Phase 1 MVP 五工作包），本批次四个 commit 是 Phase 1.1 成长期的首批交付：行为识别增强 + 数据持久化 + 导出报告扩展 + AI 辅助分析接入。
+
+### `727c625` — feat(ai): P1-2 AI 辅助分析接入
+
+- **server.py**（3 个新路由 + 启动时 config.json 合并）
+  - `POST /api/ai/analyze` — 手动触发 AI 分析未知域名；后端未起/超时 → 422 降级；结果落 pending 目录（用户确认后才进知识库）
+  - `GET /api/config` — 读 `data/config.json`，脱敏（api_key 不回传原值，只标记是否已配置）
+  - `POST /api/config` — 白名单写入（只接受 ai_backend/ai_api_key/ai_base_url/ai_model + kb_source 相关键），保存后**立即刷新 service.ai** 让新后端生效（不重启）
+  - 启动时自动读 `data/config.json` 合进 `HomewardService` config（演示模式跳过）
+- **前端**（设置 tab + unknown tab AI 按钮）
+  - 新增"设置"tab + 齿轮 SVG icon（`index.html`）
+  - `renderSettings()` — 后端类型下拉（关闭/Ollama/OpenAI 兼容）+ API Key 密码框 + Base URL + 模型名；保存按钮调 POST /api/config
+  - `renderUnknown()` — AI 按钮按 `state.data.config.ai_backend` 状态动态启用/禁用
+  - 事件绑定：`data-ai-analyze` + `data-save-ai-cfg`
+  - `loadAll()` 容错拉 `/api/config`（没配置时返回空对象，不阻塞界面）
+- **安全边界**：AI 默认关闭；只分析域名/行为元数据，不上传原始流量；API Key 只写本地 config.json，脱敏回显；结果须用户确认才进知识库
+- 回归：408 passed
 
 ### `b92c13f` — feat(behavior): P1-3 行为识别增强
 
