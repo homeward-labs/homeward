@@ -172,8 +172,34 @@ function renderOverview() {
   const topDest = (state.data.destinations?.items || []).slice(0, 6);
   const recentAlerts = (state.data.alerts?.items || []).slice(0, 3);
 
+  // Tier 1 + Tier 2 采集器状态条：如实展示「我能看多少」
+  const collectors = d.collection_status || [];
+  const collectorBar = collectors.length ? `
+    <div class="section">
+      <h2>采集器状态 <span class="count">（${collectors.filter((c) => c.active).length}/${collectors.length} 个活跃）</span></h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">
+        ${collectors.map((c) => {
+          const name = c.collector === "DnsLogCollector" ? "Tier 1 · DNS（dnsmasq）"
+            : c.collector === "SyslogDnsCollector" ? "Tier 1 · DNS（syslog）"
+            : c.collector === "ConntrackCollector" ? "Tier 2 · 连接元数据（conntrack）"
+            : c.collector;
+          const color = c.active ? "#2da44e" : "#cf222e";
+          const icon = c.active ? "●" : "○";
+          return `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;background:${c.active ? "rgba(45,164,78,0.08)" : "rgba(207,34,46,0.08)"}">
+            <span style="color:${color};font-size:12px">${icon}</span>
+            <span style="font-weight:500">${esc(name)}</span>
+            <span class="small muted" title="${esc(c.reason || "")}">${c.active ? "活跃" : "不可用"}</span>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="small muted" style="margin-top:6px">
+        Tier 1 看不见直连 IP 流量（设备硬编码 IP / 加密 DNS 绕过）；Tier 2 补连接元数据（字节数 / 连接时长），但也看不见加密域名（Tier 3 标准版）。<strong>两个 Tier 都不生效时，家卫等同于一块「只知道有多少设备」的空板。</strong>
+      </div>
+    </div>` : "";
+
   return `
     ${renderCheckup(d.checkup)}
+    ${collectorBar}
     <div class="section">
       <div class="grid">
         <div class="stat"><div class="k">设备</div><div class="v">${esc(s.devices_total ?? 0)}</div>

@@ -272,6 +272,15 @@ class HomewardService:
         # 如实展示「当前到底有几个采集器在干活、哪个不可用」（看不见要说清楚）
         self.collection_status: list[dict] = []
 
+        # —— Tier 1 + Tier 2 合并：DNS ↔ IP 双向关联缓存 ——
+        # Tier 1 DNS flow 产出 domain → dst_ip 映射，写入这里；
+        # Tier 2 conntrack flow 只有 dst_ip（没有域名），从这里反查域名填回 flow.dns_query。
+        # 30 分钟 TTL：DNS 查询与连接通常时间接近，太久远的映射会误导。
+        # 用 dict + 内联 TTL 字段，不引第三方 cache 库。
+        self._dns_ip_cache: dict[str, dict] = {}       # dst_ip -> {domain, ts}
+        self._dns_domain_cache: dict[str, dict] = {}   # domain -> {dst_ip, ts}
+        self._dns_cache_ttl = float(self.config.get("dns_cache_ttl", 1800))
+
         # 动作注册表（SQLite 持久化）：进程重启不丢动作记录，避免孤儿规则。
         # 社区版只产出「建议」不产生已生效阻断，但标准版接同一服务时这条记录就关键了。
         # 演示模式（actions_db_path=None）用纯内存注册表：与 observations.db 的处理
@@ -378,6 +387,24 @@ class HomewardService:
         """``process_flow`` 的实现体（调用方必须已持有 ``_state_lock``）。"""
         self.stats["flows_processed"] += 1
 
+        # —— Tier 1 + Tier 2 关联层 ——
+        # Tier 1 DNS flow（有 dns_query、dst_ip）→ 写入双向缓存
+        # Tier 2 conntrack flow（没 dns_query）→ 从 IP 缓存反查域名回填
+        now = flow.timestamp or time.time()
+        if flow.dns_query and flow.dst_ip:
+            # 清旧：同一 IP 在缓存里可能指向不同域名（设备刚换联网目标），直接覆盖即可
+            self._dns_ip_cache[flow.dst_ip] = {"domain": flow.dns_query, "ts": now}
+            self._dns_domain_cache[flow.dns_query] = {"dst_ip": flow.dst_ip, "ts": now}
+        elif flow.dst_ip and not flow.dns_query:
+            # Tier 2 conntrack flow：查缓存回填域名
+            entry = self._dns_ip_cache.get(flow.dst_ip)
+            if entry and (now - entry.get("ts", 0)) < self._dns_cache_ttl:
+                flow.dns_query = entry["domain"]
+            # 顺便清过期（1% 概率，避免每条都扫）
+            if not entry or (now - entry.get("ts", 0)) >= self._dns_cache_ttl:
+                if len(self._dns_ip_cache) > 128:  # 攒够 128 条再清
+                    self._purge_dns_cache(now)
+
         # W2：把这条流量归到某台设备上，并解析域名归属
         self.device_registry.observe_flow(flow)
 
@@ -404,6 +431,18 @@ class HomewardService:
             self._record_suggestion(flow, decision)
 
         return decision
+
+    def _purge_dns_cache(self, now: float) -> None:
+        """清过期 DNS↔IP 缓存项（攒够阈值才扫，避免每条 flow 都全表扫描）。"""
+        ttl = self._dns_cache_ttl
+        self._dns_ip_cache = {
+            ip: e for ip, e in self._dns_ip_cache.items()
+            if (now - e.get("ts", 0)) < ttl
+        }
+        self._dns_domain_cache = {
+            d: e for d, e in self._dns_domain_cache.items()
+            if (now - e.get("ts", 0)) < ttl
+        }
 
     @staticmethod
     def _suggestion_key(domain: str, device: str) -> str:

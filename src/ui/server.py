@@ -485,6 +485,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 "visibility": svc.visibility_coverage(),
                 "checkup": svc.privacy_checkup(),
                 "blind_spots": svc.get_blind_spots(),
+                # Tier 1 + Tier 2 采集器状态：如实展示「我能看多少」
+                "collection_status": getattr(svc, "collection_status", []),
             })
             return
 
