@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-10-27.11 — Phase 2 Tier 2 接入
+
+> Tier 2（连接元数据 / conntrack）此前已实现但与 Tier 1（DNS）各自独立，产出的 flow 没合并。本批次三件事让"社区版两 Tier 真合并叙事"成立：DNS↔IP 关联缓存、国产知识库扩量、前端采集器状态条。飞牛 / OpenWrt 应用商店打包排后续。
+
+### `16157d8` — feat(tier2): Phase 2 Tier 2 接入
+
+- **A. DNS→IP 双向关联缓存**（`src/core/main.py`，Tier 1+2 合并核心）
+  - `HomewardService.__init__` 加 `_dns_ip_cache`（dst_ip → {domain, ts}）+ `_dns_domain_cache`（domain → {dst_ip, ts}）
+  - `_process_flow_locked` 开头：Tier 1 flow（有 dns_query + dst_ip）→ 写双向缓存；Tier 2 flow（没 dns_query）→ 从 `_dns_ip_cache` 反查域名回填 `flow.dns_query`
+  - `_purge_dns_cache()` helper：攒够 128 条批量清（避免每条 flow 全表扫描），TTL 30 分钟
+  - **零侵入**：不改 `observation_to_flow()` / `Collector` 接口，关联逻辑完全在 service 层完成
+- **B. 国产知识库扩量**（`src/knowledge_base/domains.csv`，+33 条）
+  - 小米 IoT 全家桶（api.io.mi.com / ruxit / beacon warn）
+  - 涂鸦智能（tuya.com / api.tuya.com / openapi.tuya.com）
+  - 华为 HiLink + IoT 云 + 荣耀
+  - 腾讯 IoT / 微信 IoT 设备接入
+  - 百度 IoT / 小度设备
+  - 阿里云 IoT / 天猫精灵
+  - 海康萤石 + 大华
+  - BroadLink / Aqara / Yeelight / ORVIBO（智能家居生态链）
+  - TP-Link / 腾讯 / 字节 / 快手 tracker warn 条目
+  - 去重后全部追加（现有 5078 条 → 5111 条）
+- **C. UI 采集器状态条**（`/api/overview` + `renderOverview`）
+  - server.py：`/api/overview` 响应加 `collection_status`（来自 `service.collection_status`，即 CollectorRunner.start() 返回的探针结果）
+  - app.js：`renderOverview` 在统计卡前加采集器状态条，按 DnsLogCollector / SyslogDnsCollector / ConntrackCollector 映射 Tier 1 / Tier 2 标签，活跃绿 / 不可用红
+  - 附带说明文字：Tier 1 看不见直连 IP，Tier 2 补字节数但也看不见加密域名（Tier 3 标准版）
+- 回归：408 passed
+
+---
+
 ## 2026-10-27.10 — Phase 1.1 成长期四连发
 
 > 主线已闭环（Phase 1 MVP 五工作包），本批次四个 commit 是 Phase 1.1 成长期的首批交付：行为识别增强 + 数据持久化 + 导出报告扩展 + AI 辅助分析接入。
