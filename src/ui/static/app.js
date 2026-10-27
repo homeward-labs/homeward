@@ -15,6 +15,10 @@ const state = {
   timer: null,
   flash: null,   // 升级面板的一次性提示（导入/清除后反馈），渲染后清空
   loaded: false,  // 首屏加载态：首次 render 时为 false，loadAll() 结束后置 true
+  // P1-5 设备视图打磨：前端筛选/搜索/分组，不碰后端
+  deviceSearch: "",              // 搜索框值（name/vendor/mac/ips 子串）
+  deviceRiskFilter: "all",      // risk_level 筛选：all/high/medium/low
+  deviceGroupBy: "vendor",      // 分组：vendor（厂商）/none（平铺）
 };
 
 // ------------------------------------------------------------------ 工具
@@ -241,11 +245,86 @@ function renderOverview() {
 }
 
 function renderDevices() {
-  const items = state.data.devices?.items || [];
+  const all = state.data.devices?.items || [];
+
+  // —— 搜索（子串模糊匹配 name/vendor/mac/ips） ——
+  const q = state.deviceSearch.trim().toLowerCase();
+  let items = all;
+  if (q) {
+    items = items.filter((d) => {
+      const hay = [
+        d.name || "", d.vendor || "", d.mac || "",
+        ...(d.ips || []),
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  // —— 风险筛选 ——
+  if (state.deviceRiskFilter !== "all") {
+    items = items.filter((d) => d.risk_level === state.deviceRiskFilter);
+  }
+
   if (!items.length) {
+    // 有设备但全被筛掉了 → 友好提示
+    if (all.length) {
+      return `<div class="section"><div class="card empty">筛选后无匹配设备。<a href="#" data-device-reset>清除筛选</a>。</div></div>`;
+    }
     return '<div class="card empty">设备台账为空。家卫通过 DHCP 租约与 ARP 表发现设备 —— 若以单网口 Docker 形态运行，可能读不到这些数据，详见「盲区」页。</div>';
   }
-  const rows = items.map((d) => `
+
+  // —— 分组 / 平铺 ——
+  const groupByVendor = state.deviceGroupBy === "vendor";
+  const groups = {};
+  if (groupByVendor) {
+    for (const d of items) {
+      const g = d.vendor || "未知厂商";
+      (groups[g] ||= []).push(d);
+    }
+  } else {
+    groups[""] = items; // 平铺
+  }
+
+  // 每组按风险排序（组内保留原排序逻辑）
+  const groupOrder = groupByVendor
+    ? Object.keys(groups).sort((a, b) => {
+        // 未知厂商放最后
+        if (a === "未知厂商") return 1;
+        if (b === "未知厂商") return -1;
+        return a.localeCompare(b, "zh");
+      })
+    : [""];
+
+  const high = items.filter((d) => d.risk_level === "high").length;
+  const mid = items.filter((d) => d.risk_level === "medium").length;
+
+  const riskOpts = [
+    { v: "all", label: `全部（${all.length} 台）` },
+    { v: "high", label: `高风险（${all.filter((d) => d.risk_level === "high").length}）` },
+    { v: "medium", label: `需关注（${all.filter((d) => d.risk_level === "medium").length}）` },
+    { v: "low", label: `低风险（${all.filter((d) => d.risk_level === "low").length}）` },
+  ].map((o) =>
+    `<option value="${o.v}" ${state.deviceRiskFilter === o.v ? "selected" : ""}>${o.label}</option>`
+  ).join("");
+
+  const groupOpts = [
+    { v: "vendor", label: "按厂商分组" },
+    { v: "none", label: "平铺（不分组）" },
+  ].map((o) =>
+    `<option value="${o.v}" ${state.deviceGroupBy === o.v ? "selected" : ""}>${o.label}</option>`
+  ).join("");
+
+  const renderTable = (rows) => `
+    <div class="card scroll-x">
+      <table>
+        <thead><tr>
+          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>风险</th><th>最近活跃</th><th>主要去向</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  const renderRow = (d) => `
     <tr>
       <td>
         <strong>${esc(d.name)}</strong>
@@ -267,22 +346,47 @@ function renderDevices() {
             '<span class="muted small">未观测到域名</span>'}
         </div>
       </td>
-    </tr>`).join("");
+    </tr>`;
 
-  const high = items.filter((d) => d.risk_level === "high").length;
-  const mid = items.filter((d) => d.risk_level === "medium").length;
+  // 组装各分组
+  const groupSections = groupOrder.map((g) => {
+    const list = groups[g];
+    if (!groupByVendor) return renderTable(list.map(renderRow).join(""));
+    const highG = list.filter((d) => d.risk_level === "high").length;
+    return `
+      <div style="margin-top:16px">
+        <h3 style="font-size:14px;color:#57606a;margin-bottom:8px">
+          ${esc(g)} <span class="count">（${list.length} 台${highG ? ` · 高风险 ${highG}` : ""}）</span>
+        </h3>
+        ${renderTable(list.map(renderRow).join(""))}
+      </div>`;
+  }).join("");
 
-  return `<div class="section">
-    <h2>设备画像 <span class="count">（${items.length} 台，按风险排序；高风险 ${high} 台、需关注 ${mid} 台）</span></h2>
-    <div class="card scroll-x">
-      <table>
-        <thead><tr>
-          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>风险</th><th>最近活跃</th><th>主要去向</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  </div>`;
+  return `
+    <div class="section">
+      <h2>设备画像 <span class="count">（${items.length}/${all.length} 台；高风险 ${high} 台、需关注 ${mid} 台）</span></h2>
+
+      <!-- 搜索 + 筛选 + 分组 工具栏 -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;align-items:center">
+        <input
+          type="search"
+          placeholder="搜索：名称 / 厂商 / MAC / IP"
+          value="${esc(state.deviceSearch)}"
+          data-device-search
+          style="flex:1;min-width:180px;padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px"
+        >
+        <select data-device-risk style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px">
+          ${riskOpts}
+        </select>
+        <select data-device-group style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px">
+          ${groupOpts}
+        </select>
+        ${(state.deviceSearch || state.deviceRiskFilter !== "all")
+          ? `<a href="#" data-device-reset style="font-size:13px;color:#0969da">清除筛选</a>` : ""}
+      </div>
+
+      ${groupSections}
+    </div>`;
 }
 
 function destCard(x) {
@@ -449,6 +553,37 @@ document.addEventListener("click", (e) => {
     e.preventDefault();
     const days = parseInt(btn.dataset.trendDays, 10);
     if (!isNaN(days)) _refetchTrend(days);
+  }
+  // P1-5 清除设备筛选
+  const reset = e.target.closest("[data-device-reset]");
+  if (reset) {
+    e.preventDefault();
+    state.deviceSearch = "";
+    state.deviceRiskFilter = "all";
+    render();
+  }
+});
+
+// P1-5 设备搜索（input 实时触发）
+document.addEventListener("input", (e) => {
+  const el = e.target.closest("[data-device-search]");
+  if (el) {
+    state.deviceSearch = el.value;
+    render();
+  }
+});
+
+// P1-5 设备筛选 / 分组（change 触发）
+document.addEventListener("change", (e) => {
+  const risk = e.target.closest("[data-device-risk]");
+  if (risk) {
+    state.deviceRiskFilter = risk.value;
+    render();
+  }
+  const group = e.target.closest("[data-device-group]");
+  if (group) {
+    state.deviceGroupBy = group.value;
+    render();
   }
 });
 
