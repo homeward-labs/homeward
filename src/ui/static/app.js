@@ -108,6 +108,12 @@ async function loadAll() {
   } catch {
     state.data.trend = { days: 7, points: [] };
   }
+  // P1-2 用户配置（AI 后端状态等）：容错拉取
+  try {
+    state.data.config = await api("/api/config");
+  } catch {
+    state.data.config = {};
+  }
   render();
 }
 
@@ -429,12 +435,14 @@ function renderUnknown() {
   }
 
   // 「真正未知」：可让用户自己归类为自有 / 良性（家卫不替用户猜，用户说了算且可撤销）
-  const rowUnknown = (x) => `
+  const rowUnknown = (x, aiOn) => `
     <div class="item is-unknown">
       <div class="item-head">
         <span class="item-title mono">${esc(x)}</span>
-        <button class="btn btn-sm" type="button" disabled
-          title="需在配置中启用 AI 后端，且必须由你手动触发">帮我分析</button>
+        ${aiOn
+          ? `<button class="btn btn-sm" type="button" data-ai-analyze data-domain="${esc(x)}">AI 帮我分析</button>`
+          : `<button class="btn btn-sm" type="button" disabled
+             title="需在设置里启用 AI 后端（本地 Ollama 或 OpenAI 兼容 Key）">AI 分析未启用</button>`}
       </div>
       <div class="item-sub small muted">分析需你手动触发，且只在启用 AI 后端后可用；结果须经你确认才写入知识库。</div>
       <div class="item-actions" style="margin-top:6px;display:flex;gap:6px">
@@ -463,8 +471,10 @@ function renderUnknown() {
   let html = '<div class="section">';
   html += `<h2>未知域名 <span class="count">（${items.length} 个）</span></h2>`;
   html += '<div class="note">AI 分析默认关闭（需自备后端与 API Key）。未启用时这里只做列举 —— 家卫不会替你猜这些域名是谁的。</div>';
+  const aiOn = !!(state.data.config && state.data.config.ai_backend
+                  && state.data.config.ai_backend !== "none");
   html += items.length
-    ? `<div class="list" style="margin-top:10px">${items.map(rowUnknown).join("")}</div>`
+    ? `<div class="list" style="margin-top:10px">${items.map(x => rowUnknown(x, aiOn)).join("")}</div>`
     : '<div class="card empty" style="margin-top:10px">没有真正未知的域名了。</div>';
 
   if (own.length) {
@@ -626,6 +636,54 @@ function renderImport() {
     </div>`;
 }
 
+function renderSettings() {
+  const cfg = state.data.config || {};
+  const backend = cfg.ai_backend || "none";
+  const keySet = !!cfg.ai_api_key_set;
+  const baseUrl = cfg.ai_base_url || "";
+  const model = cfg.ai_model || "";
+
+  return `
+    <div class="section">
+      <h2>设置</h2>
+      <div class="note">
+        AI 分析默认关闭，启用需自备后端：本地 Ollama（<code>ollama run qwen2.5:7b</code>）
+        或任意 OpenAI 兼容接口。<strong>结果只在你手动触发时才调用，不会自动联网。</strong>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3 style="margin:0 0 12px">AI 辅助分析（P1-2）</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="width:100px">后端类型</label>
+            <select id="cfg-ai-backend" style="flex:1;max-width:220px">
+              <option value="none" ${backend === "none" ? "selected" : ""}>关闭</option>
+              <option value="ollama" ${backend === "ollama" ? "selected" : ""}>本地 Ollama</option>
+              <option value="openai" ${backend === "openai" ? "selected" : ""}>OpenAI 兼容</option>
+            </select>
+            <span class="small muted">${backend !== "none" ? "(已启用)" : "(未启用)"}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="width:100px">API Key</label>
+            <input id="cfg-ai-key" type="password" placeholder="${keySet ? '*** 已配置（留空保持不变）' : 'sk-... 或其他兼容 Key'}" style="flex:1;max-width:320px">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="width:100px">Base URL</label>
+            <input id="cfg-ai-url" type="text" placeholder="${backend === 'ollama' ? '默认本地 11434 端口' : '默认官方兼容端点'}" value="${esc(baseUrl)}" style="flex:1;max-width:320px">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="width:100px">模型名</label>
+            <input id="cfg-ai-model" type="text" placeholder="${backend === 'ollama' ? 'qwen2.5:7b' : 'gpt-4o-mini'}" value="${esc(model)}" style="flex:1;max-width:220px">
+          </div>
+        </div>
+        <div class="item-foot" style="margin-top:14px">
+          <button class="btn" type="button" data-save-ai-cfg>保存设置</button>
+          <span class="small muted">保存后立即生效，无需重启。API Key 只写本地 <code>data/config.json</code>，不发送到任何其他地方。</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderUpgrade() {
   const lic = state.data.license || {};
   const status = lic.license || {};
@@ -752,6 +810,7 @@ const RENDERERS = {
   suggestions: renderSuggestions,
   blind: renderBlind,
   import: renderImport,
+  settings: renderSettings,
   upgrade: renderUpgrade,
 };
 
@@ -827,6 +886,78 @@ document.getElementById("view").addEventListener("click", async (e) => {
     } catch (err) {
       markBtn.disabled = false;
       alert("标记失败：" + (err.message || err));
+    }
+    return;
+  }
+
+  // —— P1-2：AI 手动分析未知域名 ——
+  const aiBtn = e.target.closest("[data-ai-analyze]");
+  if (aiBtn) {
+    const domain = aiBtn.dataset.domain || "";
+    if (!domain) return;
+    aiBtn.disabled = true;
+    aiBtn.textContent = "分析中…";
+    try {
+      const r = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) {
+        const msg = [
+          `域名 ${j.domain}`,
+          `归属：${j.organization || "未知"}`,
+          `类型：${j.category || "unknown"}（置信度 ${j.confidence || "low"}）`,
+          `建议：${j.suggested_action || "warn"}`,
+          "",
+          j.explanation || "",
+        ].join("\n");
+        alert(msg);
+        await loadAll();
+      } else if (j.reason === "ai_not_enabled") {
+        alert("AI 后端未启用。请在「升级」Tab 的 AI 配置区设置本地 Ollama 或 OpenAI 兼容 Key。");
+      } else {
+        alert("AI 分析失败：" + (j.reason || "未知错误"));
+      }
+    } catch (err) {
+      alert("AI 分析网络错误：" + (err.message || err));
+    } finally {
+      aiBtn.disabled = false;
+      aiBtn.textContent = "AI 帮我分析";
+    }
+    return;
+  }
+
+  // —— P1-2：保存 AI 配置 ——
+  const saveCfgBtn = e.target.closest("[data-save-ai-cfg]");
+  if (saveCfgBtn) {
+    const backend = document.getElementById("cfg-ai-backend")?.value || "none";
+    const apiKey = document.getElementById("cfg-ai-key")?.value || "";
+    const baseUrl = document.getElementById("cfg-ai-url")?.value || "";
+    const model = document.getElementById("cfg-ai-model")?.value || "";
+    saveCfgBtn.disabled = true;
+    try {
+      const body = { ai_backend: backend };
+      if (apiKey) body.ai_api_key = apiKey;
+      if (baseUrl) body.ai_base_url = baseUrl;
+      if (model) body.ai_model = model;
+      const r = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) {
+        alert(`已保存：${(j.saved || []).join(", ") || "（无变更）"}\nAI 后端已${backend !== "none" ? "启用" : "关闭"}，立即生效。`);
+        await loadAll();
+      } else {
+        alert("保存失败：" + (j.reason || "未知错误"));
+      }
+    } catch (err) {
+      alert("保存网络错误：" + (err.message || err));
+    } finally {
+      saveCfgBtn.disabled = false;
     }
     return;
   }

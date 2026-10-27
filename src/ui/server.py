@@ -730,6 +730,104 @@ class HomewardHandler(BaseHTTPRequestHandler):
             self._json(200, {"days": days, "points": points})
             return
 
+        # —— P1-2 AI 辅助分析 ——
+        if path == "/api/ai/analyze":
+            """手动触发 AI 分析一个未知域名。后端没起 / 超时 / 返回非 JSON，
+            一律降级成 422（分析不可用），不抛异常。"""
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed"})
+                return
+            if not getattr(svc.ai, "is_enabled", lambda: False)():
+                self._json(422, {"ok": False, "reason": "ai_not_enabled"})
+                return
+            try:
+                obj = json.loads(self._read_text_body() or "{}")
+            except ValueError:
+                obj = {}
+            domain = str(obj.get("domain") or "").strip()
+            if not domain:
+                self._json(400, {"ok": False, "reason": "missing_domain"})
+                return
+            result = svc.request_ai_analysis(domain, obj.get("behavior") or {})
+            if result is None:
+                self._json(422, {"ok": False, "reason": "ai_failed_or_disabled"})
+                return
+            # 把结果写进 pending 目录（用户确认后才进知识库）
+            svc.confirm_ai_result(result)
+            self._json(200, {
+                "ok": True,
+                "domain": result.domain,
+                "organization": result.predicted_organization,
+                "category": result.category,
+                "confidence": result.confidence,
+                "explanation": result.explanation,
+                "suggested_action": result.suggested_action,
+                "side_effects": result.side_effects,
+            })
+            return
+
+        if path == "/api/config":
+            """读写用户配置（data/config.json）。GET 脱敏（api_key 只回显是否存在）；
+            POST 只接受 AI 相关键，其他键忽略，避免前端误传覆盖。"""
+            _cfg_path = ROOT / "data" / "config.json"
+            if method == "GET":
+                cfg = {}
+                if _cfg_path.exists():
+                    try:
+                        cfg = json.loads(_cfg_path.read_text(encoding="utf-8"))
+                        if not isinstance(cfg, dict):
+                            cfg = {}
+                    except Exception:
+                        cfg = {}
+                # 脱敏：api_key 不回传原值，只标记是否已配置
+                masked = {k: v for k, v in cfg.items() if k != "ai_api_key"}
+                masked["ai_api_key_set"] = bool(cfg.get("ai_api_key"))
+                self._json(200, masked)
+                return
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed"})
+                return
+            try:
+                obj = json.loads(self._read_text_body() or "{}")
+            except ValueError:
+                obj = {}
+            if not isinstance(obj, dict):
+                obj = {}
+            # 只允许 AI 相关键 + kb_source（显式白名单）
+            _ALLOW = {"ai_backend", "ai_api_key", "ai_base_url", "ai_model",
+                      "kb_source", "kb_auto_update", "kb_update_interval"}
+            updates = {k: obj[k] for k in _ALLOW if k in obj}
+            if not updates:
+                self._json(400, {"ok": False, "reason": "no_allowed_keys"})
+                return
+            _cfg_path = ROOT / "data" / "config.json"
+            _cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            existing = {}
+            if _cfg_path.exists():
+                try:
+                    existing = json.loads(_cfg_path.read_text(encoding="utf-8"))
+                    if not isinstance(existing, dict):
+                        existing = {}
+                except Exception:
+                    existing = {}
+            # api_key 为空串表示清除
+            if updates.get("ai_api_key", "__UNSET__") == "":
+                updates.pop("ai_api_key")
+                existing.pop("ai_api_key", None)
+            existing.update(updates)
+            _cfg_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2),
+                                 encoding="utf-8")
+            # 立即刷新 service.ai（让新后端/Key 立刻生效，不用重启）
+            try:
+                svc.ai.backend = existing.get("ai_backend", "none")
+                svc.ai.api_key = existing.get("ai_api_key")
+                svc.ai.base_url = existing.get("ai_base_url")
+                svc.ai.model = existing.get("ai_model")
+            except Exception:
+                pass
+            self._json(200, {"ok": True, "saved": list(updates.keys())})
+            return
+
         self._json(404, {"error": "not_found", "path": path})
 
 
@@ -960,11 +1058,24 @@ def main(argv=None) -> int:
             auth = WebAuth(token=tok)
 
     # 演示模式：不加载系统设备，也不落盘（actions.db 同样不写，避免污染生产数据）
+    _cfg_path = ROOT / "data" / "config.json"
+    _user_cfg = {}
+    if _cfg_path.exists():
+        try:
+            _user_cfg = json.loads(_cfg_path.read_text(encoding="utf-8"))
+            if not isinstance(_user_cfg, dict):
+                _user_cfg = {}
+            logger.info("已加载用户配置（data/config.json）：ai_backend=%s",
+                        _user_cfg.get("ai_backend", "none"))
+        except Exception:
+            logger.warning("data/config.json 解析失败，忽略用户配置")
     service = HomewardService(config={
         "load_system_devices": not args.demo,
         "actions_db_path": None if args.demo else (ROOT / "data" / "actions.db"),
         # 本机身份：宿主自身 IP。不填则 _resolve_self_ips 会尽力用主机名自动判定。
         "homeward_self_ips": args.self_ips,
+        # 用户持久化配置（AI 后端等）
+        **_user_cfg,
     })
 
     # 观测状态持久化：生产模式默认开启（重启不丢设备/告警），演示模式默认关闭
