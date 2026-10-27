@@ -66,6 +66,45 @@ function typeText(d) {
 // 设备风险分级（F6）：等级 + 触发理由。理由由服务端逐条给出，
 // 前端原样展示 —— 用户看到的每一档风险都能追溯到具体观测数字，不做二次加工。
 const RISK_LABEL = { high: "高风险", medium: "需关注", low: "未见异常" };
+
+// P1-6 部署网络模式自检：根据不可用的采集器给出修复建议
+// 家卫社区版最常见的坑就是 bridge 容器里 conntrack 不可用——用户看到"不可用"但不知道为什么
+function renderCollectorHints(collectors) {
+  const hints = [];
+
+  const ct = collectors.find((c) => c.collector === "ConntrackCollector");
+  if (ct && !ct.active) {
+    // bridge 容器里必然读不到 /proc/net/nf_conntrack，也没 conntrack 命令
+    hints.push(`
+      <div class="note" style="margin-top:10px;background:rgba(9,105,218,0.08);border-left:3px solid #0969da">
+        <strong>Tier 2 · 连接元数据 不可用</strong> — 这通常意味着你用的是 Docker 默认的 <code>bridge</code> 网络模式。
+        容器独立的 netns 里读不到宿主机的 <code>/proc/net/nf_conntrack</code>，也没有 <code>conntrack</code> 命令。
+        <div style="margin-top:4px">
+          <strong>修复方式</strong>（二选一）：
+          <ul style="margin:4px 0 4px 20px;padding:0">
+            <li>把容器改成 <code>--network host</code>（最简单，容器直接用宿主机网络栈）</li>
+            <li>或者把宿主机的 <code>/proc/net/nf_conntrack</code> 挂进容器：<code>-v /proc/net/nf_conntrack:/proc/net/nf_conntrack:ro</code>，并确保容器里装了 <code>conntrack-tools</code></li>
+          </ul>
+          Tier 2 不可用时家卫仍能跑（只有 Tier 1 DNS 观测），但会看不见直连 IP 流量、设备字节数、连接时长等元数据。
+        </div>
+      </div>`);
+  }
+
+  const dnsmasq = collectors.find((c) => c.collector === "DnsLogCollector");
+  if (dnsmasq && !dnsmasq.active) {
+    hints.push(`
+      <div class="note" style="margin-top:10px;background:rgba(207,34,46,0.08);border-left:3px solid #cf222e">
+        <strong>Tier 1 · DNS（dnsmasq）不可用</strong> — 家卫需要 dnsmasq 的查询日志来发现「设备 ↔ 域名」关联。
+        <div style="margin-top:4px">
+          检查 dnsmasq 是否已开启查询日志（<code>log-queries</code> 配置项），以及运行家卫的进程是否有读权限。
+          如果你的路由器用的是 OpenWrt，通常只需要 <code>opkg update && opkg install dnsmasq</code>（默认已装）。
+        </div>
+      </div>`);
+  }
+
+  return hints.join("");
+}
+
 function riskCell(d) {
   const lv = ["high", "medium", "low"].includes(d.risk_level) ? d.risk_level : "low";
   const reasons = (d.risk_reasons || []).filter(Boolean);
@@ -199,6 +238,7 @@ function renderOverview() {
           </div>`;
         }).join("")}
       </div>
+      ${renderCollectorHints(collectors)}
       <div class="small muted" style="margin-top:6px">
         Tier 1 看不见直连 IP 流量（设备硬编码 IP / 加密 DNS 绕过）；Tier 2 补连接元数据（字节数 / 连接时长），但也看不见加密域名（Tier 3 标准版）。<strong>两个 Tier 都不生效时，家卫等同于一块「只知道有多少设备」的空板。</strong>
       </div>
