@@ -45,6 +45,7 @@ from core.main import HomewardService, ROOT        # noqa: E402
 from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
 from ui.qr import qr_svg, max_capacity_bytes      # noqa: E402
 from adapters.sqlite_registry import SqliteObservationStore  # noqa: E402
+from adapters.trend_store import TrendStore                  # noqa: E402
 from license.store import (                        # noqa: E402
     device_fingerprint,
     status as license_status,
@@ -676,6 +677,22 @@ class HomewardHandler(BaseHTTPRequestHandler):
             self._send(200, md.encode("utf-8"), "text/markdown; charset=utf-8")
             return
 
+        # —— P1-4 趋势数据：7 天/30 天小时统计点 ——
+        if path == "/api/trends":
+            store = getattr(self, "trend_store", None)
+            if store is None:
+                self._json(404, {"error": "trend_store_not_enabled"})
+                return
+            days_str = (query.get("days") or ["7"])[0]
+            try:
+                days = int(days_str)
+            except ValueError:
+                days = 7
+            days = max(1, min(days, 30))  # 上限 30 天，避免请求过大
+            points = store.get_hourly(days=days)
+            self._json(200, {"days": days, "points": points})
+            return
+
         self._json(404, {"error": "not_found", "path": path})
 
 
@@ -683,18 +700,20 @@ class HomewardHandler(BaseHTTPRequestHandler):
 
 def make_server(service: HomewardService, host: str = DEFAULT_HOST,
                 port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
-                observation_store: "SqliteObservationStore | None" = None
+                observation_store: "SqliteObservationStore | None" = None,
+                trend_store: "TrendStore | None" = None
                 ) -> ThreadingHTTPServer:
     """创建一个绑定好的服务实例（未启动 serve_forever）
 
-    用子类注入 service / auth / observation_store，避免全局变量 —— 单测里可以起多个
-    互不干扰的实例。
+    用子类注入 service / auth / observation_store / trend_store，避免全局变量 ——
+    单测里可以起多个互不干扰的实例。
     """
     handler_cls = type(
         "HomewardHandler",
         (HomewardHandler,),
         {"service": service, "start_time": time.time(),
-         "auth": auth, "observation_store": observation_store},
+         "auth": auth, "observation_store": observation_store,
+         "trend_store": trend_store},
     )
     #启动时恢复上次未确认的「建议阻断」队列。
     # service.start() 是 async 且从未被 run_server 调用（信号注册也在那里），
@@ -706,13 +725,15 @@ def make_server(service: HomewardService, host: str = DEFAULT_HOST,
 
 def run_server(service: HomewardService, host: str = DEFAULT_HOST,
                port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
-               observation_store: "SqliteObservationStore | None" = None) -> None:
+               observation_store: "SqliteObservationStore | None" = None,
+               trend_store: "TrendStore | None" = None) -> None:
     """阻塞运行直到 Ctrl-C"""
     httpd = make_server(service, host=host, port=port, auth=auth,
-                        observation_store=observation_store)
+                        observation_store=observation_store,
+                        trend_store=trend_store)
     _warn_if_exposed(host, auth)
     logger.info("家卫 Web UI：http://%s:%d", host, port)
-    saver = _ObservationSaver(observation_store, service)
+    saver = _ObservationSaver(observation_store, service, trend_store=trend_store)
     saver.start()
     try:
         httpd.serve_forever()
@@ -751,18 +772,26 @@ class _ObservationSaver:
 
     只在 ``observation_store`` 非空时工作；演示模式（会灌入演示数据）默认不启用，
     避免把演示数据持久化进真实数据库。
+
+    P1-4 扩展：同一个后台线程里叠加 **每小时一次** 的趋势采样（整点触发），
+    不增加额外线程。采样写入 trend_store（独立 SQLite，不碰 observations.db）。
     """
 
+    HOUR_SECS = 3600
+
     def __init__(self, store: "SqliteObservationStore", service: HomewardService,
+                 trend_store: "TrendStore | None" = None,
                  interval: float = 60.0) -> None:
         self.store = store
         self.service = service
+        self.trend_store = trend_store
         self.interval = interval
         self._stop = threading.Event()
         self._thread: "threading.Thread | None" = None
+        self._last_hour_sampled = 0  # 上一次采样的整点 epoch
 
     def start(self) -> None:
-        if self.store is None:
+        if self.store is None and self.trend_store is None:
             return
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
@@ -770,19 +799,57 @@ class _ObservationSaver:
     def _loop(self) -> None:
         while not self._stop.wait(self.interval):
             try:
-                self.store.save(self.service.snapshot_observations())
+                if self.store is not None:
+                    self.store.save(self.service.snapshot_observations())
             except Exception:
                 logger.exception("周期持久化观测快照失败")
+            # 叠加：整点趋势采样（同一线程、不额外增加轮询开销）
+            try:
+                self._maybe_sample_trend()
+            except Exception:
+                logger.exception("周期趋势采样失败")
+
+    def _maybe_sample_trend(self) -> None:
+        """每小时整点落一条趋势统计。由 60s 周期调用，内部用时间戳整除判断是否到点。"""
+        if self.trend_store is None:
+            return
+        now = int(time.time())
+        hour_epoch = (now // self.HOUR_SECS) * self.HOUR_SECS
+        if hour_epoch == self._last_hour_sampled:
+            return  # 本小时已采样过（避免重跑 / 同小时多次触发）
+        # 取数同源：复用 service 已有接口，不重复计算
+        stats = self.service.get_stats()
+        checkup = self.service.privacy_checkup()
+        self.trend_store.record_hourly(
+            hour_epoch=hour_epoch,
+            devices_total=stats.get("devices_total", 0),
+            devices_seen_24h=stats.get("devices_total", 0),  # 社区版无 24h 活跃窗口，用当前数兜底
+            alerts_active=stats.get("alerts_active", 0),
+            alerts_high=len([a for a in self.service.alert_center.active()
+                             if a.severity in ("high", "critical")])
+                         if hasattr(self.service, "alert_center") else 0,
+            privacy_score=checkup.get("score", 0),
+            unknown_domains=stats.get("unknown_domains_count", 0),
+            vendor_hit_rate=checkup.get("coverage_rate", 0.0),
+        )
+        self._last_hour_sampled = hour_epoch
 
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
-        if self.store is not None:
-            try:
+        now = int(time.time())
+        try:
+            if self.store is not None:
                 self.store.save(self.service.snapshot_observations())
+        except Exception:
+            logger.exception("关闭前持久化观测快照失败")
+        # 关闭前补采样一次当前小时（如果还没落过）—— 避免最后半小时的数据丢失
+        if self.trend_store is not None:
+            try:
+                self._maybe_sample_trend()
             except Exception:
-                logger.exception("关闭前持久化观测快照失败")
+                logger.exception("关闭前趋势采样失败")
 
 
 def main(argv=None) -> int:
@@ -866,6 +933,7 @@ def main(argv=None) -> int:
     # 观测状态持久化：生产模式默认开启（重启不丢设备/告警），演示模式默认关闭
     # （避免把演示数据落进真实数据库）。--no-persist 可强制关闭。
     observation_store = None
+    trend_store = None
     if (not args.demo) and (not args.no_persist):
         observation_store = SqliteObservationStore(ROOT / "data" / "observations.db")
         snapshot = observation_store.load()
@@ -874,6 +942,9 @@ def main(argv=None) -> int:
             logger.info("已从 SQLite 恢复观测快照（%d 条）", n)
         else:
             logger.info("暂无历史观测快照，本次从零开始累计")
+        # P1-4 趋势持久化：和 observations.db 同目录下的独立 trend_store.db
+        trend_store = TrendStore(ROOT / "data" / "trends.db")
+        logger.info("趋势持久化已启用（data/trends.db，每小时采样，30 天滚动）")
 
     runner = None
     if args.demo:
@@ -897,7 +968,8 @@ def main(argv=None) -> int:
 
     try:
         run_server(service, host=args.host, port=args.port, auth=auth,
-                   observation_store=observation_store)
+                   observation_store=observation_store,
+                   trend_store=trend_store)
     finally:
         if runner is not None:
             runner.stop()

@@ -102,6 +102,12 @@ async function loadAll() {
     state.error = err.message || String(err);
     state.data.license = lic;
   }
+  // P1-4 趋势数据：容错拉取（没启用 trend_store 时返回空对象，不阻塞界面）
+  try {
+    state.data.trend = await api("/api/trends?days=7");
+  } catch {
+    state.data.trend = { days: 7, points: [] };
+  }
   render();
 }
 
@@ -313,6 +319,103 @@ function renderAlerts() {
     <div class="list">${items.map(alertCard).join("")}</div>
   </div>`;
 }
+
+// —— P1-4 趋势面板 ——
+async function _refetchTrend(days) {
+  try {
+    state.data.trend = await api(`/api/trends?days=${days}`);
+  } catch {
+    state.data.trend = { days, points: [] };
+  }
+  render();
+}
+
+function renderTrends() {
+  const d = state.data.trend || { points: [] };
+  const points = d.points || [];
+  const currentDays = d.days || 7;
+
+  // 无数据时的引导：首次启动后每小时自动采样，7 天后自然有
+  if (!points.length) {
+    return `
+      <div class="card empty">
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px">⏳ 趋势数据还在累积</div>
+        <p>家卫每小时整点自动采样一次。启动后约 <b>7 天</b> 可看到完整一周的活跃趋势，<b>30 天</b> 可看到月度规律。</p>
+        <p>采样不消耗额外流量、不影响设备性能，数据只存在本地 SQLite（<code>data/trends.db</code>），超过 30 天自动滚动清理。</p>
+      </div>`;
+  }
+
+  // 简易 div-bar 图：三条曲线叠加（设备数柱状 + 告警点 + 隐私分线）
+  const maxDevices = Math.max(...points.map(p => p.devices_total), 1);
+  const maxAlerts = Math.max(...points.map(p => p.alerts_active), 1);
+  const widthPct = 100 / Math.max(points.length, 1);
+
+  const bars = points.map((p, i) => {
+    const devH = (p.devices_total / maxDevices) * 100;
+    const alertTop = 100 - (p.alerts_active / maxAlerts) * 100;
+    const scoreTop = 100 - p.privacy_score;  // score 0-100 直接当 %
+    const hr = new Date(p.hour_epoch * 1000);
+    const label = hr.getHours().toString().padStart(2, "0") + ":00";
+    // 每 6 小时显示一次标签，避免拥挤
+    const showLabel = (i % 6 === 0) || i === points.length - 1;
+    return `
+      <div class="trend-col" style="width:${widthPct}%">
+        <div class="trend-canvas">
+          <div class="trend-bar" style="height:${devH}%" title="设备 ${p.devices_total}"></div>
+          ${p.alerts_active > 0 ? `<div class="trend-dot trend-alert" style="bottom:${alertTop}%" title="告警 ${p.alerts_active}"></div>` : ""}
+          <div class="trend-dot trend-score" style="bottom:${scoreTop}%" title="隐私分 ${p.privacy_score}"></div>
+        </div>
+        ${showLabel ? `<div class="trend-label">${label}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  // 汇总卡：第一天 vs 最后一天的对比
+  const first = points[0], last = points[points.length - 1];
+  const summary = `
+    <div class="card" style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><div class="muted small">窗口</div><div><b>${points.length}</b> 小时（${currentDays} 天）</div></div>
+      <div><div class="muted small">设备峰值</div><div><b>${maxDevices}</b> 台</div></div>
+      <div><div class="muted small">告警峰值</div><div><b>${maxAlerts}</b> 条</div></div>
+      <div><div class="muted small">起始隐私分</div><div><b>${first.privacy_score}</b></div></div>
+      <div><div class="muted small">当前隐私分</div><div><b>${last.privacy_score}</b></div></div>
+    </div>`;
+
+  const rangeBtn = (days, label) => `
+    <button class="btn btn-sm ${currentDays === days ? "" : "is-muted"}"
+            type="button" data-trend-days="${days}">${label}</button>`;
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2>活跃趋势</h2>
+        <div style="display:flex;gap:6px">
+          ${rangeBtn(7, "7 天")}
+          ${rangeBtn(14, "14 天")}
+          ${rangeBtn(30, "30 天")}
+        </div>
+      </div>
+      ${summary}
+      <div class="card">
+        <div class="trend-legend">
+          <span class="trend-legend-item"><span class="trend-legend-swatch" style="background:var(--accent)"></span>设备数</span>
+          <span class="trend-legend-item"><span class="trend-legend-swatch trend-alert"></span>告警</span>
+          <span class="trend-legend-item"><span class="trend-legend-swatch trend-score"></span>隐私分（0-100）</span>
+        </div>
+        <div class="trend-chart">${bars}</div>
+      </div>
+      <div class="muted small" style="margin-top:8px">提示：设备数（绿柱）= 同一小时内出现过 DNS 查询的设备数；告警点（红点）= 该小时末的活跃告警数；隐私分（蓝点）= 当前体检分数。数据只存在本地 SQLite，不联网。</div>
+    </div>`;
+}
+
+// trend 范围切换：拦截 click → refetch → render
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-trend-days]");
+  if (btn) {
+    e.preventDefault();
+    const days = parseInt(btn.dataset.trendDays, 10);
+    if (!isNaN(days)) _refetchTrend(days);
+  }
+});
 
 function renderUnknown() {
   const d = state.data.unknown || {};
@@ -644,6 +747,7 @@ const RENDERERS = {
   devices: renderDevices,
   destinations: renderDestinations,
   alerts: renderAlerts,
+  trend: renderTrends,
   unknown: renderUnknown,
   suggestions: renderSuggestions,
   blind: renderBlind,
