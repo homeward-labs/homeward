@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-10-27.12 — P0 首屏加载态修复
+
+> TASKS-2026-10-27 确认"首屏加载态修复"当年说"随下一批交付"但**从未进代码**——真机 254/252 冷启动后 UI 全是 `?? 0` 零值，用户体验极差。单文件 10 行修完。
+
+### `2b385b3` — fix(ui): 首屏加载态骨架
+
+- `src/ui/static/app.js`（+9 -1）
+  - `state` 加 `loaded: false` 标记
+  - `loadAll()` 开头 `state.loaded = false` + 结尾 `state.loaded = true`
+  - `render()` 加 `(!state.loaded && !state.error)` 判断 → 显示"加载中… 正在拉取设备清单、观测记录与告警。服务首次启动约 5–15 秒完成采集器协商。"
+  - 三态互斥：error（接口挂了）→ loading（还在拉）→ body（数据回来了）
+- 回归：408 passed
+
+---
+
 ## 2026-10-27.11 — Phase 2 Tier 2 接入
 
 > Tier 2（连接元数据 / conntrack）此前已实现但与 Tier 1（DNS）各自独立，产出的 flow 没合并。本批次三件事让"社区版两 Tier 真合并叙事"成立：DNS↔IP 关联缓存、国产知识库扩量、前端采集器状态条。飞牛 / OpenWrt 应用商店打包排后续。
