@@ -184,6 +184,11 @@ EVIDENCE_KEYS = frozenset({
     "destination_categories",  # 目标域名必须命中知识库指定类别（如 crypto_mining）
     "subdomain_length_min",   # 最长标签长度（DNS 隧道）
     "dns_rate_min",           # DNS 查询速率（次/秒）
+    # P1-3 新增：跨设备追踪 / 作息节律 —— 这两个键由 BehaviorDetector 层
+    # 单独处理（rule_engine matcher 不认识它们，但 rule_engine 允许 pattern 里
+    # 出现这些键，_matches 跳过未知 evidence 键）
+    "min_devices",                      # cross_device_tracking：跨设备聚合阈值
+    "active_hour_concentration_min",    # sleep_rhythm：活跃小时集中度阈值
 })
 """命中一条规则所需的**证据**。一条规则至少要用到其中一个。"""
 

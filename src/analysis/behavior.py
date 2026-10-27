@@ -124,7 +124,15 @@ class BehaviorDetector:
         self.max_records = int(max_records)
         self.rules = list(self.matcher.supported_rules)
 
-        windows = [float(r.get("window_seconds", DEFAULT_WINDOW_SECONDS)) for r in self.rules]
+        # retention 是 FIFO 观测池的裁剪阈值 —— 只看 rule_engine 常规规则的
+        # window。跨设备追踪 / 作息节律这类在 scan 里单独处理的规则，
+        # 它们的 window 不影响全局 retention（数据凑不够时规则自然静默）
+        _LARGE_WINDOW_SKIP_IDS = frozenset({"sleep_rhythm", "cross_device_tracking"})
+        windows = [
+            float(r.get("window_seconds", DEFAULT_WINDOW_SECONDS))
+            for r in self.rules
+            if r.get("id") not in _LARGE_WINDOW_SKIP_IDS
+        ]
         self.retention_seconds = max(windows) if windows else DEFAULT_WINDOW_SECONDS
 
         # 两个粒度的观测池，都是 FIFO 有界队列
@@ -187,8 +195,26 @@ class BehaviorDetector:
         for rule in self.rules:
             scope = rule.get("scope", "destination")
             window = float(rule.get("window_seconds", DEFAULT_WINDOW_SECONDS))
-            buckets = self.device_flows if scope == "device" else self.dest_flows
             pattern = rule.get("pattern") or {}
+
+            # —— 跨设备规则（scope=cross）—— rule_engine 只负责单设备/单目的地，
+            # 跨设备要先按 destination 聚合所有 device_flows 里的 src_ip 集合，
+            # 再看"多少不同的设备碰过同一个 dest"
+            if scope == "cross":
+                findings.extend(self._scan_cross_device(rule, window, now))
+                continue
+
+            # —— 作息节律（sleep_rhythm）—— rule_engine evidence 键里没有
+            # "活跃时段分布"，所以在这里单独处理
+            if rule.get("id") == "sleep_rhythm" or (
+                isinstance(rule.get("pattern"), dict)
+                and "active_hour_concentration_min" in rule["pattern"]
+            ):
+                findings.extend(self._scan_sleep_rhythm(rule, window, now))
+                continue
+
+            # —— 常规规则（rule_engine 能处理的）——
+            buckets = self.device_flows if scope == "device" else self.dest_flows
 
             for key, bucket in buckets.items():
                 if not bucket:
@@ -205,6 +231,104 @@ class BehaviorDetector:
 
         self.stats["findings"] += len(findings)
         return findings
+
+    # ——— 新增：跨设备追踪（cross_device_tracking）——
+    def _scan_cross_device(
+        self, rule: dict, window: float, now: float
+    ) -> list[BehaviorFinding]:
+        """按 destination 聚合所有设备的观测，筛出"≥ min_devices 台设备碰过"的目标"""
+        pat = rule.get("pattern") or {}
+        min_devices = int(pat.get("min_devices", 2))
+        min_occurrences = int(pat.get("min_occurrences", 3))
+
+        # 1. 按 destination 聚合 (src_ip → [records])
+        dest_devices: dict[str, dict[str, list[FlowRecord]]] = {}
+        for src_ip, bucket in self.device_flows.items():
+            for f in bucket:
+                if not (now - window <= f.timestamp <= now):
+                    continue
+                dest = destination_of(f)
+                if not dest:
+                    continue
+                dest_devices.setdefault(dest, {}).setdefault(src_ip, []).append(f)
+
+        out: list[BehaviorFinding] = []
+        for dest, devices in dest_devices.items():
+            if len(devices) < min_devices:
+                continue
+            all_records: list[FlowRecord] = []
+            for recs in devices.values():
+                all_records.extend(recs)
+            if len(all_records) < min_occurrences:
+                continue
+
+            # 构造 evidence
+            device_ips = list(devices.keys())
+            device_list_str = ", ".join(sorted(device_ips))
+            evidence = summarize(all_records)
+            evidence["devices_hit"] = len(device_ips)
+            evidence["device_list"] = device_list_str
+            evidence["device_count"] = len(device_ips)
+
+            # 用 first device 作为 "src_ip" 展示（alerting 会转成 device_name）
+            first_ip = sorted(device_ips)[0]
+            finding = self._build(rule, first_ip, dest, all_records, window, "cross")
+            # 覆盖 evidence 里刚加的跨设备字段
+            finding.evidence.update(evidence)
+            finding.src_ip = first_ip
+            finding.destination = dest
+            out.append(finding)
+        return out
+
+    # ——— 新增：作息节律（sleep_rhythm）——
+    def _scan_sleep_rhythm(
+        self, rule: dict, window: float, now: float
+    ) -> list[BehaviorFinding]:
+        """统计一台设备在窗口内的活跃小时分布，判定是否有明显节律"""
+        pat = rule.get("pattern") or {}
+        min_occurrences = int(pat.get("min_occurrences", 12))
+        concentration_min = float(pat.get("active_hour_concentration_min", 0.6))
+
+        out: list[BehaviorFinding] = []
+        for src_ip, bucket in self.device_flows.items():
+            records = [f for f in bucket if now - window <= f.timestamp <= now]
+            if len(records) < min_occurrences:
+                continue
+
+            dist = self._hour_distribution(records)
+            if not dist:
+                continue
+
+            # top 活跃小时占比
+            total = sum(dist.values())
+            top_hours = sorted(dist.items(), key=lambda kv: -kv[1])[:4]
+            top_count = sum(c for _, c in top_hours)
+            concentration = top_count / total if total > 0 else 0.0
+
+            if concentration < concentration_min:
+                continue
+
+            # 取 top 活跃小时区间（连续 4 小时内的活跃集中区）
+            active_hour_set = {h for h, _ in top_hours}
+            top_hour = top_hours[0][0] if top_hours else -1
+
+            evidence = summarize(records)
+            evidence["top_active_hour"] = top_hour
+            evidence["active_hours"] = "、".join(f"{h}:00" for h in sorted(active_hour_set))
+            evidence["concentration_pct"] = round(concentration * 100)
+
+            out.append(self._build(rule, src_ip, "", records, window, "device"))
+            out[-1].evidence.update(evidence)
+        return out
+
+    @staticmethod
+    def _hour_distribution(records: list[FlowRecord]) -> dict[int, int]:
+        """按 UTC+0 小时分组统计 —— 告警渲染层再用本地时间显示"""
+        buckets: dict[int, int] = {}
+        for f in records:
+            h = time.localtime(f.timestamp).tm_hour
+            buckets[h] = buckets.get(h, 0) + 1
+        return buckets
 
     def _build(
         self,

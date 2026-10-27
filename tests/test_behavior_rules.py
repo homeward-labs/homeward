@@ -252,7 +252,7 @@ class TestShippedLibraryHealth(unittest.TestCase):
                               "explanation", "side_effects", "scope", "window_seconds"):
                     self.assertTrue(rule.get(field), f"{rule['id']} 缺字段 {field}")
                 self.assertIn(rule["severity"], {"critical", "high", "medium", "low"})
-                self.assertIn(rule["scope"], {"device", "destination"})
+                self.assertIn(rule["scope"], {"device", "destination", "cross"})
                 self.assertGreater(float(rule["window_seconds"]), 0)
 
     def test_explanations_only_use_renderable_placeholders(self):
@@ -274,7 +274,8 @@ class TestShippedLibraryHealth(unittest.TestCase):
                 self.assertTrue(keys & EVIDENCE_KEYS, f"{rid} 没有任何证据键")
 
     def test_all_eight_behaviors_present(self):
-        self.assertEqual(len(self.matcher.supported_rules), 8)
+        # MVP 8 条 + P1-3 新加 2 条（sleep_rhythm + cross_device_tracking）
+        self.assertEqual(len(self.matcher.supported_rules), 10)
 
 
 if __name__ == "__main__":

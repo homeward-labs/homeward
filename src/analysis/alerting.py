@@ -118,6 +118,9 @@ TEMPLATE_KEYS = frozenset({
     "total_mb", "total_bytes",
     "start_time", "end_time", "duration_min", "window_minutes",
     "occurrences", "length", "rate", "connections",
+    # P1-3 新增：跨设备追踪 / 作息节律
+    "devices_hit", "device_list",
+    "top_active_hour", "active_hours", "concentration_pct",
 })
 
 _UNKNOWN_ORG = "未识别"
@@ -171,6 +174,13 @@ def build_context(
         "length": int(ev.get("longest_label", 0) or 0),
         "rate": f"{float(ev.get('dns_rate', 0.0) or 0.0):.1f}",
         "connections": int(ev.get("distinct_connections", 0) or 0),
+        # P1-3 新增：跨设备追踪 / 作息节律 —— evidence 里直接取，
+        # 没有时返回 0 / 空字符串，渲染器会自动替换成占位符
+        "devices_hit": int(ev.get("devices_hit", ev.get("device_count", 0)) or 0),
+        "device_list": str(ev.get("device_list", "")),
+        "top_active_hour": int(ev.get("top_active_hour", -1) or -1),
+        "active_hours": str(ev.get("active_hours", "")),
+        "concentration_pct": int(ev.get("concentration_pct", 0) or 0),
     }
 
 
