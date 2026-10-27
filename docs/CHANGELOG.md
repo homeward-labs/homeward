@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-10-27.14 — P1-6 部署网络模式自检
+
+> 社区版最常见的坑：Docker bridge 容器里 Tier 2 conntrack 必然不可用（独立 netns 读不到 /proc/net/nf_conntrack）。之前前端只显示"不可用 + reason tooltip"，用户不知道怎么修。
+
+### `d17fa49` — feat(ui): 网络模式自检 + 修复建议
+
+- `src/ui/static/app.js`（+40）
+  - 新增 `renderCollectorHints(collectors)` helper：扫 `/api/overview` 返回的 `collection_status`
+  - Tier 2 conntrack 不可用 → 显著提示（蓝色 note 卡片）：解释 bridge 容器为什么看不到 nf_conntrack + 两种修复方式（`--network host` 最简；或挂载 /proc/net/nf_conntrack + 装 conntrack-tools）+ 说明不可用时的降级影响
+  - Tier 1 dnsmasq 不可用 → 提示检查 `log-queries` 配置项 + OpenWrt `opkg install dnsmasq`
+  - `renderOverview` 的 collectorBar 里插入 `${renderCollectorHints(collectors)}`
+- 回归：408 passed
+
+---
+
 ## 2026-10-27.13 — P1-5 设备视图打磨
 
 > ROADMAP Phase 2 任务"设备分组/搜索/筛选"——设备台账里经常有几十台设备平铺，用户需要快速定位某台或某类设备。纯前端就能做，不碰后端接口。
