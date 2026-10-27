@@ -223,6 +223,33 @@ def _report_markdown(payload: dict) -> str:
     else:
         L.append("（无）")
     L.append("")
+
+    # —— 趋势段（P1-5：只有 trend_store 启用且有数据时才输出）——
+    trend = payload.get("trend", {})
+    tpoints = trend.get("points") or []
+    if tpoints:
+        L.append(f"## 活跃趋势（最近 {trend.get('days', 7)} 天，每小时一条）")
+        L.append("")
+        # 汇总指标
+        last = tpoints[-1]
+        first = tpoints[0]
+        peak_dev = max(p["devices_total"] for p in tpoints)
+        peak_alert = max(p["alerts_active"] for p in tpoints)
+        L.append(f"- 窗口：{len(tpoints)} 小时")
+        L.append(f"- 设备峰值：{peak_dev} 台（起始 {first['devices_total']} → 当前 {last['devices_total']}）")
+        L.append(f"- 告警峰值：{peak_alert} 条（起始 {first['alerts_active']} → 当前 {last['alerts_active']}）")
+        L.append(f"- 隐私分趋势：{first['privacy_score']} → {last['privacy_score']}")
+        # 表格（每 6 小时一行，最多 24 行）
+        sample = tpoints[::6][-24:]
+        if sample:
+            L.append("")
+            L.append("| 时间 | 设备 | 活跃告警 | 隐私分 | 未知域名 |")
+            L.append("| --- | --- | --- | --- | --- |")
+            for p in sample:
+                hr = time.strftime("%m-%d %H", time.localtime(p["hour_epoch"]))
+                L.append(f"| {hr} | {p['devices_total']} | {p['alerts_active']} | {p['privacy_score']} | {p['unknown_domains']} |")
+        L.append("")
+
     return "\n".join(L)
 
 
@@ -669,6 +696,16 @@ class HomewardHandler(BaseHTTPRequestHandler):
         # **绝不 Dump 知识库**，也不提供「浏览全部已知域名」接口。
         if path == "/api/report":
             payload = svc.export_report()
+            # P1-5：trend_store 已启用时追加趋势段（7 天小时统计点）
+            trend_store = getattr(self, "trend_store", None)
+            if trend_store is not None:
+                try:
+                    payload["trend"] = {
+                        "days": 7,
+                        "points": trend_store.get_hourly(days=7),
+                    }
+                except Exception:
+                    logger.exception("导出报告时读取趋势数据失败（降级继续）")
             fmt = (query.get("format") or ["markdown"])[0].lower()
             if fmt == "json":
                 self._json(200, payload)
