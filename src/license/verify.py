@@ -17,9 +17,11 @@ verify.py —— 家卫社区版 许可令牌验证（零第三方依赖，仅�
 """
 
 import base64
+import binascii
 import json
 import logging
 import os
+import re
 import time
 
 logger = logging.getLogger("homeward.license")
@@ -103,12 +105,57 @@ def canonical(payload: dict) -> bytes:
     ).encode("utf-8")
 
 
+def _b64decode_urlsafe(data: str) -> bytes:
+    """宽松的 base64 解码：兼容标准 base64、base64url、以及 HTML form 污染后的变体。
+
+    为什么需要：Ed25519 签名的 base64 编码里经常出现 ``+`` 和 ``/``。
+    - 如果令牌通过 ``application/x-www-form-urlencoded`` form POST 提交，
+      标准库的 ``urllib.parse.urlencode`` 会把 ``+`` 当成空格（RFC 1866），
+      而前端 ``fetch`` + ``URLSearchParams`` 也会做同样的事（除非显式 encodeURIComponent）。
+      空格在 base64 里是非法字符 → ``binascii.Error`` → ``parse_token`` 返回 (None, None) →
+      「明明签的没问题的令牌永远 invalid」（LIC-06 真机部署排障 2026-10-28）。
+    - 签发端也可能使用 base64url（``+``→``-``、``/``→``_``、padding ``=`` 可省略）。
+
+    本函数按顺序尝试：原生 b64decode → 补 padding + URL-safe 字符修复 → 空白符修复。
+    全部失败则抛出 ``binascii.Error``，由上层 ``parse_token`` 统一处理。
+    """
+    s = data.strip()
+    # 1) 原生解码（最常见路径，零额外开销）
+    try:
+        return base64.b64decode(s, validate=False)
+    except (binascii.Error, ValueError):
+        pass
+
+    # 2) URL-safe 变体：把 - 换回 +、_ 换回 /，补齐 padding
+    s2 = s.replace("-", "+").replace("_", "/")
+    pad = (-len(s2)) % 4
+    s2 += "=" * pad
+    try:
+        return base64.b64decode(s2, validate=False)
+    except (binascii.Error, ValueError):
+        pass
+
+    # 3) HTML form 污染：空格 / Tab / 换行 → +（base64 里本来不会有空白，这是 form 编码的经典坑）
+    if any(c.isspace() for c in s):
+        s3 = re.sub(r"\s+", "+", s2)
+        try:
+            return base64.b64decode(s3, validate=False)
+        except (binascii.Error, ValueError):
+            pass
+
+    raise binascii.Error(f"无法解码 base64：{data[:20]}...")
+
+
 def parse_token(token: str):
-    """拆分令牌为 (payload_dict, signature_bytes)，失败返回 (None, None)。"""
+    """拆分令牌为 (payload_dict, signature_bytes)，失败返回 (None, None)。
+
+    内部走 ``_b64decode_urlsafe`` 宽松解码，抵御 HTML form URL 编码污染和
+    base64url 签发的两种常见变体。
+    """
     try:
         b64_payload, b64_sig = token.split(".", 1)
-        payload = json.loads(base64.b64decode(b64_payload))
-        sig = base64.b64decode(b64_sig)
+        payload = json.loads(_b64decode_urlsafe(b64_payload))
+        sig = _b64decode_urlsafe(b64_sig)
         return payload, sig
     except Exception:
         return None, None
