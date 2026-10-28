@@ -6,6 +6,54 @@
 
 ---
 
+## 2026-10-28 — GHCR 包 visibility 修复 + 正式公钥注入流水线闭环
+
+> 从 2026-10-27 延续下来的两条主线：正式公钥注入镜像 + 生产运行门禁（compose 硬写 prod key），以及新暴露的 GHCR 包 visibility 始终卡在 private 的诊断与修复。**后者花了一整天才定位根因并解决**，过程中学到的 GitHub Actions / Packages 经验非常值得记录。
+
+### `2c6dc3a` · `db5611c` — fix(publish.yml): visibility 权限踩坑（+ 回滚）
+
+- `permissions.packages: write` → 贸然改成 `packages: admin`（以为 admin 能让 GitHub 把包自动设 public）
+- **踩坑**：GitHub Actions 的 `permissions.packages` scope 只支持 `read | write | none`，**没有 `admin`**——非法值导致整个 workflow 被 GitHub 拒，run #39 连 job 都没创建（total_count=0）
+- **秒回滚**：`db5611c` 恢复 `packages: write`，CI 立刻恢复正常（run #40 success）
+- **教训**：不要假设 REST API scope 和 Actions permissions 是一回事——REST 的 PAT 有 `admin:packages`，但 Actions `GITHUB_TOKEN` 的 permissions scope 是独立体系，且范围更窄
+
+### `a7f99b1` — ci(publish.yml): visibility 诊断增强
+
+- 把原来的 `::warning::` visibility 步骤替换成真正的诊断脚本（4 条 curl：GET 当前包状态 + PUT /visibility + PATCH /packages + GET 版本列表），全部带完整响应体 + HTTP status code
+- **诊断结论**（铁证来自 run #41 CI 日志）：
+  - REST API 没有改包 visibility 的端点：`PUT /orgs/.../packages/container/{name}/visibility` → **HTTP 404 Not Found**（`{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}`）
+  - `PATCH /orgs/.../packages/container/{name}` 也返回 404
+  - 新包推送 label 正确（`org.opencontainers.image.source=https://github.com/homeward-labs/homeward`），包 link 到公开仓库（`repository.private: False`），但 visibility 依然 `private`
+- **根因定位**：GitHub REST API 完全没提供改包 visibility 的端点，只能网页 UI 操作。但网页改完保存不了——"该设置由组织管理员禁用"，而组织 Settings → Packages → Package Creation 已确认选了 Public 且 Save
+- 推理：组织刚创建（2026-09-24）时默认 Package Creation = Private，后来虽然改成 Public，但**这个设置只影响未来创建的新包**，不回溯已有 private 包
+
+### `f92f0c9` — 删包重建 visibility 修复
+
+- **解法**：用 PAT（含 `delete:packages` scope）直接 DELETE 整个 homeward 包（280 个版本 + `visibility=private`），让 publish.yml 下次 push 创建全新的包
+- **执行**：`DELETE https://api.github.com/orgs/homeward-labs/packages/container/homeward` → **HTTP 204**（GitHub DELETE 包的标准响应）
+- **验证**：
+  - 空 commit 触发 publish.yml → 新包 created_at `2026-10-28T05:38:18Z` → **visibility = public！**（version_count 从 280 → 7，更新时间完全重置）
+  - Docker Registry 匿名 token 验证：`GET https://ghcr.io/token?scope=repository:homeward-labs/homeward:pull` → **HTTP 200 + token 返回**（证明公开包匿名 pull 可用）
+  - GitHub Packages API `/orgs/.../packages` 即使对公开包也要求认证（防滥用），但实际 Docker Registry pull 完全匿名
+
+### `a230b8c` — ci(publish.yml): 清理诊断步骤 + 结案注释
+
+- 把诊断脚本替换成结案注释，保留变更日志索引指向本文件
+
+---
+
+## 经验教训（publish.yml 全流程踩坑汇总）
+
+1. **GitHub Actions `permissions.packages` 只有 `read|write|none`，没有 `admin`**——写 `packages: admin` 会让整个 workflow 被 GitHub 静默拒掉（run total_count=0）。REST API 的 PAT scope 体系和 Actions permissions 是两套独立系统，别混淆
+2. **GitHub REST API 没有改包 visibility 的端点**——`PUT/PATCH /orgs/{org}/packages/{type}/{name}/visibility` 全部 404。包 visibility 只能网页 UI 改
+3. **组织级 Package Creation = Public 只影响新包**，已创建的 private 包不会自动继承。需要手动改（网页 Danger Zone）或**删包重建**
+4. **GitHub Packages API vs Docker Registry 的区别**：
+   - `/orgs/{org}/packages/{type}` 是 GitHub 元数据 API，即使公开包也要求认证（防滥用）
+   - `ghcr.io/v2/{org}/{repo}/manifests/{tag}` 是 Docker Registry，公开包匿名 pull token 正常返回（HTTP 200）
+5. **PowerShell `git commit` 通过 stdout/stderr 管道时，pre-push hook 会触发"echo: write error: Bad file descriptor"**——这是 hook 在管道模式下 `echo $var` 的已知问题，push 本身不受影响
+
+---
+
 ## 2026-10-27.14 — P1-6 部署网络模式自检
 
 > 社区版最常见的坑：Docker bridge 容器里 Tier 2 conntrack 必然不可用（独立 netns 读不到 /proc/net/nf_conntrack）。之前前端只显示"不可用 + reason tooltip"，用户不知道怎么修。
