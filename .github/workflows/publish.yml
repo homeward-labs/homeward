@@ -110,9 +110,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 登录 GHCR（拉取组织级包需要）
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # 组织命名空间包匿名 pull 经常 403，用 GHCR_PAT 或 GITHUB_TOKEN 登录。
+          # GHCR_PAT 已配（repo + write:packages scope），对组织包有 pull 权限。
+          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+
       - name: 拉取并跑一遍冒烟
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          # TAG 推导：打 tag v1.2.3 → 用 1.2.3；否则（push main / workflow_dispatch）→ 用 latest。
+          # 注意 GITHUB_REF_NAME 对 push main 是 "main"，不是 "v*"，不能直接拿来当 tag。
+          REF="$GITHUB_REF"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF_NAME#v}"
+          else
+            TAG="latest"
+          fi
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
           echo "验证镜像：$IMAGE"
           docker run -d --name homeward-verify -p 9595:9595 \
