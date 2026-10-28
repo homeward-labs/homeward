@@ -206,8 +206,11 @@ function renderOverview() {
   const vis = d.visibility || {};
   const as = d.alerts || {};
   const spots = d.blind_spots || [];
+  const chk = d.checkup || {};
   const rate = Math.round((cov.hit_rate || 0) * 100);
   const visRate = Math.round((vis.rate || 0) * 100);
+  const score = chk.score ?? 0;
+  const unknownCount = chk.unknown_count ?? 0;
 
   const counts = as.by_severity || {};
   const sevLine = ["critical", "high", "medium", "low"]
@@ -218,7 +221,35 @@ function renderOverview() {
   const topDest = (state.data.destinations?.items || []).slice(0, 6);
   const recentAlerts = (state.data.alerts?.items || []).slice(0, 3);
 
-  // Tier 1 + Tier 2 采集器状态条：如实展示「我能看多少」
+  // —— 前端聚合：设备厂商 / 去向分类 / 告警严重度（零后端改动） ——
+  const vendors = {};
+  (state.data.devices?.items || []).forEach((x) => {
+    const v = x.vendor || "未知厂商";
+    vendors[v] = (vendors[v] || 0) + 1;
+  });
+  const vendorItems = Object.entries(vendors).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([k, v]) => ({ label: k, value: v }));
+
+  const catColors = {
+    own: "#34c759", benign: "#86868b", tracker: "#ff9f0a", ads: "#ff453a",
+    cdn: "#0071e3", social: "#5856d6", ai: "#ff2d55", productivity: "#00b8d4",
+    cloud: "#30b0c7", unknown: "#aeaeb2", iot_core: "#ff9f0a", iot: "#ff9f0a",
+    advertising_sdk: "#ff453a", cloud_storage: "#30b0c7", analytics: "#5856d6",
+    telemetry: "#00b8d4", tracking: "#ff9f0a", malware: "#ff3b30", phishing: "#ff3b30",
+  };
+  const cats = {};
+  (state.data.destinations?.items || []).forEach((x) => {
+    const c = (x.category || "unknown").toLowerCase();
+    cats[c] = (cats[c] || 0) + 1;
+  });
+  const catItems = Object.entries(cats).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "#aeaeb2" }));
+
+  const sevColors = { critical: "#ff3b30", high: "#ff453a", medium: "#ff9f0a", low: "#34c759" };
+  const sevItems = ["critical", "high", "medium", "low"].filter((k) => counts[k])
+    .map((k) => ({ label: k, value: counts[k], color: sevColors[k] }));
+
+  // 采集器状态条：如实展示「我能看多少」（保留原逻辑）
   const collectors = d.collection_status || [];
   const collectorBar = collectors.length ? `
     <div class="section">
@@ -245,8 +276,35 @@ function renderOverview() {
     </div>` : "";
 
   return `
-    ${renderCheckup(d.checkup)}
+    <div class="hero">
+      <div class="ring-wrap">
+        ${HWCharts.donut({
+          size: 168, stroke: 15,
+          segments: [
+            { value: score, color: score >= 80 ? "var(--ok)" : (score >= 60 ? "var(--accent)" : "var(--warn)") },
+            { value: Math.max(100 - score, 0), color: "#eef0f4" },
+          ],
+          ariaLabel: "防护健康分 " + score + " 分（满分 100）",
+        })}
+        <div class="ring-center">
+          <div class="ring-pct">${esc(score)}</div>
+          <div class="ring-cap">健康分 / 100</div>
+        </div>
+        <div class="ring-pulse" title="实时守护中"></div>
+      </div>
+      <div class="hero-body">
+        <div class="hero-title">${esc(chk.verdict || "家庭网络态势")}</div>
+        <div class="hero-sub">家卫正在守护 ${esc(s.devices_total ?? 0)} 台设备 · 域名归属覆盖 ${rate}%</div>
+        <div class="hero-kpis">
+          <div class="hk"><div class="n">${esc(as.active ?? 0)}</div><div class="l">活跃告警</div></div>
+          <div class="hk"><div class="n">${esc(vis.visible ?? 0)}</div><div class="l">可见设备</div></div>
+          <div class="hk"><div class="n">${rate}%</div><div class="l">域名覆盖率</div></div>
+        </div>
+      </div>
+    </div>
+
     ${collectorBar}
+
     <div class="section">
       <div class="grid">
         <div class="stat"><div class="k">设备</div><div class="v">${esc(s.devices_total ?? 0)}</div>
@@ -256,11 +314,36 @@ function renderOverview() {
         <div class="stat"><div class="k">活跃告警</div><div class="v">${esc(as.active ?? 0)}</div>
           <div class="sub">${sevLine}</div></div>
         <div class="stat"><div class="k">域名归属覆盖率</div><div class="v">${rate}%</div>
-          <div class="sub">${esc(cov.hit ?? 0)} / ${esc(cov.total ?? 0)} 个域名认得出来</div>
+          <div class="sub">${esc(cov.hit ?? 0)} / ${esc(cov.total ?? 0)} 认得出来</div>
           <div class="bar" style="margin-top:6px"><i style="width:${rate}%"></i></div></div>
         <div class="stat"><div class="k">设备观测覆盖</div><div class="v">${esc(vis.visible ?? 0)} / ${esc(vis.suspected_invisible ?? 0)}</div>
           <div class="sub">可见 / 疑似不可见</div>
           <div class="bar" style="margin-top:6px"><i style="width:${visRate}%"></i></div></div>
+        <div class="stat"><div class="k">未知域名</div><div class="v">${esc(unknownCount)}</div>
+          <div class="sub">盲区 ${esc(spots.length)} 项</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>设备厂商分布</h3>
+          <div class="chart-hint">按识别出的厂商统计设备数</div>
+          ${vendorItems.length ? HWCharts.hbar({ items: vendorItems, ariaLabel: "设备厂商分布" })
+            : '<div class="empty">暂无设备数据</div>'}
+        </div>
+        <div class="chart-card">
+          <h3>外联去向分类</h3>
+          <div class="chart-hint">观测到的域名按归属类别分布</div>
+          ${catItems.length ? HWCharts.donut({ size: 168, stroke: 20, segments: catItems.map((i) => ({ value: i.value, color: i.color })), ariaLabel: "外联去向分类" }) : '<div class="empty">暂无去向</div>'}
+          <div class="legend">${catItems.map((i) => `<span class="legend-item"><span class="legend-swatch round" style="background:${esc(i.color)}"></span>${esc(i.label)} ${esc(i.value)}</span>`).join("")}</div>
+        </div>
+        <div class="chart-card">
+          <h3>告警严重度</h3>
+          <div class="chart-hint">按严重度分布活跃告警</div>
+          ${sevItems.length ? HWCharts.donut({ size: 168, stroke: 20, segments: sevItems.map((i) => ({ value: i.value, color: i.color })), ariaLabel: "告警严重度分布" }) : '<div class="empty">暂无告警，网络很清净</div>'}
+          <div class="legend">${sevItems.map((i) => `<span class="legend-item"><span class="legend-swatch round" style="background:${esc(i.color)}"></span>${esc(i.label)} ${esc(i.value)}</span>`).join("")}</div>
+        </div>
       </div>
     </div>
 
@@ -286,6 +369,22 @@ function renderOverview() {
 
 function renderDevices() {
   const all = state.data.devices?.items || [];
+
+  // 厂商分布柱状图（前端聚合，零后端改动）
+  const _vendors = {};
+  all.forEach((x) => { const v = x.vendor || "未知厂商"; _vendors[v] = (_vendors[v] || 0) + 1; });
+  const _vendorItems = Object.entries(_vendors).sort((a, b) => b[1] - a[1]).slice(0, 10)
+    .map(([k, v]) => ({ label: k, value: v }));
+  const vendorChart = _vendorItems.length ? `
+    <div class="section">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>设备厂商分布</h3>
+          <div class="chart-hint">按识别出的厂商统计设备数（前 10）</div>
+          ${HWCharts.hbar({ items: _vendorItems, ariaLabel: "设备厂商分布" })}
+        </div>
+      </div>
+    </div>` : "";
 
   // —— 搜索（子串模糊匹配 name/vendor/mac/ips） ——
   const q = state.deviceSearch.trim().toLowerCase();
@@ -403,6 +502,7 @@ function renderDevices() {
   }).join("");
 
   return `
+    ${vendorChart}
     <div class="section">
       <h2>设备画像 <span class="count">（${items.length}/${all.length} 台；高风险 ${high} 台、需关注 ${mid} 台）</span></h2>
 
@@ -450,12 +550,48 @@ function destCard(x) {
 function renderDestinations() {
   const d = state.data.destinations || {};
   const items = d.items || [];
-  if (!items.length) return '<div class="card empty">还没有观测到任何外联去向。</div>';
   const rate = Math.round((d.hit_rate || 0) * 100);
-  return `<div class="section">
-    <h2>去向地图 <span class="count">（${items.length} 个域名，认出 ${d.known || 0} 个，覆盖率 ${rate}%）</span></h2>
-    <div class="list">${items.map(destCard).join("")}</div>
-  </div>`;
+  if (!items.length) return '<div class="card empty">还没有观测到任何外联去向。</div>';
+
+  // 前端聚合：分类饼图 + Top 域名横向柱状（零后端改动）
+  const catColors = {
+    own: "#34c759", benign: "#86868b", tracker: "#ff9f0a", ads: "#ff453a",
+    cdn: "#0071e3", social: "#5856d6", ai: "#ff2d55", productivity: "#00b8d4",
+    cloud: "#30b0c7", unknown: "#aeaeb2", iot_core: "#ff9f0a", iot: "#ff9f0a",
+    advertising_sdk: "#ff453a", cloud_storage: "#30b0c7", analytics: "#5856d6",
+    telemetry: "#00b8d4", tracking: "#ff9f0a", malware: "#ff3b30", phishing: "#ff3b30",
+  };
+  const cats = {};
+  items.forEach((x) => { const c = (x.category || "unknown").toLowerCase(); cats[c] = (cats[c] || 0) + 1; });
+  const catItems = Object.entries(cats).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "#aeaeb2" }));
+  const byDevices = items.map((x) => ({
+    label: x.domain,
+    value: (x.devices || []).reduce((a, dd) => a + (dd.count || 1), 0) || 1,
+  })).sort((a, b) => b.value - a.value).slice(0, 8);
+  const maxDev = Math.max.apply(null, byDevices.map((x) => x.value).concat([1]));
+
+  return `
+    <div class="section">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>去向分类占比</h3>
+          <div class="chart-hint">所有观测到的域名按归属类别分布</div>
+          ${catItems.length ? HWCharts.donut({ size: 180, stroke: 22, segments: catItems.map((i) => ({ value: i.value, color: i.color })), ariaLabel: "去向分类占比" }) : '<div class="empty">暂无数据</div>'}
+          <div class="legend">${catItems.map((i) => `<span class="legend-item"><span class="legend-swatch round" style="background:${esc(i.color)}"></span>${esc(i.label)} ${esc(i.value)}</span>`).join("")}</div>
+        </div>
+        <div class="chart-card">
+          <h3>Top 域名（按请求热度）</h3>
+          <div class="chart-hint">涉及请求量最高的 8 个域名</div>
+          ${byDevices.length ? HWCharts.hbar({ items: byDevices, max: maxDev, ariaLabel: "Top 域名请求热度" }) : '<div class="empty">暂无数据</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>去向地图 <span class="count">（${items.length} 个域名，认出 ${d.known || 0} 个，覆盖率 ${rate}%）</span></h2>
+      <div class="list">${items.map(destCard).join("")}</div>
+    </div>`;
 }
 
 function alertCard(a) {
@@ -489,14 +625,38 @@ function renderAlerts() {
   if (!items.length) {
     return '<div class="card empty">暂无活跃告警。行为识别看的是「一段时间内的若干次观测」，不是单条流量。</div>';
   }
-  return `<div class="section">
-    <div class="sec-head">
-      <h2>告警 <span class="count">（${items.length} 条，按严重度排序）</span></h2>
-      <button class="btn btn-sm btn-warn" type="button" data-action="clear-observations"
-        title="清空设备/域名/告警等全部观测记录，重新开始分析（不删除许可）">清除全部观测记录</button>
+  // 前端聚合：严重度柱状 + 饼图（零后端改动）
+  const sevColors = { critical: "#ff3b30", high: "#ff453a", medium: "#ff9f0a", low: "#34c759" };
+  const counts = {};
+  items.forEach((a) => { counts[a.severity] = (counts[a.severity] || 0) + 1; });
+  const sevItems = ["critical", "high", "medium", "low"].filter((k) => counts[k])
+    .map((k) => ({ label: k, value: counts[k], color: sevColors[k] }));
+
+  return `
+    <div class="section">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>告警严重度分布</h3>
+          <div class="chart-hint">按严重度统计活跃告警数量</div>
+          ${sevItems.length ? HWCharts.donut({ size: 180, stroke: 22, segments: sevItems.map((i) => ({ value: i.value, color: i.color })), ariaLabel: "告警严重度分布" }) : '<div class="empty">暂无告警</div>'}
+          <div class="legend">${sevItems.map((i) => `<span class="legend-item"><span class="legend-swatch round" style="background:${esc(i.color)}"></span>${esc(i.label)} ${esc(i.value)}</span>`).join("")}</div>
+        </div>
+        <div class="chart-card">
+          <h3>严重度柱状</h3>
+          <div class="chart-hint">各严重度告警数对比</div>
+          ${sevItems.length ? HWCharts.vbar({ items: sevItems.map((i) => ({ label: i.label, value: i.value, color: i.color })), ariaLabel: "告警严重度柱状" }) : '<div class="empty">暂无告警</div>'}
+        </div>
+      </div>
     </div>
-    <div class="list">${items.map(alertCard).join("")}</div>
-  </div>`;
+
+    <div class="section">
+      <div class="sec-head">
+        <h2>告警 <span class="count">（${items.length} 条，按严重度排序）</span></h2>
+        <button class="btn btn-sm btn-warn" type="button" data-action="clear-observations"
+          title="清空设备/域名/告警等全部观测记录，重新开始分析（不删除许可）">清除全部观测记录</button>
+      </div>
+      <div class="list">${items.map(alertCard).join("")}</div>
+    </div>`;
 }
 
 // —— P1-4 趋势面板 ——
@@ -524,32 +684,14 @@ function renderTrends() {
       </div>`;
   }
 
-  // 简易 div-bar 图：三条曲线叠加（设备数柱状 + 告警点 + 隐私分线）
-  const maxDevices = Math.max(...points.map(p => p.devices_total), 1);
-  const maxAlerts = Math.max(...points.map(p => p.alerts_active), 1);
-  const widthPct = 100 / Math.max(points.length, 1);
-
-  const bars = points.map((p, i) => {
-    const devH = (p.devices_total / maxDevices) * 100;
-    const alertTop = 100 - (p.alerts_active / maxAlerts) * 100;
-    const scoreTop = 100 - p.privacy_score;  // score 0-100 直接当 %
-    const hr = new Date(p.hour_epoch * 1000);
-    const label = hr.getHours().toString().padStart(2, "0") + ":00";
-    // 每 6 小时显示一次标签，避免拥挤
-    const showLabel = (i % 6 === 0) || i === points.length - 1;
-    return `
-      <div class="trend-col" style="width:${widthPct}%">
-        <div class="trend-canvas">
-          <div class="trend-bar" style="height:${devH}%" title="设备 ${p.devices_total}"></div>
-          ${p.alerts_active > 0 ? `<div class="trend-dot trend-alert" style="bottom:${alertTop}%" title="告警 ${p.alerts_active}"></div>` : ""}
-          <div class="trend-dot trend-score" style="bottom:${scoreTop}%" title="隐私分 ${p.privacy_score}"></div>
-        </div>
-        ${showLabel ? `<div class="trend-label">${label}</div>` : ""}
-      </div>`;
-  }).join("");
-
-  // 汇总卡：第一天 vs 最后一天的对比
+  const maxDevices = Math.max.apply(null, points.map((p) => p.devices_total).concat([1]));
+  const maxAlerts = Math.max.apply(null, points.map((p) => p.alerts_active).concat([1]));
   const first = points[0], last = points[points.length - 1];
+
+  const devPts = points.map((p) => ({ y: p.devices_total }));
+  const alertPts = points.map((p) => ({ y: p.alerts_active }));
+  const scorePts = points.map((p) => ({ y: p.privacy_score }));
+
   const summary = `
     <div class="card" style="display:flex;gap:24px;flex-wrap:wrap">
       <div><div class="muted small">窗口</div><div><b>${points.length}</b> 小时（${currentDays} 天）</div></div>
@@ -560,7 +702,7 @@ function renderTrends() {
     </div>`;
 
   const rangeBtn = (days, label) => `
-    <button class="btn btn-sm ${currentDays === days ? "" : "is-muted"}"
+    <button class="btn btn-sm ${currentDays === days ? "is-active" : "is-muted"}"
             type="button" data-trend-days="${days}">${label}</button>`;
 
   return `
@@ -580,9 +722,21 @@ function renderTrends() {
           <span class="trend-legend-item"><span class="trend-legend-swatch trend-alert"></span>告警</span>
           <span class="trend-legend-item"><span class="trend-legend-swatch trend-score"></span>隐私分（0-100）</span>
         </div>
-        <div class="trend-chart">${bars}</div>
+        ${HWCharts.areaMulti({
+          height: 170, max: Math.max(maxDevices, maxAlerts),
+          series: [
+            { points: devPts, color: "var(--accent)", fill: true },
+            { points: alertPts, color: "var(--danger)", fill: false },
+          ],
+          ariaLabel: "设备数与告警趋势",
+        })}
+        ${HWCharts.areaMulti({
+          height: 120, max: 100,
+          series: [{ points: scorePts, color: "#00b8d4", fill: true }],
+          ariaLabel: "隐私分趋势（0-100）",
+        })}
       </div>
-      <div class="muted small" style="margin-top:8px">提示：设备数（绿柱）= 同一小时内出现过 DNS 查询的设备数；告警点（红点）= 该小时末的活跃告警数；隐私分（蓝点）= 当前体检分数。数据只存在本地 SQLite，不联网。</div>
+      <div class="muted small" style="margin-top:8px">提示：设备数（蓝）与告警（红）共享左轴；隐私分（青，0-100）单独成图。数据只存在本地 SQLite，不联网。</div>
     </div>`;
 }
 
