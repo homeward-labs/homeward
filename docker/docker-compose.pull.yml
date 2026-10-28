@@ -77,7 +77,12 @@ services:
       - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
       # 许可令牌 / 设备标识落盘目录（随 /app/data 卷持久化，容器重建不丢指纹）
       - HOMEWARD_DATA_DIR=/app/data/homeward
+      # 正式 Ed25519 公钥（LIC-06 §4.3）。默认留空让镜像用内嵌值；
+      # 部署方在 .env 里显式注入 prod key（或构建时注入），并同时设 REQUIRE_PROD_KEY=1。
       - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
+      # 运行门禁：设为 1 则 verify.py 的 assert_production_key 强制 prod key，
+      # dev key 启动直接 RuntimeError（挡住误发版）。默认空 = 只告警不阻断。
+      - HOMEWARD_REQUIRE_PROD_KEY=${HOMEWARD_REQUIRE_PROD_KEY:-}
     ports:
       - "9595:9595"
     command: ["python", "-m", "src.ui.server"]
