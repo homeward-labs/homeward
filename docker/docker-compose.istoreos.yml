@@ -91,5 +91,8 @@ services:
       - HOMEWARD_SELF_IPS=${HOMEWARD_SELF_IPS:-}
       # 许可令牌 / 设备标识落盘目录（随 ./data 卷持久化，容器重建不丢指纹）
       - HOMEWARD_DATA_DIR=/app/data/homeward
-      - HOMEWARD_LICENSE_PUBLIC_KEY_B64=${HOMEWARD_LICENSE_PUBLIC_KEY_B64:-}
+      # 构建时注入的正式 Ed25519 公钥（LIC-06 §4.3）
+      - HOMEWARD_LICENSE_PUBLIC_KEY_B64=8pbevfV2TnyqyP9TrW5uUgUK2fjwhbN20/XuY52YcOo=
+      # 运行门禁：强制使用正式公钥，dev key 启动直接 RuntimeError exit 2
+      - HOMEWARD_REQUIRE_PROD_KEY=1
     command: ["python", "-m", "src.ui.server"]
