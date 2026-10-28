@@ -73,35 +73,39 @@ jobs:
           build-args: |
             HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
 
-      - name: 将容器包设为公开（公开仓库会自动公开；此步仅作显式加固）
-        # 本仓属组织 homeward-labs，包在组织命名空间下，
-        # 须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
-        # 修正（2026-10-28 · 方案 1）：公开仓库推 GHCR 时，GitHub 会**自动**把容器包可见性
-        #   设为公开（公开仓库 → 公开包），因此此步对公开仓库是「冗余加固」而非「必需」。
-        #   默认 GITHUB_TOKEN 对组织级包无改可见性的 admin 权限，PUT 通常 403/404 → 失败。
-        #   原逻辑用 exit 1 让 job 染红，但这一步在「构建并推送」之后、不影响镜像已推上去，
-        #   且公开仓库本就自动公开 → 红是「假红」（还会顺带阻断下方的 verify job）。
-        #   现改为：失败仅 ::warning::，不染红 job，让 publish 常绿、verify 也能正常跑。
-        #   如需对私有仓库 / 显式控制可见性，在仓库 Secrets 配 GHCR_PAT
-        #   （对 homeward-labs 有包管理员角色）即可让此步真正生效。
+      - name: 诊断 GHCR 包 visibility（列出所有尝试 + 完整响应）
+        # 诊断增强（2026-10-28）：组织 homeward-labs 的 homeward 包 visibility 始终为 private，
+        #   手动改也保存不了。本步骤用 GHCR_PAT 试多种 endpoint，列出完整响应体来定位根因。
+        #   所有尝试都只是诊断，不染红 job。
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo ">>> 尝试将 ghcr.io/homeward-labs/homeward 设为公开（公开仓库通常已自动公开）"
-          code=$(curl -sS -o /tmp/vis.json -w "%{http_code}" -X PUT \
+          echo "=== 1. GET 当前包状态 ==="
+          curl -sS -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            "https://api.github.com/orgs/homeward-labs/packages/container/homeward" | python3 -m json.tool || true
+          echo ""
+          echo "=== 2. PUT /orgs/.../visibility（带 X-GitHub-Api-Version） ==="
+          curl -sS -w "\nHTTP %{http_code}\n" -X PUT \
             -H "Authorization: Bearer ${GHCR_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility" \
-            -d '{"visibility":"public"}' || echo "000")
-          cat /tmp/vis.json 2>/dev/null; echo
-          if [ "${code:0:1}" != "2" ]; then
-            echo "::warning::将包设为公开失败（HTTP ${code}）。公开仓库通常已自动公开；如需显式控制可见性，"
-            echo "::warning::请在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色），或到"
-            echo "::warning::https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动确认公开。"
-          else
-            echo "OK: 已设为公开"
-          fi
+            -d '{"visibility":"public"}' || true
+          echo ""
+          echo "=== 3. PATCH /orgs/.../packages/container/homeward ==="
+          curl -sS -w "\nHTTP %{http_code}\n" -X PATCH \
+            -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/orgs/homeward-labs/packages/container/homeward" \
+            -d '{"visibility":"public"}' || true
+          echo ""
+          echo "=== 4. GET 包的版本列表（检查 labels/source） ==="
+          curl -sS -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            "https://api.github.com/orgs/homeward-labs/packages/container/homeward/versions?per_page=1" | python3 -m json.tool || true
+          echo ""
+          echo "=== 诊断完毕 ==="
 
   verify:
     name: 校验已发布镜像（amd64）
