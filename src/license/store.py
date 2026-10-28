@@ -49,37 +49,57 @@ def device_fingerprint() -> str:
     """本机稳定指纹（sha256，仅本地使用，绝不离开本机）。
 
     用于许可的设备绑定校验（verify.verify_token 的 expected_device_fp）。
-    生产级实现取「磁盘序列号 + 主板 + 系统 UUID」组合；此处用各平台稳定的机器标识
-    做等价绑定（Linux /etc/machine-id、Windows MachineGuid），均不含敏感原始硬件信息。
-    原始标识只参与本地哈希，从不外发；哈希本身也只在本地做一致性比较。
+
+    稳定策略（优先级从高到低）：
+    1. **device.id 存在时（优先）**：只用 ``device.id + "homeward-locks-fp-v1"`` 算哈希。
+       这是部署在持久卷上的随机 UUID，容器重建 / 镜像升级 / glibc 版本变化都不影响。
+       Ed25519 Raw 32 字节种子签名，RFC 8032 兼容。
+    2. **machine-id 可用时**：Linux ``/etc/machine-id`` / Windows MachineGuid。
+       比 device.id 弱（容器重建时 Docker 可能重新生成 machine-id），
+       但比没有强。
+    3. **兜底**：MAC 地址 + ``platform.platform()`` 串。最不稳定（镜像升级
+       时 glibc 版本 / Python 版本变化会改 ``platform.platform()`` 输出），
+       只在前两者都拿不到时用。
+
+    为什么之前会漂移？iStoreOS 容器里没有 ``/etc/machine-id``（fallback 到 MAC +
+    platform），而 platform.platform() 在容器镜像更新时（glibc 版本变）会改字符串，
+    导致 sha256 重算后 fp 变了。device.id 虽然持久化了，但只是 append 到 parts 里，
+    没成为唯一源。现在修复为：有 device.id 时它就是**唯一源**。
     """
+    # 1) 优先用持久化 device.id — 镜像更新 / 容器重建 / 系统依赖变化都不影响
+    sid = _stable_id()
+    if sid:
+        return hashlib.sha256(
+            f"homeward-locks-fp-v1|{sid}".encode("utf-8")
+        ).hexdigest()
+
+    # 2) machine-id（稳定但容器重建可能漂）
     parts = []
-    # Linux：系统 machine-id（稳定、非硬件序列号）
     for p in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
         try:
             parts.append(Path(p).read_text(encoding="utf-8").strip())
         except Exception:
             pass
-    # Windows：注册表 MachineGuid
-    if not parts:
-        try:
-            import winreg
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                               r"SOFTWARE\Microsoft\Cryptography") as k:
-                parts.append(str(winreg.QueryValueEx(k, "MachineGuid")[0]))
-        except Exception:
-            pass
-    # 兜底：MAC + 平台串（隐私友好度较低，仅在前两者都拿不到时用）
-    if not parts:
-        try:
-            parts.append(hex(uuid.getnode()))
-            parts.append(platform.platform())
-        except Exception:
-            parts.append("fallback-unknown")
-    # 持久化稳定标识（能写数据目录时才有）：对抗容器重建 / machine-id 漂移
-    sid = _stable_id()
-    if sid:
-        parts.append(sid)
+    if parts:
+        return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+    # Windows MachineGuid
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                           r"SOFTWARE\Microsoft\Cryptography") as k:
+            guid = str(winreg.QueryValueEx(k, "MachineGuid")[0])
+        if guid:
+            return hashlib.sha256(guid.encode("utf-8")).hexdigest()
+    except Exception:
+        pass
+
+    # 3) 兜底（最不稳定，但比崩溃强）
+    try:
+        parts.append(hex(uuid.getnode()))
+        parts.append(platform.platform())
+    except Exception:
+        parts.append("fallback-unknown")
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
