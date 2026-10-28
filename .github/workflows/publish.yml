@@ -21,7 +21,7 @@ on:
 
 permissions:
   contents: read
-  packages: admin        # admin 而非 write：write 只能推镜像，admin 才能让 GitHub 把包自动设为 public
+  packages: write        # GitHub Actions permissions 只支持 read|write|none，没有 admin
 
 jobs:
   image:
