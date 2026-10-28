@@ -21,7 +21,7 @@ on:
 
 permissions:
   contents: read
-  packages: write        # 推送到 GHCR 必需
+  packages: admin        # admin 而非 write：write 只能推镜像，admin 才能让 GitHub 把包自动设为 public
 
 jobs:
   image:
