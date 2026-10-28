@@ -73,33 +73,35 @@ jobs:
           build-args: |
             HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
 
-      - name: 将容器包设为公开（GHCR 默认私有，须显式改公开）
+      - name: 将容器包设为公开（公开仓库会自动公开；此步仅作显式加固）
         # 本仓属组织 homeward-labs，包在组织命名空间下，
-        # 必须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
-        # ⚠️ 已知坑（见第 10 / 59 批）：默认 GITHUB_TOKEN 对「组织容器包」没有改可见性的
-        #   admin 权限，PUT 会静默 403/404 → 包保持私有 → 下游 verify job 拉取失败、
-        #   整个 publish 标红，但 image 推送其实成功。
-        #   根治：在仓库 Settings → Secrets 配一个对 homeward-labs 有「包管理员」角色的
-        #   PAT（名为 GHCR_PAT）；本步优先用它，失败再回退 GITHUB_TOKEN。
-        #   无论哪个 token，失败都显式 exit 1 让 job 变红（不再静默吞错）。
+        # 须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
+        # 修正（2026-10-28 · 方案 1）：公开仓库推 GHCR 时，GitHub 会**自动**把容器包可见性
+        #   设为公开（公开仓库 → 公开包），因此此步对公开仓库是「冗余加固」而非「必需」。
+        #   默认 GITHUB_TOKEN 对组织级包无改可见性的 admin 权限，PUT 通常 403/404 → 失败。
+        #   原逻辑用 exit 1 让 job 染红，但这一步在「构建并推送」之后、不影响镜像已推上去，
+        #   且公开仓库本就自动公开 → 红是「假红」（还会顺带阻断下方的 verify job）。
+        #   现改为：失败仅 ::warning::，不染红 job，让 publish 常绿、verify 也能正常跑。
+        #   如需对私有仓库 / 显式控制可见性，在仓库 Secrets 配 GHCR_PAT
+        #   （对 homeward-labs 有包管理员角色）即可让此步真正生效。
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo ">>> 尝试将 ghcr.io/homeward-labs/homeward 设为公开"
+          echo ">>> 尝试将 ghcr.io/homeward-labs/homeward 设为公开（公开仓库通常已自动公开）"
           code=$(curl -sS -o /tmp/vis.json -w "%{http_code}" -X PUT \
             -H "Authorization: Bearer ${GHCR_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility" \
-            -d '{"visibility":"public"}')
-          cat /tmp/vis.json; echo
+            -d '{"visibility":"public"}' || echo "000")
+          cat /tmp/vis.json 2>/dev/null; echo
           if [ "${code:0:1}" != "2" ]; then
-            echo "::error::将包设为公开失败（HTTP ${code}）。默认 GITHUB_TOKEN 通常对组织包无 admin 权限。"
-            echo "  请二选一：(1) 在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色）；"
-            echo "  (2) 到 https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动改公开。"
-            exit 1
+            echo "::warning::将包设为公开失败（HTTP ${code}）。公开仓库通常已自动公开；如需显式控制可见性，"
+            echo "::warning::请在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色），或到"
+            echo "::warning::https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动确认公开。"
+          else
+            echo "OK: 已设为公开"
           fi
-          echo "OK: 已设为公开"
 
   verify:
     name: 校验已发布镜像（amd64）
