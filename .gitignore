@@ -49,6 +49,7 @@ scripts/.kb_dist/
 # 注释一律另起一行。
 src/enforcers/
 src/editions/
+workers/
 
 # 如将来确需在 editions/ 下开源社区版代码，用否定规则放行（当前不存在该目录）：
 # !src/editions/community/

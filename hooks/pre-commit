@@ -1,13 +1,31 @@
 #!/bin/sh
 # homeward pre-commit guard
-# 目的：防止标准版/专业版（闭源）代码被误提交到公开仓库。
+# 目的：防止标准版/专业版（闭源）代码与知识库闭源资产被误提交到公开仓库。
+# 判定依据全部来自单一清单 tools/closed_assets.txt（dir / file / pattern 三类生效）。
 # 触发：每次 git commit 前自动运行（见 git config core.hooksPath）。
 # 兼容 Windows git bash：不使用 mktemp/touch/rm，改用管道子shell退出码传递。
 
-# 闭源区是「整个目录」，不只是其下的 standard/ pro/ 子目录 ——
-# 否则直接放在 src/editions/ 下的文件会绕过拦截。
-CLOSED_DIRS="src/enforcers src/editions"
+LIST="tools/closed_assets.txt"
 SENTINELS="@closed-source @standard-only @pro-only"
+
+# 清单缺失 = 判定依据丢失，按 fail-closed 拒绝提交。
+if [ ! -f "$LIST" ]; then
+  echo "BLOCKED: 单一清单 '$LIST' 缺失 —— 无法校验闭源边界，按 fail-closed 拒绝提交。"
+  echo "   请从私有仓恢复该清单后再提交。"
+  exit 1
+fi
+
+CLOSED_DIRS=$(sed -n 's/^dir://p' "$LIST")
+CLOSED_FILES=$(sed -n 's/^file://p' "$LIST")
+
+# 多行 pattern 拼成单个 ERE（p1|p2|…）
+PAT_RE=""
+while IFS= read -r p; do
+  [ -z "$p" ] && continue
+  if [ -z "$PAT_RE" ]; then PAT_RE="$p"; else PAT_RE="$PAT_RE|$p"; fi
+done <<EOF
+$(sed -n 's/^pattern://p' "$LIST")
+EOF
 
 # 管道子shell 内做检查；命中违规则 exit 1，否则 exit 0。
 # 主脚本通过 $? 读取子shell退出码来决定是否放行。
@@ -18,7 +36,7 @@ git diff --cached -z --name-only --diff-filter=ACM | {
     # 1) 目录级拦截（对所有文件生效）
     for d in $CLOSED_DIRS; do
       case "$f" in
-        "$d"/*)
+        "$d"/*|"$d")
           echo "BLOCKED: '$f' 位于闭源目录 '$d'，禁止提交到公开仓库。"
           echo "   请将其保留在本地/私有仓库，或用 git restore --staged '$f' 取消暂存。"
           exit 1
@@ -26,7 +44,16 @@ git diff --cached -z --name-only --diff-filter=ACM | {
       esac
     done
 
-    # 2) 内容标记拦截（仅对 src/ 下源码生效，文档与脚本可合法提及这些词）
+    # 2) 精确文件名拦截（KB 闭源数据 / 内容源文档 / Worker 模板等）
+    for x in $CLOSED_FILES; do
+      if [ "$f" = "$x" ]; then
+        echo "BLOCKED: '$f' 是闭源资产（见 $LIST），禁止提交到公开仓库。"
+        echo "   请用 git restore --staged '$f' 取消暂存，并保留在私有仓。"
+        exit 1
+      fi
+    done
+
+    # 3) 内容标记拦截（仅对 src/ 下源码生效，文档与脚本可合法提及这些词）
     case "$f" in
       src/*)
         for s in $SENTINELS; do
@@ -38,6 +65,15 @@ git diff --cached -z --name-only --diff-filter=ACM | {
         done
         ;;
     esac
+
+    # 4) 活源地址 / 机密标记拦截（检查**暂存内容**，排除清单文件自身）
+    if [ -n "$PAT_RE" ] && [ "$f" != "$LIST" ]; then
+      if git show ":$f" 2>/dev/null | grep -qE "$PAT_RE"; then
+        echo "BLOCKED: '$f' 暂存内容命中活源地址/机密标记（见 $LIST 的 pattern 规则），禁止提交。"
+        echo "   请清除该字符串（真实地址须走闭源构建注入），再重新提交。"
+        exit 1
+      fi
+    fi
   done
   exit 0
 }

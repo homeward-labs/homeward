@@ -4,6 +4,9 @@ name: open-source-boundary
 # hooks/ 里的 pre-commit / pre-push 只在「配好 core.hooksPath 的本地环境」生效，
 # 一旦有人用 --no-verify、或在别人机器上推送，本地钩子就形同虚设。
 # 这个 workflow 在 GitHub 侧重扫一遍全历史，出问题直接红叉并阻断合并。
+#
+# 判定依据全部来自单一清单 tools/closed_assets.txt（dir / file / kbignore / pattern 四类）——
+# 改清单即四处防线同时生效，禁止在 workflow 里再各写一份（防口径漂移）。
 
 on:
   push:
@@ -21,13 +24,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 扫描闭源目录 / 闭源标记
+      - name: 扫描闭源目录 / 闭源文件 / 活源地址
         run: |
           set -u
-          # 闭源区是「整个目录」，不只是其下的 standard/ pro/ 子目录
-          CLOSED_DIRS="src/enforcers src/editions"
+          LIST="tools/closed_assets.txt"
           SENTINEL_RE='@closed-source|@standard-only|@pro-only'
           fail=0
+
+          if [ ! -f "$LIST" ]; then
+            echo "::error::单一清单 $LIST 缺失 —— 防线失去判定依据，按 fail-closed 失败。"
+            exit 1
+          fi
+          CLOSED_DIRS=$(sed -n 's/^dir://p' "$LIST")
+          CLOSED_FILES=$(sed -n 's/^file://p' "$LIST")
+          KBIGNORE=$(sed -n 's/^kbignore://p' "$LIST")
+          PAT_RE=$(sed -n 's/^pattern://p' "$LIST" | paste -sd'|' -)
 
           echo "--- 1) 工作树中是否出现闭源目录 ---"
           for d in $CLOSED_DIRS; do
@@ -41,13 +52,34 @@ jobs:
           git log --all --pretty=format: --name-only | sort -u > /tmp/all_files.txt
           for d in $CLOSED_DIRS; do
             if grep -q "^$d/" /tmp/all_files.txt; then
-              echo "::error::提交历史中出现闭源路径: $d/"
+              echo "::error::提交历史中出现闭源目录: $d/"
               grep "^$d/" /tmp/all_files.txt || true
               fail=1
             fi
           done
+          for x in $CLOSED_FILES; do
+            if grep -qxF "$x" /tmp/all_files.txt; then
+              echo "::error::提交历史中出现闭源文件: $x"
+              fail=1
+            fi
+          done
 
-          echo "--- 3) src/ 下的闭源标记哨兵 ---"
+          echo "--- 3) 索引（git ls-files）中是否混入闭源路径 ---"
+          git ls-files > /tmp/tracked.txt
+          for d in $CLOSED_DIRS; do
+            if grep -q "^$d/" /tmp/tracked.txt; then
+              echo "::error::索引中含闭源目录: $d/"
+              fail=1
+            fi
+          done
+          for x in $CLOSED_FILES; do
+            if grep -qxF "$x" /tmp/tracked.txt; then
+              echo "::error::索引中含闭源文件: $x"
+              fail=1
+            fi
+          done
+
+          echo "--- 4) src/ 下的闭源标记哨兵 ---"
           # 只扫 src/：docs/ 与 hooks/ 需要合法地「提及」这些标记词，不应误报。
           if git grep -l -E "$SENTINEL_RE" -- src/ > /tmp/sentinels.txt 2>/dev/null; then
             echo "::error::以下 src/ 文件含闭源标记，不得开源："
@@ -55,17 +87,41 @@ jobs:
             fail=1
           fi
 
-          echo "--- 4) .gitignore 防线是否完好 ---"
+          echo "--- 5) 活源地址 / 机密标记（HEAD 全树内容） ---"
+          # 排除清单文件自身（它必然含有 pattern 明文）。
+          if [ -n "$PAT_RE" ] && git grep -l -E "$PAT_RE" HEAD -- . ':(exclude)tools/closed_assets.txt' > /tmp/pat_head.txt 2>/dev/null; then
+            echo "::error::HEAD 命中活源地址 / 机密标记："
+            cat /tmp/pat_head.txt
+            fail=1
+          fi
+
+          echo "--- 6) 活源地址 / 机密标记（全历史内容，git log -G） ---"
+          if [ -n "$PAT_RE" ]; then
+            pat_commits=$(git log --all --pretty=format:%h -G "$PAT_RE" -- . ':(exclude)tools/closed_assets.txt')
+            if [ -n "$pat_commits" ]; then
+              echo "::error::历史中曾引入活源地址 / 机密标记的提交："
+              echo "$pat_commits"
+              fail=1
+            fi
+          fi
+
+          echo "--- 7) .gitignore 防线是否完好（含 KB 子 .gitignore） ---"
           for d in $CLOSED_DIRS; do
             if ! grep -qE "^${d}/?$" .gitignore; then
               echo "::error::.gitignore 缺少规则: $d"
               fail=1
             fi
           done
+          for x in $KBIGNORE; do
+            if ! grep -qxF "$x" src/knowledge_base/.gitignore; then
+              echo "::error::src/knowledge_base/.gitignore 缺少必备规则: $x"
+              fail=1
+            fi
+          done
 
           if [ "$fail" -ne 0 ]; then
             echo ""
-            echo "闭源边界检查失败。公开仓库绝不能包含标准版 / 专业版实现。"
+            echo "闭源边界检查失败。公开仓库绝不能包含标准版 / 专业版实现与知识库闭源资产。"
             echo "若已推送，视为泄露：立即将仓库置私有，并清理历史（见 docs/EDITIONS.md）。"
             exit 1
           fi
@@ -76,6 +132,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 社区版单测回归
+      - name: 安装开发期依赖
         run: |
-          python -m unittest discover -s tests -v
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: 社区版单测回归（pytest 全量，口径与 tests.yml 一致）
+        # 原先用 `unittest discover`，只收 TestCase 子类，会漏掉 tests/test_qr.py 与
+        # tests/test_license.py 里模块级 `def test_*` 函数（共 20 例）——结果显示「绿」
+        # 但只是子集，且与 tests.yml 的 pytest 口径不一致，会误导读结果的人（214 批 R3）。
+        # 这里改为 pytest 全量，与 tests.yml 保持同一口径。
+        run: |
+          python -m pytest tests -q

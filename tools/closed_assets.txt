@@ -1,0 +1,67 @@
+# ============================================================================
+# 家卫 Homeward · 公开仓「闭源资产」单一清单（Single Source of Truth）
+# ----------------------------------------------------------------------------
+# 本文件是四道闭源防线的**唯一**判定依据，禁止在其它脚本里再各写一份目录/文件/规则
+# （历史上正是「四处各写一份 CLOSED_DIRS」导致口径漂移 —— 见 214 批架构评估报告根因 C）。
+#
+# 引用方（改本文件即四处同时生效，无需改动任何脚本）：
+#   · tools/check_open_boundary.py / .sh / .ps1   —— 手动自查（最全）
+#   · hooks/pre-commit                            —— 提交前
+#   · hooks/pre-push                              —— 推送前（含整树 + 历史扫描）
+#   · .github/workflows/open-boundary.yml         —— CI 兜底
+#
+# 格式：每行一条，`#` 起始为注释，空行忽略；值本身不含空格。
+#   dir:<path>      闭源目录（其下所有路径均闭源，前缀匹配）
+#   file:<path>     闭源文件（精确路径匹配）
+#   kbignore:<name>  src/knowledge_base/.gitignore 必须包含的行（防误删 / 误改第一道防线）
+#   pattern:<re>     活源地址 / 机密标记正则（命中即刻 fail；POSIX ERE，与 grep -E 一致）
+#
+# ⚠️ 本文件自身含有 pattern 明文，所有「内容扫描」必须排除本文件
+#    （各脚本已用 ':(exclude)tools/closed_assets.txt' 处理）。
+# ============================================================================
+
+# --- 1) 闭源版本目录（标准版 / 专业版）---
+dir:src/enforcers
+dir:src/editions
+
+# --- 2) 知识库（KB）闭源数据文件（无哨兵标记、不在上述目录内，只能靠精确文件名拦截）---
+file:src/knowledge_base/domains.csv
+file:src/knowledge_base/behaviors.json
+file:src/knowledge_base/oui_prefixes.csv
+file:src/knowledge_base/domains_homeward.csv
+file:src/knowledge_base/domains_public.csv
+file:src/knowledge_base/seeds/cloud_cdn.csv
+file:src/knowledge_base/seeds/privacy_trackers.csv
+file:src/knowledge_base/SIGNATURE
+file:src/knowledge_base/CHECKSUM
+
+# --- 3) 知识库前端脚本 / 内容源文档 / Worker 模板（2026-10-29 闭源整改结论：整包移出）---
+file:src/knowledge_base/SOURCES.md
+file:docs/CONTENT-SOURCE.md
+dir:workers
+file:scripts/kb_new_2026_10.csv
+file:scripts/expand_homeward_kb.py
+file:scripts/gen_kb_batch.py
+file:scripts/publish_kb_source.py
+file:scripts/make_kb_source.py
+file:scripts/merge_domains.py
+file:scripts/split_domains_by_source.py
+file:scripts/feed_pipeline.py
+file:scripts/feed_registry.json
+
+# --- 4) src/knowledge_base/.gitignore 必须包含以下行（删掉任一行 = 第一道防线失效）---
+kbignore:domains.csv
+kbignore:behaviors.json
+kbignore:oui_prefixes.csv
+kbignore:domains_homeward.csv
+kbignore:domains_public.csv
+kbignore:seeds/cloud_cdn.csv
+kbignore:seeds/privacy_trackers.csv
+kbignore:SIGNATURE
+kbignore:CHECKSUM
+
+# --- 5) 活源地址 / 机密标记（出现于任何被跟踪文件、或其历史 = 越界）---
+pattern:<redacted>
+pattern:homeward-kb\.
+pattern:<redacted-env>
+pattern:<redacted-env>
