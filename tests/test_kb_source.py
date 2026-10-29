@@ -93,8 +93,10 @@ class TestSourceConfig(unittest.TestCase):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def test_default_when_nothing_set(self):
+        # open-core：社区版默认不内置内容源（KB_SOURCE_DEFAULT_URL=""），
+        # 未配置任何源时 repo_urls 解析为空列表（空串在去重阶段被过滤）。
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_urls, [DEFAULT_REPO])
+        self.assertEqual(u.repo_urls, [])
 
     def test_explicit_arg_wins(self):
         u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_url="http://a.invalid/kb")
@@ -113,7 +115,7 @@ class TestSourceConfig(unittest.TestCase):
     def test_blank_env_falls_back_to_default(self):
         os.environ[ENV] = "   "
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_urls, [DEFAULT_REPO])
+        self.assertEqual(u.repo_urls, [])
 
     def test_main_service_respects_env(self):
         """主服务实例化时也要吃到环境变量 —— 否则 T0 等于没做"""
@@ -125,11 +127,11 @@ class TestSourceConfig(unittest.TestCase):
         os.environ.pop(ENV, None)
 
     def test_main_service_default_unchanged(self):
-        """不设环境变量时，默认联网目标必须与改动前完全一致"""
+        """不设环境变量时，社区版默认无内置内容源 → repo_urls 为空列表（open-core）"""
         from core.main import HomewardService
 
         svc = HomewardService()
-        self.assertEqual(svc.kb_updater.repo_urls, [DEFAULT_REPO])
+        self.assertEqual(svc.kb_updater.repo_urls, [])
 
 
     def test_env_comma_separated_resolves_to_list(self):
@@ -305,25 +307,25 @@ class TestDomesticBackup(unittest.TestCase):
         return s.base
 
     def test_empty_backups_keeps_single_default(self):
-        """备源为空（出厂默认）→ 默认清单仍是单一主源，不改变开箱联网目标"""
+        """备源为空（出厂默认）→ 社区版无内置主源，默认清单为空列表（open-core）"""
         self.assertEqual(
-            KnowledgeBaseUpdater(kb_dir=str(self.root)).repo_urls, [DEFAULT_REPO]
+            KnowledgeBaseUpdater(kb_dir=str(self.root)).repo_urls, []
         )
 
     def test_configured_backups_appended_after_main(self):
-        """配置了国内备源 → 默认清单 = 主源在前、备源按序追加"""
+        """配置了国内备源 → 默认清单 = 备源按序（主源为空时仅列备源）"""
         self._upd.KB_SOURCE_BACKUP_URLS = ("http://gitee.local/kb", "http://oss.local/kb")
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
         self.assertEqual(
             u.repo_urls,
-            [DEFAULT_REPO, "http://gitee.local/kb", "http://oss.local/kb"],
+            ["http://gitee.local/kb", "http://oss.local/kb"],
         )
 
     def test_backups_dedup_against_main(self):
-        """备源与主源重复 → 去重，不重复尝试同一地址"""
+        """备源与主源重复 → 去重；主源为空时仅保留非空备源"""
         self._upd.KB_SOURCE_BACKUP_URLS = (DEFAULT_REPO, "http://oss.local/kb")
         u = KnowledgeBaseUpdater(kb_dir=str(self.root))
-        self.assertEqual(u.repo_urls, [DEFAULT_REPO, "http://oss.local/kb"])
+        self.assertEqual(u.repo_urls, ["http://oss.local/kb"])
 
     def test_env_still_overrides_builtin_backups(self):
         """用户显式设 HOMEWARD_KB_SOURCE → 视为自定义清单，整体替换（不再附加内置备源）"""

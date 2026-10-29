@@ -20,6 +20,10 @@ from rule_engine.engine import FlowRecord, KnowledgeBase  # noqa: E402
 from analysis.behavior import BehaviorDetector  # noqa: E402
 from analysis.alerting import AlertCenter  # noqa: E402
 
+# 真实 behaviors.json 已闭源、不进公开仓；CI 中缺该文件时，依赖真实规则库的测试跳过。
+_KB_DIR = SRC_DIR / "knowledge_base"
+_REAL_BEHAVIORS = _KB_DIR / "behaviors.json"
+
 BASE = 1700000000.0
 
 
@@ -47,6 +51,7 @@ def _run(domains_per_device):
     return {a.destination: a for a in alerts}
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class BulkUploadFalsePositiveTest(unittest.TestCase):
     def test_icloud_backup_downgraded(self):
         """iCloud（良性云存储）的大流量上传应降级，不当数据外泄"""

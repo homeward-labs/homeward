@@ -21,3 +21,19 @@ LICENSE
 # 必须在此显式排除，否则会被 Dockerfile 的 COPY src/ 烤进公开镜像。
 src/enforcers/
 src/editions/
+
+# ===== 闭源知识库数据（open-core：社区版镜像不含真实内容）=====
+# 与 src/knowledge_base/.gitignore 对齐：完整域名库 / 行为库 / OUI 库 / 签名
+# 均为闭源核心资产，不进公开仓；但 Docker 构建上下文默认会纳入被 gitignore 挡住
+# 的磁盘残留文件，必须在此显式排除，否则会被 Dockerfile 的 COPY src/ 烤进公开镜像、
+# 经 GHCR 外泄。社区版镜像只分发加载器（constants.py / updater.py / VERSION），
+# 真实数据由用户自建源或内网镜像按需提供。
+src/knowledge_base/domains.csv
+src/knowledge_base/behaviors.json
+src/knowledge_base/oui_prefixes.csv
+src/knowledge_base/domains_homeward.csv
+src/knowledge_base/domains_public.csv
+src/knowledge_base/seeds/cloud_cdn.csv
+src/knowledge_base/seeds/privacy_trackers.csv
+src/knowledge_base/SIGNATURE
+src/knowledge_base/CHECKSUM

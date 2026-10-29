@@ -22,6 +22,10 @@ from analysis.alerting import (  # noqa: E402
     extract_placeholders,
 )
 
+# 真实 behaviors.json 已闭源、不进公开仓；CI 中缺该文件时，依赖真实规则库的测试跳过
+# （本地有数据时才跑）。既有范式见 tests/test_inventory.py:365。
+_REAL_BEHAVIORS = SRC_DIR / "knowledge_base" / "behaviors.json"
+
 
 def mkflow(ts, *, src="192.168.1.50", dst="203.0.113.1", port=443, proto="tcp",
            sni=None, dns=None, size=60, direction="out") -> FlowRecord:
@@ -136,6 +140,7 @@ class TestSummarize(unittest.TestCase):
         self.assertEqual(summarize([]), {})
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class TestDetectorWindow(unittest.TestCase):
     """窗口由规则声明，观测超出窗口就不参与判定"""
 
@@ -200,6 +205,7 @@ def _finding(rule_id="heartbeat_beacon", severity="low", src="192.168.1.50",
     )
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class TestRenderContext(unittest.TestCase):
     """渲染上下文必须覆盖模板能用到的全部键"""
 
@@ -237,6 +243,7 @@ class TestRenderContext(unittest.TestCase):
         self.assertEqual(extract_placeholders("{a} 和 {b}"), ["a", "b"])
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class TestAlertCenter(unittest.TestCase):
     """告警收敛：同一件事只占一条"""
 

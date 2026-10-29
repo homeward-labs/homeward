@@ -33,6 +33,10 @@ from rule_engine.engine import BehaviorMatcher, FlowRecord  # noqa: E402
 
 KB_DIR = SRC_DIR / "knowledge_base"
 BEHAVIORS = str(KB_DIR / "behaviors.json")
+# 真实 KB 数据（domains.csv / behaviors.json）已闭源、不进公开仓；CI 中缺这些文件时，
+# 依赖真实规则的测试整体跳过（本地有数据时才跑）。既有范式见 tests/test_inventory.py:365。
+REAL_KB_DOMAINS = KB_DIR / "domains.csv"
+REAL_KB_BEHAVIORS = KB_DIR / "behaviors.json"
 
 
 def _flow(src_ip, domain, ts, *, sni=False, packet_size=0, port=443):
@@ -62,6 +66,8 @@ def _crypto_findings(detector, flows, now):
     return [f for f in detector.scan(now=now) if f.rule_id == "crypto_mining"]
 
 
+@unittest.skipUnless(REAL_KB_DOMAINS.is_file() and REAL_KB_BEHAVIORS.is_file(),
+                     "需要真实 KB 数据（社区版不内置、闭源，CI 中跳过；本地有数据时才跑）")
 class CryptoMiningCategoryTest(unittest.TestCase):
 
     # 用户本机 153 的真实外联样本（来自真机 observations.db 的 domains 聚合）

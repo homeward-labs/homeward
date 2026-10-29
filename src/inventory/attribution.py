@@ -170,9 +170,10 @@ def _parent_candidates(domain: str) -> list[str]:
 class DomainAttribution:
     """域名归属查询器"""
 
-    def __init__(self, csv_path: Optional[Path] = None, cache_size: int = 4096):
+    def __init__(self, csv_path: Optional[Path] = None, cache_size: int = 4096, required: bool = True):
         self.csv_path = Path(csv_path) if csv_path else DEFAULT_DOMAINS_CSV
         self.cache_size = cache_size
+        self.required = required
         self._rules: dict[str, dict] = {}
         self._patterns: list[tuple[str, re.Pattern, dict]] = []
         self._cache: dict[str, AttributionResult] = {}
@@ -186,10 +187,24 @@ class DomainAttribution:
 
     def load(self) -> int:
         """
-        加载知识库。**表里没有数据就抛错** ——
+        加载知识库。
+
+        ``required=True``（默认，生产 / 严格模式）：表里没有数据就**抛错** ——
         静默加载成空表会让所有域名都变成 unknown 而不报错，是很难排查的假故障。
+
+        ``required=False``（社区版开箱场景）：社区版默认不带内容源、不内置知识库
+        （见 ``knowledge_base/constants.py`` 的 ``KB_SOURCE_DEFAULT_URL = ""``），开箱即可能
+        缺本地数据。此时以空表启动、记告警，让服务可用、``/api/health`` 正常，待用户配置
+        内容源或注入数据后自愈。
         """
         if not self.csv_path.is_file():
+            if not self.required:
+                logger.warning(
+                    "归属知识库不存在：%s —— 以空表启动（社区版未配置内容源时正常；"
+                    "标准版若见此告警请检查知识库分发）", self.csv_path,
+                )
+                self._rules, self._patterns, self._cache = {}, [], {}
+                return 0
             raise FileNotFoundError(f"归属知识库不存在：{self.csv_path}")
         rules: dict[str, dict] = {}
         with open(self.csv_path, encoding="utf-8", newline="") as f:

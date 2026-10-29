@@ -177,10 +177,20 @@ class HomewardService:
         self.kb = KnowledgeBase(str(KB_DIR))
         # 域名归属解析器须在行为匹配器之前建好：crypto_mining 等规则用
         # destination_categories 证据键，需要它把每条流的目标域名归到 KB 类别。
-        self.attribution = DomainAttribution()
-        self.behavior_matcher = BehaviorMatcher(
-            str(KB_DIR / BEHAVIORS_JSON), attribution=self.attribution
-        )
+        # required=False：社区版默认不带内容源、不内置知识库（见 constants.KB_SOURCE_DEFAULT_URL），
+        # 开箱即可能缺本地 KB 数据；缺失时以空表启动、记告警，服务仍可用、/api/health 正常。
+        # 标准版携带数据，required=False 也不影响（文件存在即正常加载）。
+        try:
+            self.attribution = DomainAttribution(required=False)
+            self.behavior_matcher = BehaviorMatcher(
+                str(KB_DIR / BEHAVIORS_JSON), attribution=self.attribution, required=False
+            )
+        except Exception as e:  # 兜底：即便是 required=False 仍异常（如文件存在但损坏），也不让服务起不来
+            logger.warning("知识库加载失败，以空表启动（社区版未配置内容源时正常）：%s", e)
+            self.attribution = DomainAttribution("__kb_absent__.csv", required=False)
+            self.behavior_matcher = BehaviorMatcher(
+                "__kb_behaviors_absent__.json", attribution=self.attribution, required=False
+            )
         self.engine = DecisionEngine(self.kb, self.behavior_matcher)
 
         # AI 分析器（默认关闭）

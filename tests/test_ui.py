@@ -25,6 +25,14 @@ from core.demo import seed_demo                      # noqa: E402
 from core.main import HomewardService                # noqa: E402
 from ui import server as ui_server                   # noqa: E402
 
+# 真实 KB 数据（domains.csv / behaviors.json）已闭源、不进公开仓；CI 中缺这些文件时，
+# 依赖真实知识库的断言跳过（社区版镜像本就不含内容，缺数据属正常态）。
+_KB_DIR = Path(__file__).resolve().parent.parent / "src" / "knowledge_base"
+_KB_DOMAINS = _KB_DIR / "domains.csv"
+_KB_BEHAVIORS = _KB_DIR / "behaviors.json"
+_KB_PRESENT = _KB_DOMAINS.is_file() and _KB_BEHAVIORS.is_file()
+_SKIP_NO_KB = "需要真实 KB 数据（闭源，CI 中跳过；本地有数据时才跑）"
+
 
 class ServerTestCase(unittest.TestCase):
     """起一个带演示数据的服务，每个用例共享（只读用例居多，够用且快）"""
@@ -152,6 +160,7 @@ class TestHeaders(ServerTestCase):
 
 class TestApi(ServerTestCase):
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_health(self):
         d = self.get_json("/api/health")
         self.assertTrue(d["ok"])
@@ -169,6 +178,7 @@ class TestApi(ServerTestCase):
         self.assertGreater(d["stats"]["devices_total"], 0)
         self.assertIsInstance(d["blind_spots"], list)
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_devices_have_identity_and_destinations(self):
         d = self.get_json("/api/devices")
         self.assertGreater(len(d["items"]), 0)
@@ -189,6 +199,7 @@ class TestApi(ServerTestCase):
         # 每条去向都要带"哪些设备在跟它说话"，否则去向地图画不出来
         self.assertTrue(any(x["devices"] for x in d["items"]))
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_alerts(self):
         d = self.get_json("/api/alerts")
         self.assertGreater(len(d["items"]), 0)
@@ -197,6 +208,7 @@ class TestApi(ServerTestCase):
             self.assertTrue(a["side_effects"], "告警必须写清后果")
             self.assertEqual(a["missing_keys"], [], "文案占位符缺失会渲染成原始花括号")
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_dismiss_alert(self):
         before = self.get_json("/api/alerts")["items"]
         target = before[0]["alert_id"]
@@ -248,6 +260,7 @@ class TestApi(ServerTestCase):
         # 许可注册表（actions.db）路径不受影响
         self.assertIsNotNone(svc.action_registry)
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_restore_rejudges_stale_unknowns(self):
         """快照恢复时旧「未知」归属必须用当前知识库重判（iStoreOS 实机教训）
 
@@ -285,6 +298,7 @@ class TestApi(ServerTestCase):
         self.assertNotIn("api.ip.sb", unknowns)
         self.assertIn("still-unknown.example.org", unknowns)
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_suggestions_are_never_applied(self):
         d = self.get_json("/api/suggestions")
         self.assertGreater(len(d["items"]), 0)
@@ -297,6 +311,7 @@ class TestApi(ServerTestCase):
         d = self.get_json("/api/unknown-domains")
         self.assertIn("unknown-tracking-domain.xyz", d["items"])
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_domain_lookup(self):
         d = self.get_json("/api/domain?q=ot.io.mi.com")
         self.assertTrue(d["known"])
@@ -498,6 +513,7 @@ class TestImportAndReportApi(ServerTestCase):
         # 绝不出现「浏览全部已知域名」式的能力
         self.assertNotIn("知识库全表", text)
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_report_json_structure(self):
         d = self.get_json("/api/report?format=json")
         self.assertIn("devices", d)
@@ -531,6 +547,7 @@ class TestObservationPersistence(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_service_snapshot_restore(self):
         from core.main import HomewardService
         svc_a = HomewardService(config={"load_system_devices": False})

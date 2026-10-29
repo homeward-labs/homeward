@@ -115,7 +115,9 @@ class BehaviorDetector:
         attribution=None,
         max_records: int = 2000,
     ):
-        self.matcher = matcher or BehaviorMatcher(attribution=attribution)
+        # required=False：社区版默认不内置知识库数据，缺 behaviors.json 时
+        # 退化为空规则集（不崩溃），与 main.py 启动路径的容错策略保持一致。
+        self.matcher = matcher or BehaviorMatcher(attribution=attribution, required=False)
         # 归因解析器：优先用传入值；否则沿用 matcher 上已接的（main 里先建好 attribution
         # 再传给 BehaviorMatcher 时就是这条路径）。供 _build 挑出"真正命中"的展示域名。
         self.attribution = attribution or getattr(self.matcher, "attribution", None)

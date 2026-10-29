@@ -316,7 +316,7 @@ class BehaviorMatcher:
       · ``_matches`` 自身对未知键一律返回 False —— 宁可漏报，不能乱报。
     """
 
-    def __init__(self, behaviors_path: str = None, attribution=None):
+    def __init__(self, behaviors_path: str = None, attribution=None, required: bool = True):
         if behaviors_path is None:
             # 目录名是**下划线** knowledge_base，不是连字符 knowledge-base。
             # 早期这里写错过，结果是默认构造时行为库静默加载为空、所有行为类判定
@@ -326,6 +326,7 @@ class BehaviorMatcher:
         # 域名归属解析器（DomainAttribution 实例）：供 destination_categories 证据键
         # 把每条流的目标域名归到知识库类别。没接就失败关闭——绝不靠关键词兜底。
         self.attribution = attribution
+        self.required = required
         self.rules: list[dict] = []
         self.supported_rules: list[dict] = []
         self.unsupported_rules: list[dict] = []
@@ -334,11 +335,21 @@ class BehaviorMatcher:
     def load(self):
         """加载 behaviors.json 并做规则体检
 
-        加载不到规则**必须显式失败**，不允许静默置空：行为库为空会让全部行为类判定
-        失效，且失败得毫无征兆（判不出告警和"没有异常"看起来一模一样）。
+        ``required=True``（默认，生产 / 严格模式）：加载不到规则**必须显式失败**，
+        不允许静默置空 —— 行为库为空会让全部行为类判定失效，且失败得毫无征兆。
+
+        ``required=False``（社区版开箱场景）：以空规则启动、记告警，避免服务崩溃；
+        行为类判定暂不可用，待数据注入后自愈。
         """
         path = self.behaviors_path
         if not path.exists():
+            if not self.required:
+                logger.warning(
+                    "行为模式库不存在：%s —— 以空规则启动（社区版未配置内容源时正常；"
+                    "标准版若见此告警请检查行为库分发）", path,
+                )
+                self.rules, self.supported_rules, self.unsupported_rules = [], [], []
+                return
             raise FileNotFoundError(f"行为模式库不存在：{path}")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)

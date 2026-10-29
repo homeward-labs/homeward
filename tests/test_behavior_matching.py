@@ -22,6 +22,10 @@ if str(SRC_DIR) not in sys.path:
 
 from rule_engine.engine import BehaviorMatcher, FlowRecord  # noqa: E402
 
+# 真实 behaviors.json 已闭源、不进公开仓；CI 中缺该文件时，依赖真实规则库的测试跳过
+# （本地有数据时才跑）。既有范式见 tests/test_inventory.py:365。
+_REAL_BEHAVIORS = SRC_DIR / "knowledge_base" / "behaviors.json"
+
 
 def _flow(ts: float, size: int = 64, direction: str = "out") -> FlowRecord:
     return FlowRecord(
@@ -123,6 +127,7 @@ class TestWrongDirectionIsIgnored(unittest.TestCase):
         self.assertFalse(_matches(pattern, flows))
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class TestBehaviorLibraryLoads(unittest.TestCase):
     """知识库本身必须能被加载出来（早期因目录名写错而静默为空）"""
 

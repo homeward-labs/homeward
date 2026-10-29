@@ -25,6 +25,9 @@ from analysis.behavior import BehaviorDetector  # noqa: E402
 from analysis.alerting import AlertCenter  # noqa: E402
 from inventory.device import DeviceRegistry, _SELF_DEVICE_KEY  # noqa: E402
 
+# 真实 behaviors.json 已闭源、不进公开仓；CI 中缺该文件时，依赖真实规则库的测试跳过。
+_REAL_BEHAVIORS = SRC_DIR / "knowledge_base" / "behaviors.json"
+
 BASE = 1700000000.0
 SELF_IP = "192.168.1.254"
 OTHER_IP = "192.0.2.10"
@@ -90,6 +93,7 @@ class HostIdentityDeviceMergeTest(unittest.TestCase):
         self.assertFalse(reg.is_self_ip(OTHER_IP))
 
 
+@unittest.skipUnless(_REAL_BEHAVIORS.is_file(), "需要真实 behaviors.json（闭源，CI 中跳过；本地有数据时才跑）")
 class HostIdentityAlertDowngradeTest(unittest.TestCase):
     def test_self_bulk_upload_downgraded(self):
         """源是宿主自身、目的地是未知公网 IP 的大流量上传应降级（不当外泄）"""

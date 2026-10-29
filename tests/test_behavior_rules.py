@@ -34,6 +34,10 @@ from analysis.alerting import TEMPLATE_KEYS, extract_placeholders  # noqa: E402
 from inventory.attribution import DomainAttribution  # noqa: E402
 
 BEHAVIORS = SRC_DIR / "knowledge_base" / "behaviors.json"
+# 真实 KB 数据（behaviors.json / domains.csv）已闭源、不进公开仓；CI 中缺这些文件时，
+# 依赖真实规则的测试整体跳过（本地有数据时才跑）。既有范式见 tests/test_inventory.py:365。
+_REAL_DOMAINS = SRC_DIR / "knowledge_base" / "domains.csv"
+_KB_PRESENT = BEHAVIORS.is_file() and _REAL_DOMAINS.is_file()
 
 
 def flows(
@@ -75,6 +79,7 @@ def hit_ids(sample: list[FlowRecord]) -> set[str]:
     return {r["id"] for r in matcher.match(sample)}
 
 
+@unittest.skipUnless(_KB_PRESENT, "需要真实 KB 数据（社区版不内置、闭源，CI 中跳过；本地有数据时才跑）")
 class TestFailClosed(unittest.TestCase):
     """失败关闭：看不懂 / 没证据，就不许命中"""
 
@@ -124,6 +129,7 @@ class TestFailClosed(unittest.TestCase):
             self.assertIn("未知键", reasons["unknown_key"])
 
 
+@unittest.skipUnless(_KB_PRESENT, "需要真实 KB 数据（社区版不内置、闭源，CI 中跳过；本地有数据时才跑）")
 class TestKeywordBoundary(unittest.TestCase):
     """关键词必须落在域名标签边界上"""
 
@@ -142,6 +148,7 @@ class TestKeywordBoundary(unittest.TestCase):
         self.assertNotIn("firmware_backdoor", hit_ids(flows(4, domain="backdoorsafe.example.com")))
 
 
+@unittest.skipUnless(_KB_PRESENT, "需要真实 KB 数据（社区版不内置、闭源，CI 中跳过；本地有数据时才跑）")
 class TestEachRuleFires(unittest.TestCase):
     """8 条规则各有一个能真正命中的样本 —— 防止规则变成死代码"""
 
@@ -235,6 +242,7 @@ class TestEachRuleFires(unittest.TestCase):
                                        spread_dst=4)))
 
 
+@unittest.skipUnless(_KB_PRESENT, "需要真实 KB 数据（社区版不内置、闭源，CI 中跳过；本地有数据时才跑）")
 class TestShippedLibraryHealth(unittest.TestCase):
     """随库发布的行为库必须是健康的"""
 
