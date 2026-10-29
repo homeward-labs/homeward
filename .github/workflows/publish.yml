@@ -21,7 +21,7 @@ on:
 
 permissions:
   contents: read
-  packages: write        # GitHub Actions permissions 只支持 read|write|none，没有 admin
+  packages: write        # 推送到 GHCR 必需
 
 jobs:
   image:
@@ -73,12 +73,33 @@ jobs:
           build-args: |
             HOMEWARD_LICENSE_PUBLIC_KEY_B64=${{ secrets.HOMEWARD_LICENSE_PUBLIC_KEY_B64 }}
 
-      - name: 清理旧版 visibility 诊断（2026-10-28 · 已结案）
-        # 诊断结论：GitHub REST API 无改包 visibility 端点（PUT/PATCH 全 404）。
-        # 解法：删除整个 homeward 包让 publish.yml 推新包自动继承组织级 Package Creation = Public。
-        # 新包 visibility 已确认 = public（2026-10-28T05:38:18Z），匿名 pull token 正常返回。
-        # 见 STATUS.md 2026-10-28.6。
-        run: echo "visibility issue resolved; see STATUS.md"
+      - name: 将容器包设为公开（GHCR 默认私有，须显式改公开）
+        # 本仓属组织 homeward-labs，包在组织命名空间下，
+        # 必须用 /orgs/{org}/packages/... 端点（用 /user/ 会 404 而静默失败）。
+        # ⚠️ 已知坑（见第 10 / 59 批）：默认 GITHUB_TOKEN 对「组织容器包」没有改可见性的
+        #   admin 权限，PUT 会静默 403/404 → 包保持私有 → 下游 verify job 拉取失败、
+        #   整个 publish 标红，但 image 推送其实成功。
+        #   根治：在仓库 Settings → Secrets 配一个对 homeward-labs 有「包管理员」角色的
+        #   PAT（名为 GHCR_PAT）；本步优先用它，失败再回退 GITHUB_TOKEN。
+        #   无论哪个 token，失败都显式 exit 1 让 job 变红（不再静默吞错）。
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo ">>> 尝试将 ghcr.io/homeward-labs/homeward 设为公开"
+          code=$(curl -sS -o /tmp/vis.json -w "%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${GHCR_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/homeward-labs/packages/container/homeward/visibility" \
+            -d '{"visibility":"public"}')
+          cat /tmp/vis.json; echo
+          if [ "${code:0:1}" != "2" ]; then
+            echo "::error::将包设为公开失败（HTTP ${code}）。默认 GITHUB_TOKEN 通常对组织包无 admin 权限。"
+            echo "  请二选一：(1) 在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色）；"
+            echo "  (2) 到 https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动改公开。"
+            exit 1
+          fi
+          echo "OK: 已设为公开"
 
   verify:
     name: 校验已发布镜像（amd64）
@@ -87,25 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 登录 GHCR（拉取组织级包需要）
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          # 组织命名空间包匿名 pull 经常 403，用 GHCR_PAT 或 GITHUB_TOKEN 登录。
-          # GHCR_PAT 已配（repo + write:packages scope），对组织包有 pull 权限。
-          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
-
       - name: 拉取并跑一遍冒烟
         run: |
-          # TAG 推导：打 tag v1.2.3 → 用 1.2.3；否则（push main / workflow_dispatch）→ 用 latest。
-          # 注意 GITHUB_REF_NAME 对 push main 是 "main"，不是 "v*"，不能直接拿来当 tag。
-          REF="$GITHUB_REF"
-          if [[ "$REF" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF_NAME#v}"
-          else
-            TAG="latest"
-          fi
+          TAG="${GITHUB_REF_NAME#v}"
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
           echo "验证镜像：$IMAGE"
           docker run -d --name homeward-verify -p 9595:9595 \
