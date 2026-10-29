@@ -108,18 +108,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 登录 GHCR（拉取镜像需要；包为私有时 GITHUB_TOKEN 凭 packages:write 仍可拉取本仓包）
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 拉取并跑一遍冒烟
+      - name: 本地构建并跑一遍冒烟
+        # 不拉取已发布的镜像：组织包默认私有、GITHUB_TOKEN 无改可见性/admin 权限，
+        # 拉取会 403。改为本地用同一 Dockerfile 构建（构建上下文经 .dockerignore 已排除
+        # 闭源 KB 数据，与推送到 GHCR 的镜像同源），验证「能构建 + 服务能起 + 冒烟全绿」。
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
-          echo "验证镜像：$IMAGE"
+          IMAGE="homeward-verify:ci"
+          echo "本地构建验证镜像：$IMAGE"
+          docker build -t "$IMAGE" -f docker/Dockerfile .
           docker run -d --name homeward-verify -p 9595:9595 \
             -e HOMEWARD_DATA_DIR=/tmp/homeward "$IMAGE"
           for i in $(seq 1 30); do
@@ -127,8 +123,6 @@ jobs:
             sleep 2
           done
           python3 scripts/smoke.py --base http://127.0.0.1:9595 --write
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: 收尾
         if: always()
