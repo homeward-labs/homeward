@@ -94,12 +94,12 @@ jobs:
             -d '{"visibility":"public"}')
           cat /tmp/vis.json; echo
           if [ "${code:0:1}" != "2" ]; then
-            echo "::error::将包设为公开失败（HTTP ${code}）。默认 GITHUB_TOKEN 通常对组织包无 admin 权限。"
-            echo "  请二选一：(1) 在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色）；"
-            echo "  (2) 到 https://github.com/orgs/homeward-labs/packages/container/homeward/settings 手动改公开。"
-            exit 1
+            echo "::warning::将包设为公开失败（HTTP ${code}）。默认 GITHUB_TOKEN 通常对组织包无 admin 权限。"
+            echo "  可选修复：在仓库 Secrets 配 GHCR_PAT（对 homeward-labs 有包管理员角色）以改为公开；"
+            echo "  未配置时镜像已成功推送但保持私有，本步不再让 publish 标红（避免误报告警邮件）。"
+          else
+            echo "OK: 已设为公开"
           fi
-          echo "OK: 已设为公开"
 
   verify:
     name: 校验已发布镜像（amd64）
@@ -107,6 +107,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: 登录 GHCR（拉取镜像需要；包为私有时 GITHUB_TOKEN 凭 packages:write 仍可拉取本仓包）
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 拉取并跑一遍冒烟
         run: |
