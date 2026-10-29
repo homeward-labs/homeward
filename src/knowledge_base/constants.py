@@ -13,8 +13,10 @@
 from __future__ import annotations
 
 # 内容源（Cloudflare Worker / 内网镜像）默认地址。
-# 客户端知识库更新器的兜底源；可用环境变量 HOMEWARD_KB_SOURCE 覆盖。
-KB_SOURCE_DEFAULT_URL = "https://<kb-source>"
+# ⚠️ 闭源核心资产：完整知识库不进公开仓（见 docs/00-治理规范/BOUNDARY.md）。
+# 默认留空；真实源地址仅由闭源私有构建通过环境变量 HOMEWARD_KB_SOURCE 注入，
+# 开源/社区构建不携带任何可用源，不会向公网发起内容源连接。
+KB_SOURCE_DEFAULT_URL = ""
 
 # 国内备源清单（内容源多源降级的第二跳，FEAT-01）。
 # 背景：主源 workers.dev 在国内部分地区被干扰，而客户端几乎全在国内；更新器已支持

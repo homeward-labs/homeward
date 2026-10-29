@@ -1,0 +1,10 @@
+# 闭源核心资产：完整知识库数据不进公开仓（见 docs/00-治理规范/BOUNDARY.md）
+domains.csv
+behaviors.json
+oui_prefixes.csv
+domains_homeward.csv
+domains_public.csv
+seeds/cloud_cdn.csv
+seeds/privacy_trackers.csv
+SIGNATURE
+CHECKSUM
