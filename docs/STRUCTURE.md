@@ -1,68 +1,125 @@
 # 项目目录结构
 
-> 以仓库实际内容为准。标注「规划」的条目**当前不存在**，是后续工作包的位置，
-> 不要照着它去找文件（早期版本这份树图里混进了十几个从未创建的文件，已清理）。
+> 以仓库**实际内容**为准（核对方式：`git ls-files`）。
+> 本仓库只承载 open-core 的**公开部分**：标准版/专业版执行器、知识库数据本体、KB 内容源与
+> Cloudflare Worker 模板都**不随本仓库发布**，其判定依据是**单一清单** `tools/closed_assets.txt`
+> （历史上「四处各写一份 CLOSED_DIRS」导致口径漂移，现已收敛为一份）。
+> 该清单被四道防线共同引用：`tools/check_open_boundary.{py,sh,ps1}`（手动自查）、`hooks/pre-commit`
+> （提交前）、`hooks/pre-push`（推送前，含整棵提交树 + 历史）、`.github/workflows/open-boundary.yml`
+> （CI 兜底）。清单同时声明活源地址/机密标记正则，命中即失败；⚠️ 清单文件自身含 pattern 明文，
+> 所有内容扫描都必须排除它（脚本已用 `:(exclude)tools/closed_assets.txt` 处理）。
 
 ```
 homeward/
 ├── README.md                        # 项目门面
 ├── LICENSE                          # BSL 1.1（仅覆盖代码；该版本 4 年后转 MPL-2.0）
-├── requirements.txt                 # 当前零第三方依赖；Dockerfile 依赖它存在
+├── LICENSE-NOTES.md                 # 各来源许可证与署名说明
+├── SECURITY.md                      # 安全披露渠道与红线
+├── requirements.txt                 # 社区版：零第三方依赖（Dockerfile 依赖它存在）
+├── requirements-dev.txt             # 仅开发/测试（pytest / segno / numpy / opencv-python-headless），绝不进运行时镜像
+├── .dockerignore / .gitattributes / .gitignore
+│
 ├── docs/
 │   ├── README.md                    # 项目总览
 │   ├── STRUCTURE.md                 # 本文档
 │   ├── ARCHITECTURE.md              # 架构设计
-│   ├── DEPLOYMENT.md                # 部署形态与安装方式（接入方式/平台/装法 三维度）
-│   └── （商业/策略文档：版本矩阵、竞品分析、阻断策略、路线图、进度、同步约定
-│       已迁出本公开仓库，存于维护者私有目录，不随仓库发布）
+│   ├── DEPLOYMENT.md                # 部署形态与安装方式（接入方式 / 平台 / 装法 三维度）
+│   ├── USER-MANUAL.md               # 用户手册
+│   ├── CHANGELOG.md                 # 变更日志
+│   └── ROADMAP.md                   # 路线图
+│   （商业/策略文档：版本矩阵、竞品分析、阻断策略、进度、同步约定
+│     已迁出本公开仓库，存于维护者私有目录，不随仓库发布）
 │
 ├── src/
 │   ├── core/                        # 核心服务
 │   │   ├── main.py                  # 入口 HomewardService：编排采集/决策/建议队列
-│   │   └── demo.py                  # 演示剧本（命令行演示与 UI --demo 共用，不在生产路径调用）
-│   ├── adapters/                    # 采集 / 执行 正交抽象层（本期只有接口）
+│   │   ├── demo.py                  # 演示剧本（命令行演示与 UI --demo 共用，不在生产路径调用）
+│   │   ├── collector.py             # 采集编排与去重
+│   │   ├── import_log.py            # 历史日志导入
+│   │   └── netclass.py              # 本网 / 外网 / 保留网段判定
+│   ├── adapters/                    # 采集 / 执行 正交抽象层（详见本文下半篇）
 │   │   ├── base.py                  # Capabilities + Collector/Enforcer + 撤销契约
-│   │   └── capability.py            # CapabilitySet：can_show / can_enforce / blind_spots
+│   │   ├── capability.py            # CapabilitySet：can_show / can_enforce / blind_spots
+│   │   ├── sqlite_registry.py       # 建议与动作的持久化登记
+│   │   └── trend_store.py           # 趋势数据存储
 │   ├── collectors/                  # 采集器实现（社区版开源）
 │   │   ├── dns.py                   # Tier 1：dnsmasq 查询日志
-│   │   └── conntrack.py             # Tier 2：连接元数据（字节数 / 直连 IP）
-│   ├── enforcers/                   # 执行器实现（标准版闭源，gitignore + pre-commit 拦截）
+│   │   ├── conntrack.py             # Tier 2：连接元数据（字节数 / 直连 IP）
+│   │   └── syslog_dns.py            # 远程 syslog 的 DNS 日志采集
 │   ├── inventory/                   # W2：设备台账 + 域名归属
 │   │   ├── device.py                # IP → MAC → 厂商 / 品类；MAC 变 IP 仍是同一台
 │   │   └── attribution.py           # 域名 → 组织：精确 + 逐级向上，认输不猜
 │   ├── analysis/                    # W3：行为识别 + 中文告警
 │   │   ├── ingest.py                # Observation → FlowRecord（补上 W1→W2 断掉的一截）
 │   │   ├── behavior.py              # 时间窗 + 设备级/目的地级粒度 → BehaviorFinding（带证据）
-│   │   └── alerting.py              # 中文模板渲染 + 去重冷却收敛 → Alert
+│   │   ├── alerting.py              # 中文模板渲染 + 去重冷却收敛 → Alert
+│   │   └── profiler.py              # 设备画像（行为基线）
 │   ├── rule_engine/                 # 规则匹配引擎
 │   │   └── engine.py                # 知识库加载 + 行为匹配 + 决策（产出建议，不产出动作）
-│   ├── knowledge_base/              # 知识库（数据 CC BY 4.0，使用须署名）
-│   │   ├── domains.csv              # 域名 → 组织归属
-│   │   ├── behaviors.json           # 行为模式库（8 个行为）
-│   │   ├── oui_prefixes.csv         # MAC 前缀 → 厂商（脚本生成，见 tools/build_oui_table.py）
+│   ├── knowledge_base/              # 知识库 **loader 层**；数据本体闭源，不随本仓库发布
+│   │   ├── .gitignore               # 第一道防线：拦截 9 个数据文件（清单 kbignore 行校验其完整性）
+│   │   ├── LICENSE                  # 分来源：上游公开源 MIT / 家卫策展 CC BY 4.0，均须署名
+│   │   ├── VERSION                  # 本地知识库版本
+│   │   ├── constants.py             # 默认源地址**置空**，运行时由闭源构建经环境变量注入
 │   │   ├── updater.py               # 在线更新（默认关闭；无遥测回传）
-│   │   └── LICENSE                  # 分来源：上游公开源 MIT / 家卫策展 CC BY 4.0，均须署名
-│   ├── ui/                          # W4：Web UI（端口 9595，社区版只读）
-│   │   ├── server.py                # 标准库 http.server + 十个 JSON 接口 + 静态文件
+│   │   └── seeds/README.md          # 数据文件落位与生成方式说明
+│   ├── license/                     # 许可与签名校验（公钥随源码分发）
+│   │   ├── ed25519.py               # 纯 stdlib Ed25519 验签
+│   │   ├── kb_pubkey.txt            # 知识库分发包验签公钥
+│   │   ├── verify.py                # 许可文件校验
+│   │   └── store.py                 # 许可本地存储
+│   ├── ui/                          # Web UI（端口 9595，社区版只读）
+│   │   ├── server.py                # 标准库 http.server + JSON 接口 + 静态文件
+│   │   ├── auth.py                  # 访问令牌鉴权
+│   │   ├── qr.py                    # 二维码生成
+│   │   ├── DESIGN.md                # 前端设计系统：:root 令牌冻结为唯一取色源 + 硬编码债登记
 │   │   └── static/                  # 页面本体：零外部资源，图标为内联 SVG（禁用 emoji）
 │   │       ├── index.html
-│   │       ├── app.css
-│   │       └── app.js
+│   │       ├── app.css              # `:root` 令牌（唯一取色来源）
+│   │       ├── app.js
+│   │       ├── charts.js
+│   │       └── login.css            # 登录页独立深色主题
 │   └── ai/                          # AI 辅助层（默认关闭，手动触发）
 │       └── analyzer.py              # LLM 分析接口（ollama / openai 兼容）
 │
 ├── tests/                           # 标准库 unittest，无需装 pytest
-│   ├── test_collectors.py           # 采集层：解析 / 增量 / 能力位 / 降级链
+│   ├── test_collector.py            # 采集层：解析 / 增量 / 能力位 / 降级链
+│   ├── test_collector_dns_source.py # DNS 日志来源切换
+│   ├── test_collectors.py
+│   ├── test_concurrency.py
 │   ├── test_ui.py                   # W4：真起 HTTP 服务打请求（路由/头/CSP/穿越/动词约束）
+│   ├── test_ui_auth.py
 │   ├── test_behavior_matching.py    # 行为判定语义（duration 按秒 / interval 真算间隔）
 │   ├── test_behavior_rules.py       # W3：失败关闭 / 关键词边界 / 8 条规则各自能命中
-│   └── test_analysis.py             # W3：观测转换 / 窗口与粒度 / 告警渲染与收敛
+│   ├── test_analysis.py             # W3：观测转换 / 窗口与粒度 / 告警渲染与收敛
 │   ├── test_inventory.py            # W2：设备识别 + 域名归属（含「不猜」红线断言）
-│   └── test_revert_contract.py      # 撤销契约端到端往返
+│   ├── test_revert_contract.py      # 撤销契约端到端往返
+│   ├── test_license.py / test_license_api.py
+│   ├── test_kb_source.py / test_qr.py
+│   ├── test_sqlite_registry.py / test_suggestion_persistence.py / test_import_log.py
+│   ├── test_bulk_upload_fp.py / test_bulk_upload_grade.py / test_crypto_mining_category.py
+│   ├── test_feature_evolution_f6.py / test_feature_evolution_f6_profile.py
+│   ├── test_feature_evolution_f7.py / test_feature_evolution_phase_a.py
+│   ├── test_visibility_coverage.py
+│   └── __init__.py
 │
 ├── docker/
 │   ├── Dockerfile
-│   └── docker-compose.yaml          # 社区版形态：只读挂 dnsmasq 日志，非 privileged
+│   ├── .env.example
+│   ├── docker-compose.yaml          # 社区版形态：只读挂 dnsmasq 日志，非 privileged
+│   ├── docker-compose.full.yml      # 全量形态
+│   ├── docker-compose.pull.yml      # 拉取官方镜像
+│   ├── docker-compose.istoreos.yml  # iStoreOS 形态
+│   └── dnsmasq/                     # 自带 dnsmasq 容器
+│       ├── Dockerfile
+│       └── dnsmasq.homeward.conf
+│
+├── scripts/                         # 部署与运维脚本
+│   ├── install.sh                   # 通用安装
+│   ├── install-istoreos.sh / boot-istoreos.sh / setup-istoreos.sh
+│   ├── homeward-sync.sh             # 镜像同步
+│   ├── git-mirror-pull.sh
+│   └── smoke.py                     # 冒烟脚本
 │
 ├── fnpk/                            # 飞牛应用包（草稿，未上架）
 │   └── package.toml                 # 素材 icon.png / screenshot*.png 待补
@@ -71,24 +128,36 @@ homeward/
 │   ├── pre-commit                   # 闭源防误传（提交前：暂存 diff）
 │   └── pre-push                     # 闭源防误传（推送前：整棵提交树 + 历史）
 │
-├── .github/
-│   ├── CONTRIBUTING.md
-│   └── workflows/
-│       └── open-boundary.yml        # CI 兜底：重扫全历史 + 跑社区版单测
-│
-│
 ├── tools/
+│   ├── closed_assets.txt            # ⭐ 闭源资产单一清单（四道防线的唯一判定依据）
+│   ├── check_open_boundary.py       # 开源边界自检（Python，最全）
+│   ├── check_open_boundary.sh       # 同上（Linux / Git Bash）
+│   ├── check_open_boundary.ps1      # 同上（PowerShell，无依赖）
 │   ├── asn_hit_test.py              # ASN 命中率测试脚本
-│   ├── build_oui_table.py           # 生成 oui_prefixes.csv（默认拉 Wireshark 官方 manuf）
-│   ├── check_open_boundary.sh       # 开源边界自检（Linux / Git Bash）
-│   ├── check_open_boundary.py       # 同上（装了 Python 的环境）
-│   └── check_open_boundary.ps1      # 同上（PowerShell，无依赖）
+│   └── build_oui_table.py           # 生成 oui_prefixes.csv（默认拉 Wireshark 官方 manuf）
 │
 └── .github/
-    └── CONTRIBUTING.md              # 开源边界红线与贡献流程
+    ├── CONTRIBUTING.md              # 开源边界红线与贡献流程
+    ├── PULL_REQUEST_TEMPLATE.md
+    ├── ISSUE_TEMPLATE/              # bug_report / feature_request / domain-attribution / config
+    └── workflows/
+        ├── tests.yml                # 社区版单测
+        ├── open-boundary.yml        # 闭源边界 CI 兜底（重扫全历史 + 全量 pytest）
+        ├── publish.yml              # 发布（含公钥前置断言，fail-closed）
+        └── build-smoke.yml          # 构建冒烟
 ```
 
-**规划中、尚未创建的目录**：`src/ui/`（W4 Web UI）、`src/editions/`（标准版/专业版，闭源）。
+**不随本仓库发布（闭源）**：`src/enforcers/`（执行器与 Tier 3 深度抓包）、`src/editions/`
+（标准版/专业版）、知识库**数据本体**（`domains.csv` / `behaviors.json` / `oui_prefixes.csv` /
+`domains_homeward.csv` / `domains_public.csv` / `seeds/cloud_cdn.csv` / `seeds/privacy_trackers.csv` /
+`SIGNATURE` / `CHECKSUM`）、KB 内容源与发布链路、Cloudflare Worker 模板。这些条目**统一由
+`tools/closed_assets.txt` 声明**，不出现在上面的目录树中。
+
+> ⚠️ **2026-10-29 闭源整改进行中**：仓库当前仍残留少量越界文件（`workers/` 整包、
+> `docs/CONTENT-SOURCE.md`、`src/knowledge_base/SOURCES.md`、`tests/test_merge_domains.py`
+> 及 KB 生成/发布脚本若干）及其历史提交，正按「**先补防线（已完成）→ 再重写历史 → 最后清理
+> 残留**」的顺序移除。上面的树图是**整改后的目标态**，过渡期内以「该文件已被清单声明为闭源」
+> 为唯一判准，不要因为它暂时还在仓库里就当作公开内容。
 
 ---
 
