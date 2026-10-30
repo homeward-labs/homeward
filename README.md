@@ -8,7 +8,7 @@
 
 **家卫是「设备外联流量治理」工具，不是摄像头、不是安防监控 App。** 我们不拍你、不装你的设备，只在网络层**看清**谁在给外面打电话；真正**拦下**外联是标准版能力。
 
-- 中文文档：[docs/README.md](docs/README.md) · **部署形态：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** · **服务端内容源：[docs/CONTENT-SOURCE.md](docs/CONTENT-SOURCE.md)** · 阻断策略与竞品分析：见私有《阻断与撤销》《竞品分析》文档（不随本仓库发布）
+- 中文文档：[docs/README.md](docs/README.md) · **部署形态：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** · 阻断策略、服务端内容源与竞品分析：见私有《阻断与撤销》《服务端内容源》《竞品分析》文档（不随本仓库发布）
 - **开源边界（社区版开源 / 标准版·专业版闭源）**：见私有《版本与能力归属》文档
 
 ---
@@ -57,7 +57,8 @@ cat /tmp/dnsmasq.log        # OpenWrt / iStoreOS 常见落点
 cat /var/log/dnsmasq.log    # Debian 系常见落点
 ```
 
-把输出粘进界面 **导入/导出 → 离线日志分析**，即可看到设备画像与告警，还能导出 Markdown / JSON 观测报告带走。  
+把输出粘进界面 **导入/导出 → 离线日志分析**，即可看到设备画像与告警，还能导出 Markdown / JSON 观测报告带走。
+  
 离线导入走的是**与实时采集完全相同**的判定链路 —— 看到的就是真实效果，不是演示数据。
 
 > 手头还没有日志？`python -m src.ui.server --demo` 会灌入演示剧本（界面自测用，非真实数据）。
@@ -94,18 +95,17 @@ python -m src.core.main        # 只跑核心服务（命令行输出，不起�
 ## 开源协议 · 竞品隔离声明
 
 - 代码 **BSL 1.1**（见 [LICENSE](./LICENSE)）：源码可审计，家庭 / 个人非商业使用**永久免费**，禁止未经授权的商业性服务，4 年后转为 MPL-2.0。人话解释见 [LICENSE-NOTES.md](./LICENSE-NOTES.md)。
-- 知识库数据 **按来源分别授权**：`domains_public.csv`（上游公开源）为 MIT，`domains_homeward.csv`（家卫策展）为 CC BY 4.0 —— 详见 [SOURCES.md](./src/knowledge_base/SOURCES.md)，**使用须署名**。
+- 知识库**数据本体属闭源核心资产，不随本仓库发布**（本仓库只保留加载器与常量）；分来源授权（上游公开源 MIT / 家卫策展 CC BY 4.0）与署名要求随闭源分发说明，**使用须署名**。
 - **本项目不集成、不复制任何 AGPL 或其他强 Copyleft 协议的代码。** 任何竞品源码仅作产品调研参考、隔离在仓库之外，避免许可证传染。
 
 ---
 
 ## 参与共建
 
-**最有价值的贡献是补域名归属知识库** —— 家卫「读懂」的能力直接取决于它的覆盖率：
+欢迎贡献社区版代码、界面、文档与缺陷报告 —— 知识库**数据本体属闭源核心资产、不随本仓库发布**，因此不接受向本仓库提交数据，只接收线索：
 
-- 发现某个域名被标成「未知」？提一个 [域名归属贡献](.github/ISSUE_TEMPLATE/domain-attribution.yml)，或直接改 `src/knowledge_base/domains.csv` 发 PR。
-- 知识库数据**按来源分别授权**（上游公开源沿用 MIT / 家卫策展 CC BY 4.0，使用须署名），众包共建、人人可用 —— 详见 [SOURCES.md](./src/knowledge_base/SOURCES.md)。
-- 知识库在线更新的内容源与降级语义见 [docs/CONTENT-SOURCE.md](docs/CONTENT-SOURCE.md)：**服务端只是静态内容源与信任根，零遥测，永不接收你的观测数据。**
+- 发现某个域名被标成「未知」或误标？用 [域名归属反馈](.github/ISSUE_TEMPLATE/domain-attribution.yml) 提交线索（域名 + 归属 + 依据），由维护者核实后补录到闭源知识库。
+- 知识库只做「静态内容源 + 信任根」，**零遥测，永不接收你的观测数据**；内容源地址属闭源侧，不随本仓库发布。
 - 提缺陷 / 建议：见 [Issue 模板](.github/ISSUE_TEMPLATE)；开发约定见 [CONTRIBUTING](.github/CONTRIBUTING.md)。
 - **安全问题请不要开公开 Issue**，按 [SECURITY.md](./SECURITY.md) 私下报告。
 

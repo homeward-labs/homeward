@@ -153,11 +153,10 @@ homeward/
 `SIGNATURE` / `CHECKSUM`）、KB 内容源与发布链路、Cloudflare Worker 模板。这些条目**统一由
 `tools/closed_assets.txt` 声明**，不出现在上面的目录树中。
 
-> ⚠️ **2026-10-29 闭源整改进行中**：仓库当前仍残留少量越界文件（`workers/` 整包、
-> `docs/CONTENT-SOURCE.md`、`src/knowledge_base/SOURCES.md`、`tests/test_merge_domains.py`
-> 及 KB 生成/发布脚本若干）及其历史提交，正按「**先补防线（已完成）→ 再重写历史 → 最后清理
-> 残留**」的顺序移除。上面的树图是**整改后的目标态**，过渡期内以「该文件已被清单声明为闭源」
-> 为唯一判准，不要因为它暂时还在仓库里就当作公开内容。
+> ✅ **2026-10-30 闭源整改已完成**：越界文件（`workers/` 整包、`docs/CONTENT-SOURCE.md`、
+> `src/knowledge_base/SOURCES.md`、`tests/test_merge_domains.py` 及 KB 生成/发布脚本若干）
+> 已从**当前树与全部历史提交**中移除（`git filter-repo` 全仓重写，旧对象已 `gc` 清除）。
+> 上面的树图即**当前实态**；「某文件是否该进公开仓」的唯一判准是 `tools/closed_assets.txt`。
 
 ---
 

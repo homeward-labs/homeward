@@ -68,14 +68,15 @@ Additional Use Grant **只授予了自己家庭自用 + 自己的教育/研究**
 
 ## 四、知识库数据不适用本许可
 
-`src/knowledge_base/` 下的**数据**按来源分别授权，与本文件的代码许可无关：
+知识库**数据本体属闭源核心资产，不随本开源仓发布**（公开仓只保留加载器与常量），
+因此本许可不覆盖它；其数据许可与本文件的代码许可无关，按来源分别授权：
 
 | 部分 | 许可 |
 |---|---|
-| `domains_public.csv`（StevenBlack/NoCoin，2959 条） | **MIT**（沿用上游，必须署名） |
-| `domains_homeward.csv`（家卫策展，525 条） | **CC BY 4.0** |
+| 上游公开源（StevenBlack / NoCoin 等） | **MIT**（沿用上游，必须署名） |
+| 家卫策展条目 | **CC BY 4.0** |
 
-详见 `src/knowledge_base/LICENSE` 与 `src/knowledge_base/SOURCES.md`。
+（随数据本体分发的许可全文见其内附的 `src/knowledge_base/LICENSE`，不在本仓库。）
 
 ## 五、第三方组件
 

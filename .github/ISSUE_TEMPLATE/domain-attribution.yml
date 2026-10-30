@@ -6,11 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        感谢补知识库！这是本项目**最有价值的贡献**：社区版能不能把设备外联「读懂」，
-        完全取决于这张表覆盖多少域名。
+        感谢提供域名归属线索！家卫把设备外联「读懂」的能力，直接取决于知识库覆盖多少域名。
 
-        > 想直接动手？编辑 `src/knowledge_base/domains.csv` 发 PR 更快（字段说明见下方）。
-        > 开这个 Issue 也完全可以，由维护者补录。
+        > 知识库**数据本体属闭源核心资产、不随公开仓发布**，因此**不接受直接改 CSV 的 PR**；
+        > 请按下面表单提交线索，由维护者核实后补录到闭源知识库。
 
   - type: input
     id: domain
@@ -81,7 +80,7 @@ body:
       value: |
         ---
 
-        ### 附：直接改 CSV 发 PR 时的字段格式
+        ### 附：知识库条目字段格式（供参考，由维护者录入）
 
         ```csv
         domain,organization,category,confidence,description,action,side_effects
@@ -90,4 +89,4 @@ body:
 
         - `action` 只是**建议**（`allow` / `block_soft` / `block_medium`），社区版不执行拦截，仅用于预览后果。
         - `side_effects` 写「拦了之后会怎样」，这是家卫区别于普通 DNS 过滤器的关键字段，能填请填。
-        - 数据以 **CC BY 4.0** 发布（使用须署名），请勿提交来源不明或受保密义务约束的内容。
+        - 家卫策展条目以 **CC BY 4.0** 并入闭源知识库（使用须署名），请勿提交来源不明或受保密义务约束的内容。

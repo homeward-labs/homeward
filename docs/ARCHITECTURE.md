@@ -160,19 +160,19 @@ xiaomi.speech.ai,Xiaomi,machine_learning,medium,小米语音AI处理,block_mediu
 collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步确认
 ```
 
-字段说明（以 `src/knowledge_base/domains.csv` 实际表头为准）：
+字段说明（表头由加载器约定，见 `src/knowledge_base/constants.py`；数据本体在闭源侧）：
 - `category`：IoT_core / cloud_storage / analytics / advertising_sdk / telemetry /
   machine_learning / cdn / unknown
 - `action`：**建议动作**，不是系统会自动做的事 —— allow / warn / block_soft /
   block_medium / block_hard（阻断类一律需用户确认，实际下发属标准版）
 - `side_effects`：中文分号分隔的后果说明，供「阻断后果预览」使用；allow 类留空
 
-数据**按来源分别授权**（上游公开源沿用 MIT / 家卫策展 CC BY 4.0），使用须署名，
-见 `src/knowledge_base/LICENSE` 与 `SOURCES.md`。
+知识库**数据本体属闭源核心资产，不随本仓库发布**；数据按来源分别授权
+（上游公开源沿用 MIT / 家卫策展 CC BY 4.0），使用须署名。
 
 ### 3.2 行为模式库（behaviors.json）
 
-当前内置 8 个行为：心跳信标、突发大流量上传、周期性外联、疑似 DNS 隧道、
+行为模式库（`behaviors.json`，数据本体在闭源侧）定义了 8 类行为：心跳信标、突发大流量上传、周期性外联、疑似 DNS 隧道、
 局域网 mDNS 扫描、疑似挖矿、疑似 C2 通信、疑似固件后门。
 
 ```json
@@ -233,7 +233,7 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
 
 ### 3.3 在线更新
 
-知识库定期从社区仓库拉取更新（默认每周），用户可关闭。更新方式：
+知识库定期从配置的**内容源**（静态源 + 信任根，源地址由闭源构建注入）拉取更新，用户可关闭。更新方式：
 
 - 启动时检查版本
 - 后台静默下载

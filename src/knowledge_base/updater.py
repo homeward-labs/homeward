@@ -1,6 +1,6 @@
 """
 知识库在线更新模块
-支持从社区仓库拉取最新域名归属数据
+支持从配置的内容源拉取最新域名归属数据（源地址由闭源构建注入）
 """
 
 import hashlib
@@ -329,7 +329,7 @@ class KnowledgeBaseUpdater:
     def _verify_signature(self, checksum_text: str, url: str) -> bool:
         """验证内容源签名（C2）。
 
-        签名是对 ``CHECKSUM`` 内容的 Ed25519 签名（见 ``scripts/make_kb_source.py --sign``）。
+        签名是对 ``CHECKSUM`` 内容的 Ed25519 签名（由闭源侧的 ``make_kb_source.py --sign`` 生成）。
         返回 True=可继续替换；False=应拒绝替换。
 
         降级策略由 ``HOMEWARD_KB_REQUIRE_SIGNATURE`` 控制：

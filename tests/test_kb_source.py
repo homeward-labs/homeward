@@ -371,52 +371,10 @@ class TestBundledVersion(unittest.TestCase):
         self.assertEqual(u._read_local_version(), "2.3.1")
 
 
-class TestMakeKbSource(unittest.TestCase):
-    """C4：一键起内容源脚本，CHECKSUM 格式须与 updater 解析一致"""
-
-    def setUp(self):
-        self.root = Path(tempfile.mkdtemp())
-
-    def tearDown(self):
-        shutil.rmtree(self.root, ignore_errors=True)
-
-    def _load_module(self):
-        import importlib.util
-
-        p = (
-            Path(__file__).resolve().parent.parent
-            / "scripts"
-            / "make_kb_source.py"
-        )
-        spec = importlib.util.spec_from_file_location("make_kb_source", p)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-
-    def test_build_checksum_format_and_verifiable(self):
-        from knowledge_base.updater import KnowledgeBaseUpdater
-
-        src = self.root / "kb"
-        src.mkdir(parents=True)
-        (src / "domains.csv").write_text("x,y\n", encoding="utf-8")
-        (src / "behaviors.json").write_text("[]", encoding="utf-8")
-        mks = self._load_module()
-        checksum = mks.build_checksum(src)
-        # 格式：<sha256>  <filename>（两空格）
-        for line in checksum.strip().splitlines():
-            self.assertRegex(line, r"^[0-9a-f]{64}  \S+$")
-        # updater 能认这个 CHECKSUM（反方向校验，防止格式漂移）
-        u = KnowledgeBaseUpdater(kb_dir=str(src))
-        self.assertTrue(u._verify_checksum(src, checksum))
-
-    def test_build_checksum_missing_required_raises(self):
-        src = self.root / "kb"
-        src.mkdir()
-        (src / "domains.csv").write_text("x\n", encoding="utf-8")
-        # 故意缺 behaviors.json
-        mks = self._load_module()
-        with self.assertRaises(SystemExit):
-            mks.build_checksum(src)
+# TestMakeKbSource（校验内容源打包脚本 scripts/make_kb_source.py 的 CHECKSUM 格式）
+# 已随该脚本移出公开仓（属闭源核心资产）而删除本类；对应覆盖保留在私有侧
+# kb-private/homeward-public-mirror/tests/test_kb_source.py。
+# updater 对 CHECKSUM 格式的解析仍由本文件其余用例（TestUpdateLoop 等）正向覆盖。
 
 
 class TestSignature(unittest.TestCase):
