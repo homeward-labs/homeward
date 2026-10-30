@@ -161,6 +161,15 @@ class TestLicenseApi(unittest.TestCase):
         self.assertEqual(len(fp), 64, f"device_fp 应为 64 位 sha256: {fp!r}")
         int(fp, 16)  # 非十六进制会抛错
 
+    def test_status_includes_external_entry_kvs(self):
+        """升级面板的外部入口（付款 / 早鸟）统一由服务端下发，前端不硬编码外部 URL。"""
+        _st, body = self._get_json("/api/license/status")
+        self.assertIn("order_url", body)
+        self.assertIn("earlybird_url", body)
+        self.assertTrue(body["order_url"], "order_url 不应为空（有默认付款页）")
+        # earlybird_url 未配置时为空串，前端据以降级为「待上线」
+        self.assertIsInstance(body["earlybird_url"], str)
+
     # ---- S1-2 试用链路（EDITIONS 试用条款：order_id=trial-* 的时间受限标准版许可）----
 
     def test_trial_token_recognized(self):

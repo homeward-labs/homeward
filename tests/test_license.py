@@ -22,6 +22,7 @@ from license.verify import (  # noqa: E402
     verify_token,
     is_revoked,
     days_remaining,
+    payload_tier,
 )
 
 
@@ -37,6 +38,7 @@ def _make_payload(valid_days=365, device_fp="fp-abc", order_id="WX-1"):
     return {
         "kid": "2026-09",
         "edition": "standard",
+        "tier": 2,  # ADR-007 预留档位
         "device_fp": device_fp,
         "features": ["dns_block"],
         "issued_at": now,
@@ -95,6 +97,27 @@ def test_token_roundtrip():
     assert out["edition"] == "standard"
     assert out["order_id"] == "WX-1"
     assert days_remaining(out) >= 364
+
+
+def test_tier_roundtrip():
+    """ADR-007：payload 预留 tier 字段，验签后应原样透出。"""
+    seed = os.urandom(32)
+    pub = derive_public(seed)
+    payload = _make_payload()
+    assert payload["tier"] == 2
+    token = _sign_token(seed, payload)
+    out = verify_token(token, expected_device_fp="fp-abc", public_key=pub)
+    assert out["tier"] == 2
+    assert payload_tier(out) == 2
+
+
+def test_tier_legacy_fallback():
+    """旧令牌未签 tier 时，按 edition 回退档位（向前兼容，ADR-007）。"""
+    payload = _make_payload()
+    payload.pop("tier")
+    assert payload_tier(payload) == 2  # edition=standard → 2
+    assert payload_tier({**payload, "edition": "pro"}) == 3
+    assert payload_tier({**payload, "edition": "unknown"}) == 1
 
 
 def test_token_tampered():

@@ -76,7 +76,7 @@ function renderCollectorHints(collectors) {
   if (ct && !ct.active) {
     // bridge 容器里必然读不到 /proc/net/nf_conntrack，也没 conntrack 命令
     hints.push(`
-      <div class="note" style="margin-top:10px;background:rgba(9,105,218,0.08);border-left:3px solid #0969da">
+      <div class="note" style="margin-top:10px;background:var(--accent-soft);border-left:3px solid var(--accent)">
         <strong>Tier 2 · 连接元数据 不可用</strong> — 这通常意味着你用的是 Docker 默认的 <code>bridge</code> 网络模式。
         容器独立的 netns 里读不到宿主机的 <code>/proc/net/nf_conntrack</code>，也没有 <code>conntrack</code> 命令。
         <div style="margin-top:4px">
@@ -93,7 +93,7 @@ function renderCollectorHints(collectors) {
   const dnsmasq = collectors.find((c) => c.collector === "DnsLogCollector");
   if (dnsmasq && !dnsmasq.active) {
     hints.push(`
-      <div class="note" style="margin-top:10px;background:rgba(207,34,46,0.08);border-left:3px solid #cf222e">
+      <div class="note" style="margin-top:10px;background:var(--danger-soft);border-left:3px solid var(--danger)">
         <strong>Tier 1 · DNS（dnsmasq）不可用</strong> — 家卫需要 dnsmasq 的查询日志来发现「设备 ↔ 域名」关联。
         <div style="margin-top:4px">
           检查 dnsmasq 是否已开启查询日志（<code>log-queries</code> 配置项），以及运行家卫的进程是否有读权限。
@@ -176,7 +176,7 @@ function renderCheckup(c) {
       <div class="card">
         <div style="display:flex;align-items:center;gap:14px">
           <span class="sev sev-${vcls}" style="font-size:15px;padding:6px 12px">${esc(c.verdict)}</span>
-          <span style="font-size:26px;font-weight:700">${esc(c.score)}<span style="font-size:14px;color:var(--muted,#888)"> /100</span></span>
+          <span style="font-size:26px;font-weight:700">${esc(c.score)}<span style="font-size:14px;color:var(--text-muted)"> /100</span></span>
           <span class="small muted">健康分</span>
         </div>
         <div class="grid" style="margin-top:14px">
@@ -231,11 +231,11 @@ function renderOverview() {
     .map(([k, v]) => ({ label: k, value: v }));
 
   const catColors = {
-    own: "#34c759", benign: "#86868b", tracker: "#ff9f0a", ads: "#ff453a",
-    cdn: "#0071e3", social: "#5856d6", ai: "#ff2d55", productivity: "#00b8d4",
-    cloud: "#30b0c7", unknown: "#aeaeb2", iot_core: "#ff9f0a", iot: "#ff9f0a",
-    advertising_sdk: "#ff453a", cloud_storage: "#30b0c7", analytics: "#5856d6",
-    telemetry: "#00b8d4", tracking: "#ff9f0a", malware: "#ff3b30", phishing: "#ff3b30",
+own: "var(--ok)", benign: "var(--text-muted)", tracker: "var(--warn)", ads: "var(--sev-high)",
+    cdn: "var(--accent)", social: "var(--cat-social)", ai: "var(--cat-ai)", productivity: "var(--cat-productivity)",
+    cloud: "var(--cat-cloud)", unknown: "var(--cat-unknown)", iot_core: "var(--warn)", iot: "var(--warn)",
+    advertising_sdk: "var(--sev-high)", cloud_storage: "var(--cat-cloud)", analytics: "var(--cat-social)",
+    telemetry: "var(--cat-productivity)", tracking: "var(--warn)", malware: "var(--danger)", phishing: "var(--danger)",
   };
   const cats = {};
   (state.data.destinations?.items || []).forEach((x) => {
@@ -243,9 +243,9 @@ function renderOverview() {
     cats[c] = (cats[c] || 0) + 1;
   });
   const catItems = Object.entries(cats).sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "#aeaeb2" }));
+    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "var(--cat-unknown)" }));
 
-  const sevColors = { critical: "#ff3b30", high: "#ff453a", medium: "#ff9f0a", low: "#34c759" };
+  const sevColors = { critical: "var(--sev-critical)", high: "var(--sev-high)", medium: "var(--sev-medium)", low: "var(--sev-low)" };
   const sevItems = ["critical", "high", "medium", "low"].filter((k) => counts[k])
     .map((k) => ({ label: k, value: counts[k], color: sevColors[k] }));
 
@@ -260,9 +260,9 @@ function renderOverview() {
             : c.collector === "SyslogDnsCollector" ? "Tier 1 · DNS（syslog）"
             : c.collector === "ConntrackCollector" ? "Tier 2 · 连接元数据（conntrack）"
             : c.collector;
-          const color = c.active ? "#2da44e" : "#cf222e";
+          const color = c.active ? "var(--ok)" : "var(--danger)";
           const icon = c.active ? "●" : "○";
-          return `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;background:${c.active ? "rgba(45,164,78,0.08)" : "rgba(207,34,46,0.08)"}">
+          return `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;background:${c.active ? "var(--ok-soft)" : "var(--danger-soft)"}">
             <span style="color:${color};font-size:12px">${icon}</span>
             <span style="font-weight:500">${esc(name)}</span>
             <span class="small muted" title="${esc(c.reason || "")}">${c.active ? "活跃" : "不可用"}</span>
@@ -282,7 +282,7 @@ function renderOverview() {
           size: 168, stroke: 15,
           segments: [
             { value: score, color: score >= 80 ? "var(--ok)" : (score >= 60 ? "var(--accent)" : "var(--warn)") },
-            { value: Math.max(100 - score, 0), color: "#eef0f4" },
+            { value: Math.max(100 - score, 0), color: "var(--chart-track)" },
           ],
           ariaLabel: "防护健康分 " + score + " 分（满分 100）",
         })}
@@ -494,7 +494,7 @@ function renderDevices() {
     const highG = list.filter((d) => d.risk_level === "high").length;
     return `
       <div style="margin-top:16px">
-        <h3 style="font-size:14px;color:#57606a;margin-bottom:8px">
+        <h3 style="font-size:14px;color:var(--text-2);margin-bottom:8px">
           ${esc(g)} <span class="count">（${list.length} 台${highG ? ` · 高风险 ${highG}` : ""}）</span>
         </h3>
         ${renderTable(list.map(renderRow).join(""))}
@@ -513,16 +513,16 @@ function renderDevices() {
           placeholder="搜索：名称 / 厂商 / MAC / IP"
           value="${esc(state.deviceSearch)}"
           data-device-search
-          style="flex:1;min-width:180px;padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px"
+          style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px"
         >
-        <select data-device-risk style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px">
+        <select data-device-risk style="padding:6px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px">
           ${riskOpts}
         </select>
-        <select data-device-group style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:13px">
+        <select data-device-group style="padding:6px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px">
           ${groupOpts}
         </select>
         ${(state.deviceSearch || state.deviceRiskFilter !== "all")
-          ? `<a href="#" data-device-reset style="font-size:13px;color:#0969da">清除筛选</a>` : ""}
+          ? `<a href="#" data-device-reset style="font-size:13px;color:var(--accent)">清除筛选</a>` : ""}
       </div>
 
       ${groupSections}
@@ -555,16 +555,16 @@ function renderDestinations() {
 
   // 前端聚合：分类饼图 + Top 域名横向柱状（零后端改动）
   const catColors = {
-    own: "#34c759", benign: "#86868b", tracker: "#ff9f0a", ads: "#ff453a",
-    cdn: "#0071e3", social: "#5856d6", ai: "#ff2d55", productivity: "#00b8d4",
-    cloud: "#30b0c7", unknown: "#aeaeb2", iot_core: "#ff9f0a", iot: "#ff9f0a",
-    advertising_sdk: "#ff453a", cloud_storage: "#30b0c7", analytics: "#5856d6",
-    telemetry: "#00b8d4", tracking: "#ff9f0a", malware: "#ff3b30", phishing: "#ff3b30",
+own: "var(--ok)", benign: "var(--text-muted)", tracker: "var(--warn)", ads: "var(--sev-high)",
+    cdn: "var(--accent)", social: "var(--cat-social)", ai: "var(--cat-ai)", productivity: "var(--cat-productivity)",
+    cloud: "var(--cat-cloud)", unknown: "var(--cat-unknown)", iot_core: "var(--warn)", iot: "var(--warn)",
+    advertising_sdk: "var(--sev-high)", cloud_storage: "var(--cat-cloud)", analytics: "var(--cat-social)",
+    telemetry: "var(--cat-productivity)", tracking: "var(--warn)", malware: "var(--danger)", phishing: "var(--danger)",
   };
   const cats = {};
   items.forEach((x) => { const c = (x.category || "unknown").toLowerCase(); cats[c] = (cats[c] || 0) + 1; });
   const catItems = Object.entries(cats).sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "#aeaeb2" }));
+    .map(([k, v]) => ({ label: k, value: v, color: catColors[k] || "var(--cat-unknown)" }));
   const byDevices = items.map((x) => ({
     label: x.domain,
     value: (x.devices || []).reduce((a, dd) => a + (dd.count || 1), 0) || 1,
@@ -626,7 +626,7 @@ function renderAlerts() {
     return '<div class="card empty">暂无活跃告警。行为识别看的是「一段时间内的若干次观测」，不是单条流量。</div>';
   }
   // 前端聚合：严重度柱状 + 饼图（零后端改动）
-  const sevColors = { critical: "#ff3b30", high: "#ff453a", medium: "#ff9f0a", low: "#34c759" };
+  const sevColors = { critical: "var(--sev-critical)", high: "var(--sev-high)", medium: "var(--sev-medium)", low: "var(--sev-low)" };
   const counts = {};
   items.forEach((a) => { counts[a.severity] = (counts[a.severity] || 0) + 1; });
   const sevItems = ["critical", "high", "medium", "low"].filter((k) => counts[k])
@@ -732,7 +732,7 @@ function renderTrends() {
         })}
         ${HWCharts.areaMulti({
           height: 120, max: 100,
-          series: [{ points: scorePts, color: "#00b8d4", fill: true }],
+          series: [{ points: scorePts, color: "var(--cat-productivity)", fill: true }],
           ariaLabel: "隐私分趋势（0-100）",
         })}
       </div>
@@ -1047,15 +1047,21 @@ function renderUpgrade() {
   const status = lic.license || {};
   // 订单 URL 由服务端下发（HOMEWARD_ORDER_URL），前端不硬编码任何外部链接。
   // 此处不给外部链接字面量兜底，避免破坏「界面零外部资源」约束；若缺失则输入框留空由用户填写。
-  const orderUrl = lic.order_url || "";
+const orderUrl = lic.order_url || "";
+  // 早鸟假门 URL 同由服务端下发（HOMEWARD_EARLYBIRD_URL），未配置时前端展示「待上线」降级态。
+  const earlybirdUrl = lic.earlybird_url || "";
+  const ebClicks = (() => {
+    try { return parseInt(localStorage.getItem("homeward_earlybird_cta") || "0", 10) || 0; }
+    catch (e) { return 0; }
+  })();
   const valid = !!status.valid;
   const reason = status.reason || "none";
 
-  const planRows = [
-    ["单月", "30 天", "入门 / 体验"],
-    ["3 个月", "90 天", ""],
-    ["6 个月", "180 天", ""],
-    ["1 年", "365 天", "通常单价最低 · 主推"],
+const planRows = [
+    ["月付", "¥19.9 / 月", "灵活尝鲜"],
+    ["3 个月", "¥49", "季度体验"],
+    ["6 个月", "¥79", "半年用户"],
+    ["年付", "¥99 / 年", "主推 · 单价最低"],
   ];
   const tiers = planRows.map(([name, dur, note]) =>
     `<div class="tier">
@@ -1117,7 +1123,7 @@ function renderUpgrade() {
   }
 
   const flash = state.flash
-    ? `<div class="note" style="border-color:var(--ok);background:#eafaf1">${esc(state.flash)}</div>` : "";
+    ? `<div class="note" style="border-color:var(--ok);background:var(--ok-surface)">${esc(state.flash)}</div>` : "";
 
   return `
     ${flash}
@@ -1129,7 +1135,24 @@ function renderUpgrade() {
     <div class="section">
       <h2>升级到标准版 / 专业版</h2>
       <div class="note">家卫本体 100% 客户端、可离线使用；仅「激活」需联网一次。扫码付款后，把服务端返回的许可令牌粘贴到下方即可解锁。</div>
-      <div class="grid" style="margin-top:12px">${tiers}</div>
+<div class="grid" style="margin-top:12px">${tiers}</div>
+    </div>
+
+    <div class="section">
+      <h2>早鸟抢先 · 标准版首年 ¥69</h2>
+      <div class="card">
+        <div class="item-head">
+          <span class="item-title">早鸟名额占位</span>
+          <span class="sev sev-medium">限 100 名</span>
+        </div>
+        <div class="item-body small muted">原价 ¥99/年 → 早鸟 ¥69/年；先占位、不收款，开售前按占位顺序邮件通知，名额满自动转候补。</div>
+        <div class="item-foot">
+          ${earlybirdUrl
+            ? `<a class="btn btn-primary" href="${esc(earlybirdUrl)}" target="_blank" rel="noopener" data-earlybird>抢早鸟名额</a>`
+            : `<button class="btn" type="button" disabled title="早鸟假门尚未上线（服务端未配置 HOMEWARD_EARLYBIRD_URL）">抢早鸟（待上线）</button>`}
+          <span class="small muted">本机点击 ${ebClicks} 次（仅本地统计，不外发）</span>
+        </div>
+      </div>
     </div>
 
     <div class="section">
@@ -1352,8 +1375,18 @@ document.getElementById("view").addEventListener("click", async (e) => {
   const gotoPayBtn = e.target.closest("[data-goto-pay]");
   if (gotoPayBtn) {
     // 到期回落的「续费解锁」（EDITIONS 试用条款 3）：滚到付款码区，不跳外部链接
-    const box = document.getElementById("qr-box");
+const box = document.getElementById("qr-box");
     if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  const earlybirdBtn = e.target.closest("[data-earlybird]");
+  if (earlybirdBtn) {
+    // 本地埋点：仅统计本机 CTA 点击次数，不发送任何数据（零遥测红线）
+    try {
+      const n = parseInt(localStorage.getItem("homeward_earlybird_cta") || "0", 10) || 0;
+      localStorage.setItem("homeward_earlybird_cta", String(n + 1));
+    } catch (er) { /* 隐私模式等场景忽略，不影响跳转 */ }
     return;
   }
 

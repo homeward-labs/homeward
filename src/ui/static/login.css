@@ -1,5 +1,20 @@
 /* 登录页样式（未登录可见，已对 /static/login.css 放白名单）
-   不引任何外部资源；仅用系统字体栈。 */
+   不引任何外部资源；仅用系统字体栈。登录页刻意走深色，色值统一收敛到下方 :root 深色令牌组。 */
+:root {
+  --dark-bg: #0f1419;
+  --dark-bg-card: #161b22;
+  --dark-bg-input: #0d1117;
+  --dark-bg-inset: #1c2128;
+  --dark-border: #30363d;
+  --dark-text: #e6edf3;
+  --dark-text-muted: #8b949e;
+  --dark-text-faint: #6e7681;
+  --dark-accent: #2f81f7;
+  --dark-accent-hover: #4493f8;
+  --dark-code: #d29922;
+  --dark-code-strong: #f0883e;
+  --dark-text-inverse: #ffffff;
+}
 * { box-sizing: border-box; }
 body.login {
   margin: 0;
@@ -7,8 +22,8 @@ body.login {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0f1419;
-  color: #e6edf3;
+  background: var(--dark-bg);
+  color: var(--dark-text);
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 }
@@ -16,24 +31,24 @@ body.login {
   width: 340px;
   max-width: 90vw;
   padding: 32px 28px;
-  background: #161b22;
-  border: 1px solid #30363d;
+  background: var(--dark-bg-card);
+  border: 1px solid var(--dark-border);
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   text-align: center;
 }
 h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0.5px; }
-.sub { margin: 0 0 20px; color: #8b949e; font-size: 13px; }
+.sub { margin: 0 0 20px; color: var(--dark-text-muted); font-size: 13px; }
 .gen {
-  background: #1c2128;
-  border: 1px solid #30363d;
+  background: var(--dark-bg-inset);
+  border: 1px solid var(--dark-border);
   border-radius: 8px;
   padding: 10px;
   font-size: 12px;
-  color: #d29922;
+  color: var(--dark-code);
   word-break: break-all;
 }
-.gen code { color: #f0883e; }
+.gen code { color: var(--dark-code-strong); }
 .login-form {
   display: flex;
   flex-direction: column;
@@ -41,25 +56,25 @@ h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0.5px; }
   margin: 18px 0 12px;
   text-align: left;
 }
-.login-form label { font-size: 13px; color: #8b949e; }
+.login-form label { font-size: 13px; color: var(--dark-text-muted); }
 .login-form input {
   padding: 10px 12px;
-  border: 1px solid #30363d;
+  border: 1px solid var(--dark-border);
   border-radius: 8px;
-  background: #0d1117;
-  color: #e6edf3;
+  background: var(--dark-bg-input);
+  color: var(--dark-text);
   font-size: 14px;
 }
-.login-form input:focus { outline: 2px solid #2f81f7; border-color: #2f81f7; }
+.login-form input:focus { outline: 2px solid var(--dark-accent); border-color: var(--dark-accent); }
 .login-form button {
   margin-top: 6px;
   padding: 10px;
   border: none;
   border-radius: 8px;
-  background: #2f81f7;
-  color: #fff;
+  background: var(--dark-accent);
+  color: var(--dark-text-inverse);
   font-size: 15px;
   cursor: pointer;
 }
-.login-form button:hover { background: #4493f8; }
-.note { font-size: 11px; color: #6e7681; line-height: 1.5; margin: 8px 0 0; }
+.login-form button:hover { background: var(--dark-accent-hover); }
+.note { font-size: 11px; color: var(--dark-text-faint); line-height: 1.5; margin: 8px 0 0; }

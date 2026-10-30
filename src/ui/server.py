@@ -91,6 +91,7 @@ SECURITY_HEADERS = [
 # 社区版能力边界 —— 前端据此把不可用的操作显示为禁用态，而不是灰掉不给理由
 EDITION_INFO = {
     "edition": EDITION,
+    "tier": 1,  # ADR-007 预留档位：1=社区（只读/无拦截）· 2=标准（软/中断）· 3=专业（硬阻断）
     "label": "社区版",
     "can_see": True,
     "can_enforce": False,
@@ -430,13 +431,13 @@ class HomewardHandler(BaseHTTPRequestHandler):
             rel = path[len("/static/"):]
         else:
             rel = path.lstrip("/")
-        # 目录穿越防护：解析后的真实路径必须仍在 static/ 内
+        # 目录穿越防护：解析后的真实路径必须仍在 static/ 内（R10：is_relative_to 替换字符串前缀）
         try:
             target = (STATIC_DIR / rel).resolve()
         except (OSError, ValueError):
             self._json(400, {"error": "bad_path"})
             return
-        if not str(target).startswith(str(STATIC_DIR.resolve())) or not target.is_file():
+        if not target.is_relative_to(STATIC_DIR.resolve()) or not target.is_file():
             self._json(404, {"error": "not_found", "path": path})
             return
         ctype = MIME_TYPES.get(target.suffix.lower(), "application/octet-stream")
@@ -614,6 +615,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 # 前端不硬编码任何外部 URL，便于私有化部署改写。
                 "order_url": os.environ.get(
                     "HOMEWARD_ORDER_URL", "https://pay.homeward.dev/order"),
+                # 早鸟假门 URL 同由服务端下发（HOMEWARD_EARLYBIRD_URL）；未配置留空，前端据此降级为「待上线」。
+                "earlybird_url": os.environ.get("HOMEWARD_EARLYBIRD_URL", ""),
             })
             return
 

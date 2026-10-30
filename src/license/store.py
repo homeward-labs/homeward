@@ -12,6 +12,7 @@ store.py —— 社区版许可本地存储（零依赖，纯本地文件）
 """
 import hashlib
 import json
+import logging
 import os
 import platform
 import time
@@ -19,6 +20,8 @@ import uuid
 from pathlib import Path
 
 from license.verify import status_summary, verify_token, PUBLIC_KEY
+
+logger = logging.getLogger("homeward.license")
 
 
 def _stable_id() -> "str | None":
@@ -41,7 +44,8 @@ def _stable_id() -> "str | None":
         v = uuid.uuid4().hex
         p.write_text(v, encoding="utf-8")
         return v
-    except Exception:
+    except Exception as e:
+        logger.warning("持久化设备标识不可用，退回不稳定指纹: %s", e)
         return None
 
 
@@ -78,8 +82,8 @@ def device_fingerprint() -> str:
     for p in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
         try:
             parts.append(Path(p).read_text(encoding="utf-8").strip())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("读取 %s 失败（预期可能缺失）: %s", p, e)
     if parts:
         return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
@@ -91,14 +95,15 @@ def device_fingerprint() -> str:
             guid = str(winreg.QueryValueEx(k, "MachineGuid")[0])
         if guid:
             return hashlib.sha256(guid.encode("utf-8")).hexdigest()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("读取 Windows MachineGuid 失败（非 Windows 预期）: %s", e)
 
     # 3) 兜底（最不稳定，但比崩溃强）
     try:
         parts.append(hex(uuid.getnode()))
         parts.append(platform.platform())
-    except Exception:
+    except Exception as e:
+        logger.warning("指纹兜底计算失败，使用占位值: %s", e)
         parts.append("fallback-unknown")
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
@@ -124,7 +129,8 @@ def load_token() -> str | None:
         return None
     try:
         return p.read_text(encoding="utf-8").strip()
-    except Exception:
+    except Exception as e:
+        logger.warning("读取许可令牌失败: %s", e)
         return None
 
 
@@ -140,7 +146,8 @@ def save_token(token: str) -> bool:
         except OSError:
             pass
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning("保存许可令牌失败: %s", e)
         return False
 
 
@@ -150,7 +157,8 @@ def clear_token() -> bool:
         try:
             p.unlink()
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning("清除许可令牌失败: %s", e)
             return False
     return True
 
@@ -160,7 +168,8 @@ def status(expected_device_fp: str = None) -> dict:
     token = load_token()
     if not token:
         return {"valid": False, "reason": "none", "edition": None,
-                "days_remaining": 0, "device_bound": expected_device_fp is not None}
+                "tier": None, "days_remaining": 0,
+                "device_bound": expected_device_fp is not None}
     revoked = set(load_crl().get("revoked_order_ids", []))
     summary = status_summary(token, expected_device_fp=expected_device_fp)
     if summary["valid"] and token and revoked:
@@ -180,7 +189,8 @@ def load_crl() -> dict:
         return {"revoked_order_ids": [], "fetched_at": 0}
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.warning("读取吊销名单失败: %s", e)
         return {"revoked_order_ids": [], "fetched_at": 0}
 
 
@@ -189,7 +199,8 @@ def save_crl(crl: dict) -> bool:
     try:
         _crl_path().write_text(json.dumps(crl, ensure_ascii=False), encoding="utf-8")
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning("保存吊销名单失败: %s", e)
         return False
 
 

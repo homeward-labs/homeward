@@ -25,13 +25,13 @@
   }
 
   // 环形 / 饼图：segments = [{value, color, label}]
-  // opts: { size=180, stroke=16, track="#eef0f4", gap=2, ariaLabel }
+  // opts: { size=180, stroke=16, track="var(--chart-track)", gap=2, ariaLabel }
   // 仅返回纯 SVG；中心文字由调用方用 .ring-center 绝对定位叠加。
   function donut(opts) {
     opts = opts || {};
     var size = opts.size || 180;
     var stroke = opts.stroke || 16;
-    var track = opts.track || "#eef0f4";
+    var track = opts.track || "var(--chart-track)";
     var gap = typeof opts.gap === "number" ? opts.gap : 2;
     var cx = size / 2, cy = size / 2;
     var r = (size - stroke) / 2;
@@ -61,7 +61,7 @@
   }
 
   // 横向柱状图：items = [{label, value, color?}]
-  // opts: { max, rowH=30, labelW=130, barColor="#0071e3", unit="" }
+  // opts: { max, rowH=30, labelW=130, barColor="var(--accent)", unit="" }
   function hbar(opts) {
     opts = opts || {};
     var items = opts.items || [];
@@ -80,7 +80,7 @@
       var ty = i * (rowH + gap);
       return '<g transform="translate(0,' + ty + ')">' +
         '<text x="0" y="' + (rowH / 2) + '" dominant-baseline="middle" font-size="12.5" fill="var(--text-2)">' + esc(it.label) + '</text>' +
-        '<rect x="' + labelW + '" y="0" width="' + barArea + '" height="' + rowH + '" rx="7" fill="rgba(0,0,0,0.05)"/>' +
+        '<rect x="' + labelW + '" y="0" width="' + barArea + '" height="' + rowH + '" rx="7" fill="var(--overlay-track)"/>' +
         '<rect x="' + labelW + '" y="0" width="' + (barArea * pct / 100).toFixed(2) + '" height="' + rowH + '" rx="7" fill="' + esc(c) + '"/>' +
         '<text x="' + (labelW + barArea + 6) + '" y="' + (rowH / 2) + '" dominant-baseline="middle" font-size="12" fill="var(--text-muted)">' +
           esc(it.value) + esc(unit) + '</text>' +
@@ -92,7 +92,7 @@
   }
 
   // 纵向柱状图：items = [{label, value, color?}]
-  // opts: { max, height=180, barColor="#0071e3", labelEvery=1 }
+  // opts: { max, height=180, barColor="var(--accent)", labelEvery=1 }
   function vbar(opts) {
     opts = opts || {};
     var items = opts.items || [];
@@ -126,14 +126,14 @@
     }).join("");
 
     body = '<line x1="' + padLeft + '" y1="' + (padTop + plotH) + '" x2="' + (100 - padRight) + '" y2="' + (padTop + plotH) +
-      '" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>' + body;
+      '" stroke="var(--border)" stroke-width="1"/>' + body;
 
     return '<svg viewBox="0 0 ' + 100 + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "纵向柱状图") +
       '" preserveAspectRatio="none" style="width:100%;height:auto">' + body + '</svg>';
   }
 
   // 面积 / 折线：points = [{x, y}]（y 为原始值，用 max 归一）
-  // opts: { max, height=120, color="#0071e3", fill=true, dots=false }
+  // opts: { max, height=120, color="var(--accent)", fill=true, dots=false }
   function area(opts) {
     opts = opts || {};
     var pts = opts.points || [];

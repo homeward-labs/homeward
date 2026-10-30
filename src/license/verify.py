@@ -222,6 +222,22 @@ def is_trial(payload: dict) -> bool:
     return str((payload or {}).get("order_id") or "").startswith("trial-")
 
 
+# 许可档位 tier（ADR-007 预留，向前兼容）：1=社区（只读/无拦截）· 2=标准（软/中断）· 3=专业（硬阻断）。
+# 旧令牌未签 tier 时按 edition 回退，保证 UI 始终能读到一个档位值。
+TIER_BY_EDITION = {"community": 1, "standard": 2, "pro": 3}
+
+
+def edition_tier(edition) -> int:
+    """按版本推断档位；未知版本回退 1（社区）。"""
+    return TIER_BY_EDITION.get(edition, 1)
+
+
+def payload_tier(payload: dict) -> int:
+    """读取 payload 的 tier；旧令牌未签时按 edition 回退（ADR-007 预留字段）。"""
+    tier = payload.get("tier")
+    return tier if tier is not None else edition_tier(payload.get("edition"))
+
+
 def status_summary(token: str, expected_device_fp: str = None) -> dict:
     """给 UI 用的摘要：是否有效、版本、剩余天数、吊销/过期原因。"""
     payload = verify_token(token, expected_device_fp=expected_device_fp)
@@ -233,11 +249,12 @@ def status_summary(token: str, expected_device_fp: str = None) -> dict:
             if int(p.get("valid_until", 0)) < int(time.time()):
                 reason = "expired"
         return {"valid": False, "reason": reason, "edition": None,
-                "days_remaining": 0, "is_trial": is_trial(p)}
+                "tier": None, "days_remaining": 0, "is_trial": is_trial(p)}
     return {
         "valid": True,
         "reason": "ok",
         "edition": payload.get("edition"),
+        "tier": payload_tier(payload),
         "features": payload.get("features", []),
         "order_id": payload.get("order_id"),
         "is_trial": is_trial(payload),
