@@ -61,7 +61,7 @@ kbignore:SIGNATURE
 kbignore:CHECKSUM
 
 # --- 5) 活源地址 / 机密标记（出现于任何被跟踪文件、或其历史 = 越界）---
-pattern:<redacted>
+pattern:782238788
 pattern:homeward-kb\.
-pattern:<redacted-env>
-pattern:<redacted-env>
+pattern:CF_API_TOKEN
+pattern:HOMEWARD_KB_SIGN_SEED
