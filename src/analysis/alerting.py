@@ -415,6 +415,16 @@ class AlertCenter:
         alert.status = "dismissed"
         return True
 
+    def undismiss(self, alert_id: str) -> bool:
+        """恢复一条已忽略的告警（重新进入活跃告警列表）。"""
+        alert = self._alerts.get(alert_id)
+        if alert is None:
+            return False
+        if alert.status == "dismissed":
+            alert.status = "open"
+            return True
+        return False
+
     def clear(self) -> int:
         """清空全部告警（含已忽略的）。返回清掉的条数。
 

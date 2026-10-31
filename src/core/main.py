@@ -576,6 +576,11 @@ class HomewardService:
         with self._state_lock:
             return self.alert_center.dismiss(alert_id)
 
+    def restore_alert(self, alert_id: str) -> bool:
+        """恢复一条已忽略的告警"""
+        with self._state_lock:
+            return self.alert_center.undismiss(alert_id)
+
     def reset_observations(self) -> dict:
         """清空全部观测态（设备 / 归属缓存 / 未知域名 / 告警），只动内存。
 

@@ -56,7 +56,7 @@
     }
 
     return '<svg viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="' +
-      esc(opts.ariaLabel || "环形图") + '" style="max-width:' + size + 'px;margin:0 auto;display:block">' +
+      esc(opts.ariaLabel || "环形图") + '" class="hw-chart hw-donut">' +
       parts.join("") + '</svg>';
   }
 
@@ -71,28 +71,34 @@
     var unit = opts.unit || "";
     var max = opts.max || Math.max.apply(null, items.map(function (x) { return x.value; }).concat([1]));
     var gap = 6;
-    var w = 100, barArea = w - labelW; // 0..100 坐标系
+    // 真实像素坐标系：viewBox 宽用接近实际渲染宽度（约 600），
+    // 文字用绝对像素字号，SVG 拉伸时文字不再被等比放大成巨字。
+    var w = 600;
+    var valueW = 60;                        // 右侧数值区预留宽度
+    var barArea = w - labelW - valueW;      // 柱区宽度（正值，修复原 100-130=-30 负值 bug）
     var h = Math.max(items.length * (rowH + gap) - gap, rowH);
 
     var body = items.map(function (it, i) {
-      var pct = max > 0 ? (it.value / max * 100) : 0;
+      var pct = max > 0 ? (it.value / max) : 0;   // 0..1
       var c = it.color || barColor;
       var ty = i * (rowH + gap);
       return '<g transform="translate(0,' + ty + ')">' +
         '<text x="0" y="' + (rowH / 2) + '" dominant-baseline="middle" font-size="12.5" fill="var(--text-2)">' + esc(it.label) + '</text>' +
         '<rect x="' + labelW + '" y="0" width="' + barArea + '" height="' + rowH + '" rx="7" fill="var(--overlay-track)"/>' +
-        '<rect x="' + labelW + '" y="0" width="' + (barArea * pct / 100).toFixed(2) + '" height="' + rowH + '" rx="7" fill="' + esc(c) + '"/>' +
+        '<rect x="' + labelW + '" y="0" width="' + (barArea * pct).toFixed(2) + '" height="' + rowH + '" rx="7" fill="' + esc(c) + '"/>' +
         '<text x="' + (labelW + barArea + 6) + '" y="' + (rowH / 2) + '" dominant-baseline="middle" font-size="12" fill="var(--text-muted)">' +
           esc(it.value) + esc(unit) + '</text>' +
         '</g>';
     }).join("");
 
     return '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + esc(opts.ariaLabel || "横向柱状图") +
-      '" preserveAspectRatio="xMinYMid meet" style="width:100%;height:auto">' + body + '</svg>';
+      '" class="hw-chart hw-hbar" preserveAspectRatio="xMinYMid meet">' + body + '</svg>';
   }
 
-  // 纵向柱状图：items = [{label, value, color?}]
-  // opts: { max, height=180, barColor="var(--accent)", labelEvery=1 }
+  // 纵向柱状图：items = [{label, value, color?, selected?}]
+  // opts: { max, height=180, barColor="var(--accent)", labelEvery=1, clickable=false }
+  //   clickable=true 时每根柱带 data-sev-filter（供 #view 事件委托筛选）；
+  //   selected=true 的柱显示选中高亮 + 描边。
   function vbar(opts) {
     opts = opts || {};
     var items = opts.items || [];
@@ -101,9 +107,14 @@
     var barColor = opts.barColor || "var(--accent)";
     var max = opts.max || Math.max.apply(null, items.map(function (x) { return x.value; }).concat([1]));
     var n = items.length || 1;
-    var areaW = 100 - padLeft - padRight;
-    var bw = areaW / n * 0.62;
+    // 真实像素坐标系：viewBox 宽 600（与 hbar 一致），文字用绝对像素字号，
+    // 柱宽/间距为真实像素，SVG 拉伸时不再被等比放大成巨柱/巨字。
+    var W = 600;
+    var areaW = W - padLeft - padRight;
+    // 柱宽 = 步长×0.62，但设上限 200（viewBox 单位）：分类少（如仅 1 根柱）时
+    // step 会等于整个绘图区，不加限会导致单柱横跨 60%+ 宽度，显得过宽。
     var step = areaW / n;
+    var bw = Math.min(step * 0.62, 200);
     var plotH = height - padTop - padBottom;
 
     var body = items.map(function (it, i) {
@@ -117,19 +128,27 @@
       var label = showLabel
         ? '<text x="' + cx + '" y="' + (height - 6) + '" text-anchor="middle" font-size="9" fill="var(--text-muted)">' + esc(it.label) + '</text>'
         : "";
-      return '<g>' +
+      // 点击筛选：给柱挂 data-sev-filter，由 #view 事件委托处理（charts 库零事件绑定）
+      var hit = opts.clickable
+        ? '<rect x="' + (padLeft + step * i).toFixed(2) + '" y="0" width="' + step.toFixed(2) + '" height="' + plotH +
+          '" fill="transparent" data-sev-filter="' + esc(it.label) + '" class="vbar-hit"/>'
+        : "";
+      var selectedCls = it.selected ? " is-selected" : "";
+      return '<g class="vbar-item' + selectedCls + '">' +
         '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + bw.toFixed(2) + '" height="' + bh.toFixed(2) +
-          '" rx="3" fill="' + esc(c) + '" opacity="0.85"/>' +
+          '" rx="3" fill="' + esc(c) + '" opacity="0.85" class="vbar-bar"/>' +
         (it.value ? '<text x="' + cx + '" y="' + (y - 4).toFixed(2) + '" text-anchor="middle" font-size="9.5" fill="var(--text-2)">' + esc(it.value) + '</text>' : "") +
         label +
+        hit +
         '</g>';
     }).join("");
 
-    body = '<line x1="' + padLeft + '" y1="' + (padTop + plotH) + '" x2="' + (100 - padRight) + '" y2="' + (padTop + plotH) +
+    body = '<line x1="' + padLeft + '" y1="' + (padTop + plotH) + '" x2="' + (W - padRight) + '" y2="' + (padTop + plotH) +
       '" stroke="var(--border)" stroke-width="1"/>' + body;
 
-    return '<svg viewBox="0 0 ' + 100 + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "纵向柱状图") +
-      '" preserveAspectRatio="none" style="width:100%;height:auto">' + body + '</svg>';
+    return '<svg viewBox="0 0 ' + W + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "纵向柱状图") +
+      '" class="hw-chart hw-vbar" preserveAspectRatio="none"' +
+      (opts.clickable ? ' data-clickable="1"' : '') + '>' + body + '</svg>';
   }
 
   // 面积 / 折线：points = [{x, y}]（y 为原始值，用 max 归一）
@@ -142,17 +161,19 @@
     var color = opts.color || "var(--accent)";
     var plotH = height - pad * 2;
     var n = pts.length;
-    if (n === 0) return '<svg viewBox="0 0 100 ' + height + '"></svg>';
+    // 真实像素坐标系：viewBox 宽 600，折线 stroke / 圆点用真实像素，拉伸不变形
+    var W = 600;
+    if (n === 0) return '<svg viewBox="0 0 ' + W + ' ' + height + '"></svg>';
     var max = opts.max || Math.max.apply(null, pts.map(function (p) { return p.y; }).concat([1]));
-    var step = n > 1 ? 100 / (n - 1) : 100;
+    var step = n > 1 ? W / (n - 1) : W;
 
     var coords = pts.map(function (p, i) {
-      var x = n > 1 ? i * step : 50;
+      var x = n > 1 ? i * step : W / 2;
       var y = pad + plotH - (max > 0 ? (p.y / max) : 0) * plotH;
       return [x, y];
     });
     var line = coords.map(function (c, i) { return (i ? "L" : "M") + c[0].toFixed(2) + " " + c[1].toFixed(2); }).join(" ");
-    var areaPath = line + " L100 " + (pad + plotH) + " L0 " + (pad + plotH) + " Z";
+    var areaPath = line + " L" + W + " " + (pad + plotH) + " L0 " + (pad + plotH) + " Z";
 
     var dots = opts.dots
       ? coords.map(function (c) { return '<circle cx="' + c[0].toFixed(2) + '" cy="' + c[1].toFixed(2) + '" r="2.4" fill="' + esc(color) + '"/>'; }).join("")
@@ -164,8 +185,8 @@
       '<stop offset="100%" stop-color="' + esc(color) + '" stop-opacity="0"/></linearGradient></defs>' +
       '<path d="' + areaPath + '" fill="url(#' + gid + ')" stroke="none"/>';
 
-    return '<svg viewBox="0 0 100 ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势图") +
-      '" preserveAspectRatio="none" style="width:100%;height:auto">' +
+    return '<svg viewBox="0 0 ' + W + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势图") +
+      '" class="hw-chart hw-area" preserveAspectRatio="none">' +
       fillSvg + '<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
       dots + '</svg>';
   }
@@ -180,15 +201,17 @@
     var plotH = height - pad * 2;
     var n = 0;
     series.forEach(function (s) { n = Math.max(n, s.points.length); });
-    if (n === 0) return '<svg viewBox="0 0 100 ' + height + '"></svg>';
+    // 真实像素坐标系：viewBox 宽 600，折线 stroke / 圆点用真实像素，拉伸不变形
+    var W = 600;
+    if (n === 0) return '<svg viewBox="0 0 ' + W + ' ' + height + '"></svg>';
     var allMax = opts.max || 1;
-    var step = n > 1 ? 100 / (n - 1) : 100;
+    var step = n > 1 ? W / (n - 1) : W;
     var defs = [], bodies = [];
 
     series.forEach(function (s, si) {
       var pts = s.points || [];
       var coords = pts.map(function (p, i) {
-        var x = n > 1 ? i * step : 50;
+        var x = n > 1 ? i * step : W / 2;
         var y = pad + plotH - (allMax > 0 ? (p.y / allMax) : 0) * plotH;
         return [x, y];
       });
@@ -199,7 +222,7 @@
         defs.push('<linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0%" stop-color="' + esc(color) + '" stop-opacity="0.20"/>' +
           '<stop offset="100%" stop-color="' + esc(color) + '" stop-opacity="0"/></linearGradient>');
-        bodies.push('<path d="' + line + ' L100 ' + (pad + plotH) + ' L0 ' + (pad + plotH) + ' Z" fill="url(#' + gid + ')" stroke="none"/>');
+        bodies.push('<path d="' + line + ' L' + W + ' ' + (pad + plotH) + ' L0 ' + (pad + plotH) + ' Z" fill="url(#' + gid + ')" stroke="none"/>');
       }
       bodies.push('<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
       // 末点圆点
@@ -209,8 +232,8 @@
       }
     });
 
-    return '<svg viewBox="0 0 100 ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势对比图") +
-      '" preserveAspectRatio="none" style="width:100%;height:auto"><defs>' + defs.join("") + '</defs>' +
+    return '<svg viewBox="0 0 ' + W + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势对比图") +
+      '" class="hw-chart hw-area" preserveAspectRatio="none"><defs>' + defs.join("") + '</defs>' +
       bodies.join("") + '</svg>';
   }
 

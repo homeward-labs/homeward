@@ -19,6 +19,9 @@ const state = {
   deviceSearch: "",              // 搜索框值（name/vendor/mac/ips 子串）
   deviceRiskFilter: "all",      // risk_level 筛选：all/high/medium/low
   deviceGroupBy: "vendor",      // 分组：vendor（厂商）/none（平铺）
+  // 告警页：已忽略入口 + 严重度柱状图点击筛选（纯前端）
+  alertsShowDismissed: false,   // 是否展开「已忽略」列表
+  alertsSevFilter: null,        // 严重度筛选：null=全部 / critical/high/medium/low
 };
 
 // ------------------------------------------------------------------ 工具
@@ -146,6 +149,13 @@ async function loadAll() {
   } catch (err) {
     state.error = err.message || String(err);
     state.data.license = lic;
+  }
+  // 告警页「已忽略」入口：单独容错拉取全量（含已忽略），不阻塞界面。
+  // 旧版本后端无此参数时回退为活跃告警，前端仍能工作。
+  try {
+    state.data.alertsAll = await api("/api/alerts?include_dismissed=1");
+  } catch {
+    state.data.alertsAll = state.data.alerts || { items: [] };
   }
   // P1-4 趋势数据：容错拉取（没启用 trend_store 时返回空对象，不阻塞界面）
   try {
@@ -598,11 +608,15 @@ function alertCard(a) {
   const missing = (a.missing_keys || []).length
     ? `<div class="small" style="color:var(--sev-high)">文案占位符缺失：${(a.missing_keys || []).map(esc).join("、")}</div>`
     : "";
+  const dismissed = a.status === "dismissed";
+  const action = dismissed
+    ? `<button class="btn btn-sm" type="button" data-restore="${esc(a.alert_id)}">恢复此告警</button>`
+    : `<button class="btn btn-sm" type="button" data-dismiss="${esc(a.alert_id)}">忽略此告警</button>`;
   return `
-    <div class="item sev-${esc(a.severity)}">
+    <div class="item sev-${esc(a.severity)}${dismissed ? " is-dismissed" : ""}">
       <div class="item-head">
         <div>
-          <span class="sev sev-${esc(a.severity)}">${esc(a.severity_label)}</span>
+          ${dismissed ? `<span class="sev sev-dismissed">已忽略</span>` : `<span class="sev sev-${esc(a.severity)}">${esc(a.severity_label)}</span>`}
           <span class="item-title">${esc(a.title)}</span>
           <div class="item-sub">${esc(a.device_name)} → ${esc(a.domain || a.destination)}
             （归属：${esc(a.organization || "未识别")}）· 置信度 ${esc(a.confidence)}</div>
@@ -614,16 +628,21 @@ function alertCard(a) {
       <div class="item-body small">后果：${esc(a.side_effects || "（未填写）")}</div>
       ${missing}
       <div class="item-foot">
-        <button class="btn btn-sm" type="button" data-dismiss="${esc(a.alert_id)}">忽略此告警</button>
-        <span class="small muted">社区版不下发任何阻断</span>
+        ${action}
+        <span class="small muted">${dismissed ? "该告警已被忽略，不影响活跃列表统计。" : "社区版不下发任何阻断"}</span>
       </div>
     </div>`;
 }
 
 function renderAlerts() {
-  const items = state.data.alerts?.items || [];
-  if (!items.length) {
-    return '<div class="card empty">暂无活跃告警。行为识别看的是「一段时间内的若干次观测」，不是单条流量。</div>';
+  const all = state.data.alertsAll?.items || state.data.alerts?.items || [];
+  const items = all.filter((a) => a.status !== "dismissed");
+  const dismissed = all.filter((a) => a.status === "dismissed");
+  const sevFilter = state.alertsSevFilter;
+  const showDismissed = state.alertsShowDismissed;
+  const visible = sevFilter ? items.filter((a) => a.severity === sevFilter) : items;
+  if (!all.length) {
+    return '<div class="card empty">暂无告警。行为识别看的是「一段时间内的若干次观测」，不是单条流量。</div>';
   }
   // 前端聚合：严重度柱状 + 饼图（零后端改动）
   const sevColors = { critical: "var(--sev-critical)", high: "var(--sev-high)", medium: "var(--sev-medium)", low: "var(--sev-low)" };
@@ -631,34 +650,57 @@ function renderAlerts() {
   items.forEach((a) => { counts[a.severity] = (counts[a.severity] || 0) + 1; });
   const sevItems = ["critical", "high", "medium", "low"].filter((k) => counts[k])
     .map((k) => ({ label: k, value: counts[k], color: sevColors[k] }));
+  const sevLabels = { critical: "严重", high: "高危", medium: "需关注", low: "低危" };
+  const barItems = sevItems.map((i) => ({
+    label: i.label, value: i.value, color: i.color,
+    selected: sevFilter === i.label,
+  }));
+  const filterNote = sevFilter
+    ? `<button class="btn btn-sm" type="button" data-sev-filter="all" style="margin-left:8px">显示全部严重度</button>`
+    : "";
+  const dismissedSec = `
+    <div class="section">
+      <div class="sec-head">
+        <h2>已忽略的告警 <span class="count">（${dismissed.length} 条）</span></h2>
+        ${dismissed.length
+          ? `<button class="btn btn-sm" type="button" data-toggle-dismissed>${showDismissed ? "收起" : "展开"}</button>`
+          : `<span class="small muted">暂无已忽略告警。忽略某条告警后可在这里找回。</span>`}
+      </div>
+      ${showDismissed && dismissed.length
+        ? `<div class="list">${dismissed.map(alertCard).join("")}</div>`
+        : ""}
+    </div>`;
 
   return `
     <div class="section">
       <div class="chart-grid">
         <div class="chart-card">
           <h3>告警严重度分布</h3>
-          <div class="chart-hint">按严重度统计活跃告警数量</div>
+          <div class="chart-hint">按严重度统计活跃告警数量${sevFilter ? `，当前筛选：${esc(sevLabels[sevFilter] || sevFilter)}` : ""}</div>
           ${sevItems.length ? HWCharts.donut({ size: 180, stroke: 22, segments: sevItems.map((i) => ({ value: i.value, color: i.color })), ariaLabel: "告警严重度分布" }) : '<div class="empty">暂无告警</div>'}
           <div class="legend">${sevItems.map((i) => `<span class="legend-item"><span class="legend-swatch round" style="background:${esc(i.color)}"></span>${esc(i.label)} ${esc(i.value)}</span>`).join("")}</div>
         </div>
         <div class="chart-card">
           <h3>严重度柱状</h3>
-          <div class="chart-hint">各严重度告警数对比</div>
-          ${sevItems.length ? HWCharts.vbar({ items: sevItems.map((i) => ({ label: i.label, value: i.value, color: i.color })), ariaLabel: "告警严重度柱状" }) : '<div class="empty">暂无告警</div>'}
+          <div class="chart-hint">各严重度告警数对比 · 点击柱子筛选下方列表</div>
+          ${sevItems.length ? HWCharts.vbar({ items: barItems, clickable: true, ariaLabel: "告警严重度柱状" }) : '<div class="empty">暂无告警</div>'}
         </div>
       </div>
     </div>
 
     <div class="section">
       <div class="sec-head">
-        <h2>告警 <span class="count">（${items.length} 条，按严重度排序）</span></h2>
+        <h2>告警 <span class="count">（${visible.length} 条${sevFilter ? `，筛选：${esc(sevLabels[sevFilter] || sevFilter)}` : "，按严重度排序"}）</span></h2>
+        ${filterNote}
         <button class="btn btn-sm btn-warn" type="button" data-action="clear-observations"
           title="清空设备/域名/告警等全部观测记录，重新开始分析（不删除许可）">清除全部观测记录</button>
       </div>
-      <div class="list">${items.map(alertCard).join("")}</div>
-    </div>`;
+      ${visible.length
+        ? `<div class="list">${visible.map(alertCard).join("")}</div>`
+        : '<div class="card empty">当前筛选下没有活跃告警。</div>'}
+    </div>
+    ${dismissedSec}`;
 }
-
 // —— P1-4 趋势面板 ——
 async function _refetchTrend(days) {
   try {
@@ -1250,6 +1292,38 @@ document.getElementById("view").addEventListener("click", async (e) => {
       dismiss.disabled = false;
       alert("忽略失败：" + (err.message || err));
     }
+    return;
+  }
+
+  // —— 恢复一条已忽略告警 ——
+  const restore = e.target.closest("[data-restore]");
+  if (restore) {
+    const id = restore.dataset.restore;
+    restore.disabled = true;
+    try {
+      await fetch(`/api/alerts/${encodeURIComponent(id)}/restore`, { method: "POST" });
+      await loadAll();
+    } catch (err) {
+      restore.disabled = false;
+      alert("恢复失败：" + (err.message || err));
+    }
+    return;
+  }
+
+  // —— 严重度柱状图点击筛选：data-sev-filter="critical|high|medium|low|all" ——
+  const sevBtn = e.target.closest("[data-sev-filter]");
+  if (sevBtn) {
+    const v = sevBtn.dataset.sevFilter;
+    state.alertsSevFilter = (v && v !== "all") ? v : null;
+    render();
+    return;
+  }
+
+  // —— 已忽略告警分区展开/收起 ——
+  const toggleD = e.target.closest("[data-toggle-dismissed]");
+  if (toggleD) {
+    state.alertsShowDismissed = !state.alertsShowDismissed;
+    render();
     return;
   }
 

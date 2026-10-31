@@ -515,6 +515,17 @@ class HomewardHandler(BaseHTTPRequestHandler):
                        {"dismissed": ok, "id": alert_id})
             return
 
+        m = re.fullmatch(r"/api/alerts/([^/]+)/restore", path)
+        if m:
+            if method != "POST":
+                self._json(405, {"error": "method_not_allowed", "need": "POST"})
+                return
+            alert_id = unquote(m.group(1))
+            ok = svc.restore_alert(alert_id)
+            self._json(200 if ok else 404,
+                       {"restored": ok, "id": alert_id})
+            return
+
         if path == "/api/observations/clear":
             # 一键清除全部观测记录（设备/域名/告警），让用户能重新开始分析：
             # 把"修复前的旧证据"和"重新采集到的新数据"彻底分开。

@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-10-31 — 前端图表渲染修复（图太大 / CSP 丢弃 inline style / 单柱过宽）
+
+> 用户实测反馈「图太大了」「几乎每个页面都有问题」「无痕模式还是不行」「这几个页面还是有点问题」。根因有三层，全部在手写 SVG 图表库 `HWCharts`（`src/ui/static/charts.js`）。
+
+### `uncommitted` — fix(ui): 图表库真实像素坐标系 + CSP 兼容 + 柱宽上限
+
+- **问题 1：viewBox 宽固定 100 + 绝对字号**——`hbar`/`vbar`/`area`/`areaMulti` 的 viewBox 宽写死 `100`，文字/图形用绝对字号，SVG 拉伸到卡片宽（≈517px）时被等比放大成巨字/巨柱。且 `hbar` 的 `barArea = 100 - 130 - 60 = -30` 为负值，柱区宽度直接出错。
+  - 修复：全部图表函数 viewBox 宽改为**真实像素 600**（`hbar` 的 `w=600`、`vbar`/`area`/`areaMulti` 的 `W=600`），文字/柱宽/间距均为真实像素，SVG 拉伸不再放大；`hbar` 柱区改为 `barArea = 600-130-60 = 410` 正值。
+- **问题 2（核心）：CSP `style-src 'self'` 丢弃所有 SVG inline `style` 属性**——`server.py` 的 `Content-Security-Policy` 为 `style-src 'self'`（不含 `'unsafe-inline'`），浏览器强制丢弃 SVG 的 inline style。donut 原先唯一靠 inline `max-width:168/180px` 限尺寸，被丢弃后回落到 `.chart-card svg{width:100%}` 拉宽成 517px 巨大圆环。
+  - 修复：`charts.js` 5 处图表（donut/hbar/vbar/area/areaMulti）全部去 inline style 改 CSS class（`hw-chart` + `hw-donut`/`hw-hbar`/`hw-vbar`/`hw-area`）；`app.css` 新增 `.hw-chart{display:block;height:auto}`、`.hw-donut{width:100%;max-width:var(--donut-max,180px);margin:0 auto}`、`.hw-hbar/.hw-vbar/.hw-area{width:100%;max-width:none}`。
+- **问题 3：vbar 单柱过宽**——`bw = step*0.62`，分类仅 1 根时 `step=588`，单柱横跨 61% 卡片宽。
+  - 修复：`bw = Math.min(step*0.62, 200)`，单柱从 61% 收敛到 33%（实测 172px）。
+- **缓存**：`index.html` 脚本引用加 `?v=20261031-2` cache-busting，10 秒自动刷新不重载 `<script>`，普通刷新不再命中旧缓存。
+- **验证（真实浏览器，http://127.0.0.1:9597/）**：6 目标全 PASS——告警严重度柱状单柱占卡片 31%（≤1/3）、告警/去向环形图均 180px 空心圆环居中、去向 Top 域名/设备厂商横向柱标签 12.5px 正常小字且柱宽按比例（410/351/234/205/29/29 与 410/205/205/205）、设备画像表格 7 列 5/5 台正常。
+- **约束**：DESIGN.md §1（零第三方/零构建/`esc()` 防 XSS）——仍纯手写 SVG，零依赖，未引入任何库。
+- **回归**：`python -m py_compile src/analysis/alerting.py src/core/main.py src/ui/server.py` 通过（PY_OK）；本批改动文件 7 个（charts.js/app.css/index.html/app.js/server.py/alerting.py/main.py），与第 241 批「告警已忽略 + 严重度柱状图点击筛选」共用同批文件，未拆分。
+
+---
+
 ## 2026-10-28 — GHCR 包 visibility 修复 + 正式公钥注入流水线闭环
 
 > 从 2026-10-27 延续下来的两条主线：正式公钥注入镜像 + 生产运行门禁（compose 硬写 prod key），以及新暴露的 GHCR 包 visibility 始终卡在 private 的诊断与修复。**后者花了一整天才定位根因并解决**，过程中学到的 GitHub Actions / Packages 经验非常值得记录。
