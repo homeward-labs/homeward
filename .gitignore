@@ -22,6 +22,7 @@ venv/
 .vscode/
 .idea/
 .trae/
+skills/
 .DS_Store
 
 # 本地配置（可能含密钥）
