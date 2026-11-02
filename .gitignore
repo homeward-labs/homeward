@@ -21,6 +21,7 @@ venv/
 # 编辑器 / 系统
 .vscode/
 .idea/
+.trae/
 .DS_Store
 
 # 本地配置（可能含密钥）
