@@ -91,6 +91,9 @@ class KnowledgeBaseUpdater:
     ENV_PUBKEY = "HOMEWARD_KB_PUBKEY"
     #: 环境变量名：是否强制验签（1/true/yes = 无签名或验签失败一律拒绝更新）
     ENV_REQUIRE_SIG = "HOMEWARD_KB_REQUIRE_SIGNATURE"
+    #: 环境变量名：解密主密钥 KEK（hex，32 字节）。仅闭源私有构建经此注入；
+    #: 开源/社区构建不配置 → 客户端只尝试明文源（且默认源为空，不连公网）。
+    ENV_DECRYPT_KEY = "HOMEWARD_KB_DECRYPT_KEY"
     #: 仓内公钥文件名（与 updater.py 同仓、随开源分发）
     KB_PUBKEY_FILENAME = "kb_pubkey.txt"
     #: 内容源签名文件名（对 CHECKSUM 内容的 Ed25519 签名，hex 编码）
@@ -252,17 +255,14 @@ class KnowledgeBaseUpdater:
         版本号能表达这种半新半旧，排查极痛。故改为全或无。
         """
         files = self.REQUIRED_FILES + self.OPTIONAL_FILES
+        kek = self._load_kek()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             missing: list[str] = []
             for fname in self.REQUIRED_FILES:
-                dst = tmpdir / fname
-                try:
-                    dst.write_bytes(_http_get(f"{url}/{fname}", 30))
-                except Exception as e:
-                    print(f"[KB Update] 必需文件下载失败：{fname} ({e})")
+                if not self._download_data_file(tmpdir, fname, url, kek):
                     missing.append(fname)
 
             if missing:
@@ -273,11 +273,8 @@ class KnowledgeBaseUpdater:
                 return False
 
             for fname in self.OPTIONAL_FILES:
-                dst = tmpdir / fname
-                try:
-                    dst.write_bytes(_http_get(f"{url}/{fname}", 30))
-                except Exception as e:
-                    print(f"[KB Update] 可选文件下载失败，跳过：{fname} ({e})")
+                # 可选项失败静默跳过，不影响本次更新成功
+                self._download_data_file(tmpdir, fname, url, kek)
 
             # 校验（可选：比对 checksum）
             checksum_url = f"{url}/{CHECKSUM_FILE}"
@@ -302,6 +299,65 @@ class KnowledgeBaseUpdater:
                     shutil.move(str(src), str(self.kb_dir / fname))
 
         return True
+
+    def _load_kek(self) -> bytes | None:
+        """加载解密主密钥 KEK（仅闭源私有构建经 HOMEWARD_KB_DECRYPT_KEY 注入）。
+
+        开源/社区构建不配置此变量 → 返回 None → 客户端只尝试明文源（且默认源为空，
+        不会向公网发起连接）。仅当测试者被授权拿到 KEK 时才非空，此时客户端
+        才能从加密端点消费 ``.enc`` 密文。
+        """
+        env = os.environ.get(self.ENV_DECRYPT_KEY, "").strip()
+        if not env:
+            return None
+        try:
+            raw = bytes.fromhex(env)
+        except ValueError:
+            print(f"[KB Update] {self.ENV_DECRYPT_KEY} 不是合法 hex，忽略")
+            return None
+        if len(raw) != 32:
+            print(f"[KB Update] {self.ENV_DECRYPT_KEY} 必须为 32 字节，实际 {len(raw)}，忽略")
+            return None
+        return raw
+
+    def _decrypt(self, enc: bytes, kek: bytes, name: str) -> bytes:
+        """AES-256-GCM 解密单个 ``.enc`` 文件（与 ``kb-private/encrypt_build.py`` 对称）。
+
+        encrypt_build 输出 = nonce(12) || ciphertext||GCM-tag；
+        密钥 = HKDF-SHA256(KEK, info=name)。第三方库 lazy import，
+        仅配置了 KEK 的闭源构建才会走到这里，开源用户不受影响。
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+        if len(enc) <= 12:
+            raise ValueError("密文过短，缺少 nonce")
+        key = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=name.encode()).derive(kek)
+        nonce, ct = enc[:12], enc[12:]
+        return AESGCM(key).decrypt(nonce, ct, None)
+
+    def _download_data_file(self, tmpdir: Path, fname: str, url: str, kek: bytes | None) -> bool:
+        """下载单个数据文件到 ``tmpdir/fname``。
+
+        闭源加密源优先：若配置了 KEK，先尝试 ``<url>/<fname>.enc``，成功则用 KEK
+        解密还原为明文 ``fname``；未配置 KEK 或加密源不可达时，回退明文
+        ``<url>/<fname>``。返回 True=已就位；False=未取得（调用方决定缺失/跳过）。
+        """
+        dst = tmpdir / fname
+        if kek is not None:
+            try:
+                enc = _http_get(f"{url}/{fname}.enc", 30)
+                dst.write_bytes(self._decrypt(enc, kek, fname))
+                return True
+            except Exception as e:
+                print(f"[KB Update] 加密源 {fname}.enc 获取/解密失败，回退明文：{e}")
+        try:
+            dst.write_bytes(_http_get(f"{url}/{fname}", 30))
+            return True
+        except Exception as e:
+            print(f"[KB Update] 文件下载失败：{fname} ({e})")
+            return False
 
     def _load_pubkey(self) -> bytes | None:
         """加载验签公钥（双轨：环境变量优先，回退仓内文件）。
