@@ -1,8 +1,8 @@
 # 项目目录结构
 
 > 以仓库**实际内容**为准（核对方式：`git ls-files`）。
-> 本仓库只承载 open-core 的**公开部分**：标准版/专业版执行器、知识库数据本体、KB 内容源与
-> Cloudflare Worker 模板都**不随本仓库发布**，其判定依据是**单一清单** `tools/closed_assets.txt`
+> 本仓库只承载 open-core 的**公开部分**。以下**不随本仓库发布**：标准版/专业版执行器、
+> 知识库数据本体、KB 内容源与 Cloudflare Worker 模板；判定依据是**单一清单** `tools/closed_assets.txt`
 > （历史上「四处各写一份 CLOSED_DIRS」导致口径漂移，现已收敛为一份）。
 > 该清单被四道防线共同引用：`tools/check_open_boundary.{py,sh,ps1}`（手动自查）、`hooks/pre-commit`
 > （提交前）、`hooks/pre-push`（推送前，含整棵提交树 + 历史）、`.github/workflows/open-boundary.yml`

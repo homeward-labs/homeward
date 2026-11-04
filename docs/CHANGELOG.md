@@ -174,7 +174,7 @@
   - `_process_flow_locked` 开头：Tier 1 flow（有 dns_query + dst_ip）→ 写双向缓存；Tier 2 flow（没 dns_query）→ 从 `_dns_ip_cache` 反查域名回填 `flow.dns_query`
   - `_purge_dns_cache()` helper：攒够 128 条批量清（避免每条 flow 全表扫描），TTL 30 分钟
   - **零侵入**：不改 `observation_to_flow()` / `Collector` 接口，关联逻辑完全在 service 层完成
-- **B. 国产知识库扩量**（`src/knowledge_base/domains.csv`，+33 条）
+- **B. 国产知识库扩量**（知识库数据本体 `domains.csv`，+33 条；数据本体不随本仓库发布）
   - 小米 IoT 全家桶（api.io.mi.com / ruxit / beacon warn）
   - 涂鸦智能（tuya.com / api.tuya.com / openapi.tuya.com）
   - 华为 HiLink + IoT 云 + 荣耀
@@ -215,7 +215,7 @@
 
 ### `b92c13f` — feat(behavior): P1-3 行为识别增强
 
-- **新增两条行为规则**（`src/knowledge_base/behaviors.json`）
+- **新增两条行为规则**（知识库数据本体 `behaviors.json`，不随本仓库发布）
   - `sleep_rhythm` 作息节律推断：scope=device，窗口 48h，活跃小时集中度 ≥ 60% 时告警；证据字段含 top_active_hour / active_hours / concentration_pct
   - `cross_device_tracking` 跨设备身份追踪：scope=cross，窗口 1h，≥ 2 台设备碰过同一目的地时告警；证据字段含 devices_hit / device_list
 - **BehaviorDetector 扩展**（`src/analysis/behavior.py`）
