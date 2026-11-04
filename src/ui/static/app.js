@@ -22,6 +22,8 @@ const state = {
   // 告警页：已忽略入口 + 严重度柱状图点击筛选（纯前端）
   alertsShowDismissed: false,   // 是否展开「已忽略」列表
   alertsSevFilter: null,        // 严重度筛选：null=全部 / critical/high/medium/low
+  // 去向页：有界历史时间轴档位（服务端 data/history.db）
+  historyRange: "24h",          // 1h/6h/24h/7d/30d
 };
 
 // ------------------------------------------------------------------ 工具
@@ -162,6 +164,14 @@ async function loadAll() {
     state.data.trend = await api("/api/trends?days=7");
   } catch {
     state.data.trend = { days: 7, points: [] };
+  }
+  // 有界历史：只在「去向」页拉取（30 天档查询较重，没必要每 10 秒在其他页陪跑）
+  if (state.view === "destinations") {
+    try {
+      state.data.history = await api(`/api/history?range=${state.historyRange}`);
+    } catch {
+      state.data.history = null;
+    }
   }
   // P1-2 用户配置（AI 后端状态等）：容错拉取
   try {
@@ -467,7 +477,7 @@ function renderDevices() {
     <div class="card scroll-x">
       <table>
         <thead><tr>
-          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>风险</th><th>最近活跃</th><th>主要去向</th>
+          <th>名称 / 品类</th><th>IP</th><th>MAC</th><th>厂商</th><th>风险</th><th>首次发现</th><th>最近活跃</th><th>主要去向</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -487,6 +497,7 @@ function renderDevices() {
           : ""}</td>
       <td>${esc(d.vendor || "—")}</td>
       <td>${riskCell(d)}</td>
+      <td class="small muted">${d.first_seen ? esc(fmtTime(d.first_seen)) : "—"}</td>
       <td class="small muted">${esc(ago(d.last_seen))}</td>
       <td>
         <div class="tags">
@@ -557,11 +568,105 @@ function destCard(x) {
     </div>`;
 }
 
+// 有界历史（data/history.db）：1h/6h/24h/7d/30d 档位 + 逐目的地时间序列。
+// 口径硬规则：只有「请求次数」（来自 DNS/SNI 事件）与「流量」（conntrack 增量字节）；
+// conntrack 是快照增量上报，**不存在连接数**，这里所有文案都不得出现「连接」。
+const HISTORY_RANGES = [
+  { v: "1h", label: "本小时" }, { v: "6h", label: "近 6 小时" },
+  { v: "24h", label: "近 24 小时" }, { v: "7d", label: "近 7 天" },
+  { v: "30d", label: "近 30 天" },
+];
+
+function fmtBytes(n) {
+  const v = Number(n || 0);
+  if (v < 1024) return `${v} B`;
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+  if (v < 1024 * 1024 * 1024) return `${(v / 1024 / 1024).toFixed(1)} MB`;
+  return `${(v / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function renderHistory() {
+  const d = state.data.history;
+  const pills = `<div class="history-pills">${HISTORY_RANGES.map((r) =>
+    `<button class="btn btn-sm${state.historyRange === r.v ? " is-on" : ""}" type="button"
+      data-history-range="${r.v}">${esc(r.label)}</button>`).join("")}</div>`;
+
+  if (!d) {
+    return `<div class="section"><h2>去向时间轴</h2>${pills}
+      <div class="card empty">历史库未启用（服务端以 --no-history / --no-persist 启动，或尚在累积第一批数据）。
+      它需要独立的历史底座 data/history.db；当前只能看到「此刻」的快照。</div></div>`;
+  }
+  const points = d.points || [];
+  const totals = d.totals || {};
+  const dests = d.destinations || [];
+  if (!dests.length) {
+    return `<div class="section"><h2>去向时间轴</h2>${pills}
+      <div class="card empty">该时间段内没有观测记录。首批数据在服务启动后 60 秒内落盘。</div></div>`;
+  }
+  const newSet = new Set(d.new_destinations || []);
+  const seriesByDest = {};
+  (d.series || []).forEach((s) => { seriesByDest[s.dest] = s.points || []; });
+  const totalDns = totals.dns_count || 0;
+  const totalBytes = totals.bytes || 0;
+
+  const rows = dests.map((x) => {
+    const pts = seriesByDest[x.dest];
+    const spark = pts && pts.length
+      ? HWCharts.area({
+          points: pts.map((p) => ({ x: p.ts, y: p.dns_count })),
+          height: 46, fill: false, color: "var(--accent)",
+          ariaLabel: `${x.dest} 时间序列`,
+        })
+      : '<span class="small muted">—（仅本轮 Top 20 有序列）</span>';
+    return `<div class="item">
+      <div class="item-head">
+        <div>
+          <span class="item-title mono">${esc(x.dest)}</span>
+          ${newSet.has(x.dest) ? '<span class="tag is-new" title="该目的地的首次出现时间落在本时间段内">本时段新出现</span>' : ""}
+          <div class="item-sub">${x.known ? esc(x.organization || "未识别") : "未识别"} · ${esc(x.category || "unknown")}
+            · ${esc(x.device_count)} 台设备 · 首见 ${x.first_seen ? esc(fmtTime(x.first_seen)) : "—"}</div>
+        </div>
+        <span class="small muted">请求 <b>${esc(x.dns_count)}</b> 次 · 流量 ${esc(fmtBytes(x.bytes))}</span>
+      </div>
+      <div class="hist-spark">${spark}</div>
+    </div>`;
+  }).join("");
+
+  return `
+    <div class="section">
+      <div class="sec-head">
+        <h2>去向时间轴 <span class="count">（${dests.length} 个目的地 · 请求 ${totalDns} 次 · 流量 ${fmtBytes(totalBytes)}）</span></h2>
+      </div>
+      ${pills}
+      <div class="chart-card">
+        <h3>请求次数走势</h3>
+        <div class="chart-hint">按${d.bucket === "day" ? "天" : "小时"}聚合的 DNS/SNI 请求次数；首批数据 30 天后可看完整月度窗口。</div>
+        ${points.length ? HWCharts.area({
+          points: points.map((p) => ({ x: p.ts, y: p.dns_count })),
+          height: 140, ariaLabel: "请求次数走势",
+        }) : '<div class="empty">暂无数据</div>'}
+        <div class="small muted">流量口径：conntrack 增量字节（只加不减，按轮询增量累计）。</div>
+      </div>
+      <div class="list">${rows}</div>
+    </div>`;
+}
+
+// 切换档位时按需拉取；未启用历史库（404）时给出「未启用」提示，不阻塞其余视图
+async function _refetchHistory() {
+  try {
+    state.data.history = await api(`/api/history?range=${state.historyRange}`);
+  } catch {
+    state.data.history = null;
+  }
+  render();
+}
+
 function renderDestinations() {
   const d = state.data.destinations || {};
   const items = d.items || [];
   const rate = Math.round((d.hit_rate || 0) * 100);
-  if (!items.length) return '<div class="card empty">还没有观测到任何外联去向。</div>';
+  const historySection = renderHistory();
+  if (!items.length) return historySection + '<div class="card empty">还没有观测到任何外联去向。</div>';
 
   // 前端聚合：分类饼图 + Top 域名横向柱状（零后端改动）
   const catColors = {
@@ -582,6 +687,7 @@ own: "var(--ok)", benign: "var(--text-muted)", tracker: "var(--warn)", ads: "var
   const maxDev = Math.max.apply(null, byDevices.map((x) => x.value).concat([1]));
 
   return `
+    ${historySection}
     <div class="section">
       <div class="chart-grid">
         <div class="chart-card">
@@ -1277,10 +1383,23 @@ document.getElementById("tabs").addEventListener("click", (e) => {
   if (!btn) return;
   state.view = btn.dataset.view;
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === btn));
+  // 去向页历史数据按档位单独拉取（30 天档较重，不在其他页陪跑）
+  if (state.view === "destinations") {
+    _refetchHistory();
+    return;
+  }
   render();
 });
 
 document.getElementById("view").addEventListener("click", async (e) => {
+  const rangeBtn = e.target.closest("[data-history-range]");
+  if (rangeBtn) {
+    state.historyRange = rangeBtn.dataset.historyRange;
+    render();
+    await _refetchHistory();
+    return;
+  }
+
   const dismiss = e.target.closest("[data-dismiss]");
   if (dismiss) {
     const id = dismiss.dataset.dismiss;

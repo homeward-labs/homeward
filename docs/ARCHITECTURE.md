@@ -311,3 +311,91 @@ collector.pending.example,Unknown,unknown,low,待判定域名,warn,需进一步�
 
 **已知缺口**：当前版本没有鉴权。绑定非回环地址时启动日志会告警，
 正式修法见私有《路线图》文档的 P1-0（反代 / 防火墙 / 登录）。
+
+## 五、本地数据存储与历史底座（2026-11 起）
+
+社区版此前只有「此刻」的覆盖式快照：`observations.db` 的 `observation_state`
+是单 slot 全量 JSON，每次保存都整体覆盖，因此**无法回答「昨天这个域名出现了几次」**。
+2026-11 新增了一个**旁路**的历史库，原快照的 schema 与写入方式**零改动**。
+
+### 5.1 三个库的分工
+
+| 文件 | 表 | 粒度 | 保留 | 用途 |
+| --- | --- | --- | --- | --- |
+| `data/observations.db` | `observation_state` | 单 slot 全量 JSON | 覆盖式，无历史 | 重启后恢复设备 / 告警 / 未知域名 |
+| `data/trends.db` | `trend_hourly` | 全局 7 个指标 / 小时 | 30 天 | 首页趋势线（全局，不按设备/去向） |
+| `data/history.db` | `flow_hourly` | 小时 × 设备 × 去向 | **7 天** | 1h / 6h / 24h 去向时间轴 |
+| | `flow_daily` | 天 × 设备 × 去向 | **30 天** | 7d / 30d 回看 |
+| | `entity_meta` | 设备 × 去向 | 首次时间长期保留（行数上限 2 万） | 「本时段新出现」判定 |
+
+### 5.2 `history.db` 建表摘要
+
+```sql
+flow_hourly(hour_epoch, device_key, device_ip, dest_key,
+            dns_count, bytes, first_ts, last_ts,
+            PRIMARY KEY (hour_epoch, device_key, dest_key))
+flow_daily(day_epoch, device_key, device_ip, dest_key,
+           dns_count, bytes, first_ts, last_ts,
+           PRIMARY KEY (day_epoch, device_key, dest_key))
+entity_meta(device_key, dest_key, first_seen, last_seen,
+            PRIMARY KEY (device_key, dest_key))
+```
+
+- `hour_epoch` / `day_epoch` 是**本地时区**的整点 / 零点 epoch 秒；
+- `dest_key` 归一化：`dns_query` > `sni` > `dst_ip:port`（统一小写）；
+- `device_key` 是设备台账主键（已识别 MAC 时即 MAC），并冗余 `device_ip` 以便按 IP 追查；
+- **不建 dest / device 二级索引**：只有主键（时间）索引。原因见 5.5 的实测，
+  按 dest 分组走二级索引反而慢一个数量级。
+
+### 5.3 计量口径（硬规则）
+
+conntrack 是 `conntrack -E` 增量上报，**只报新增字节**，不是连接表快照。因此历史库只有两个量：
+
+| 字段 | 来源 | 口语化文案 |
+| --- | --- | --- |
+| `dns_count` | 仅 DNS 查询 / SNI 事件（`dst_port=53 且 dst_ip 为空`，或带 `sni`） | 「请求 N 次」 |
+| `bytes` | `FlowRecord.packet_size`（conntrack 增量字节） | 「流量 X」 |
+
+**任何 API / UI 文案都不得出现「连接数」**：把 FlowRecord 条数当连接数会随轮询频率虚高。
+`/api/history` 的响应里没有 `connections` 字段，测试 `test_history_store.py` 对此有断言。
+
+### 5.4 写入路径：热路径不写库
+
+```
+collectors → service.process_flow
+              └─ _process_flow_locked（已持 _state_lock）
+                   ├─ device_registry.observe_flow(flow) → Device
+                   └─ history_rollup.add(flow, device)   # 仅内存字典自增
+_ObservationSaver._loop（每 60 秒）
+              └─ service.drain_history()  # 同一把锁内交换字典
+                   └─ HistoryStore.flush()  # executemany 批量 UPSERT + 裁剪
+```
+
+- `src/analysis/history_rollup.py`：小时桶、天桶各一份内存字典，`dns_count` / `bytes` /
+  `first_ts` / `last_ts` 自增；单小时键上限 5000（超出丢**新键**并每小时告警一次，
+  避免在热路径做 O(n) 淘汰）。天桶上限为小时上限 × 6。
+- `src/adapters/history_store.py`：WAL + `synchronous=NORMAL`，UPSERT 用
+  `dns_count=dns_count+excluded`、首末时间 `MIN/MAX` —— saver 重跑或进程重启都不会覆盖旧量。
+- `stop()` 时强制 flush 一次，最多丢最近 60 秒。
+- 服务端 `--no-history` 关闭该库；`--demo` / `--no-persist` 下自动关闭。
+
+### 5.5 查询与保留
+
+- `GET /api/history?range=1h|6h|24h|7d|30d&device=<key|ip>&dest=<key>`：
+  总量时间序列（空桶零填充）+ 目的地汇总（次数/字节/设备数/首见）+ Top 20 目的地序列。
+- 1h / 6h / 24h 读 `flow_hourly`；7d / 30d 读 `flow_daily`（日粒度足够看趋势，
+  且避免 168 小时 × 设备 × 去向的大扫描）。
+- 裁剪：`flush` 内每小时最多一次 —— `flow_hourly` 删 7 天前、`flow_daily` 删 30 天前、
+  `entity_meta` 超 2 万行时按 `last_seen` 淘汰最久未活跃。
+- 清除联动：`POST /api/observations/clear` 同时调用 `history_store.clear()` 与
+  `history_rollup.clear()`，避免「清除后看到的」混进清除前的旧时间轴。
+- **实测**（本机 Windows，120k 行日表 / 120k 行小时表）：30 天查询 237–324 ms、
+  24 小时 240–346 ms、7 天 68–105 ms、1 小时 39–47 ms；30 天 + 单设备过滤 124 ms；
+  flush 5000 + 5000 个桶 48 ms。回归用例里对 30 天 ≤ 500 ms 有硬断言。
+
+### 5.6 前端
+
+去向页签顶部新增「去向时间轴」：1h / 6h / 24h / 7d / 30d 胶囊、请求次数面积图、
+逐目的地行（首见时间、「本时段新出现」标签、Top 20 的 sparkline）。设备表新增「首次发现」列
+（直接来自 `Device.first_seen`，不依赖历史库）。
+

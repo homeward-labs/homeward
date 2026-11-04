@@ -46,6 +46,7 @@ from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
 from ui.qr import qr_svg, max_capacity_bytes      # noqa: E402
 from adapters.sqlite_registry import SqliteObservationStore  # noqa: E402
 from adapters.trend_store import TrendStore                  # noqa: E402
+from adapters.history_store import HistoryStore              # noqa: E402
 from license.store import (                        # noqa: E402
     device_fingerprint,
     status as license_status,
@@ -539,6 +540,12 @@ class HomewardHandler(BaseHTTPRequestHandler):
                     self.observation_store.clear()
                 except Exception as exc:  # 内存态已清，落盘失败不致命
                     logger.warning("清除落盘观测快照失败（内存态已清空）：%s", exc)
+            # 旁路历史库必须一起清 —— 否则「清除后看到的」还会混进清除前的旧时间轴
+            if self.history_store is not None:
+                try:
+                    self.history_store.clear()
+                except Exception as exc:
+                    logger.warning("清除历史库失败（内存态已清空）：%s", exc)
             self._json(200, {"ok": True, **result})
             return
 
@@ -746,6 +753,36 @@ class HomewardHandler(BaseHTTPRequestHandler):
             self._json(200, {"days": days, "points": points})
             return
 
+        # —— 有界历史：1h / 6h / 24h / 7d / 30d 时间轴（旁路 history.db）——
+        # 口径只有两个：dns_count（DNS/SNI 事件次数）与 bytes（增量字节）。
+        # conntrack 是快照增量上报，**不存在「连接数」这个量**，接口与文案都不提供。
+        if path == "/api/history":
+            store = getattr(self, "history_store", None)
+            if store is None:
+                self._json(404, {"error": "history_not_enabled"})
+                return
+            rng = (query.get("range") or ["24h"])[0]
+            if rng not in ("1h", "6h", "24h", "7d", "30d"):
+                self._json(400, {"error": "bad_range",
+                                 "allowed": ["1h", "6h", "24h", "7d", "30d"]})
+                return
+            device = (query.get("device") or [""])[0].strip() or None
+            dest = (query.get("dest") or [""])[0].strip() or None
+            data = store.get_window(rng, device=device)
+            if dest:
+                # 单目的地查询：保留该目的地的序列，其余目的地图层清空
+                data["destinations"] = [
+                    d for d in data["destinations"] if d["dest"] == dest]
+                data["series"] = [s for s in data["series"] if s["dest"] == dest]
+            # 归属信息用「当前」知识库补，不把可能过期的组织名写进历史库
+            for item in data["destinations"]:
+                info = svc.describe_domain(item["dest"]) if not item["dest"].count(":") else {}
+                item["organization"] = info.get("organization")
+                item["category"] = info.get("category", "unknown")
+                item["known"] = bool(info.get("known"))
+            self._json(200, data)
+            return
+
         # —— P1-2 AI 辅助分析 ——
         if path == "/api/ai/analyze":
             """手动触发 AI 分析一个未知域名。后端没起 / 超时 / 返回非 JSON，
@@ -852,7 +889,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
 def make_server(service: HomewardService, host: str = DEFAULT_HOST,
                 port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
                 observation_store: "SqliteObservationStore | None" = None,
-                trend_store: "TrendStore | None" = None
+                trend_store: "TrendStore | None" = None,
+                history_store: "HistoryStore | None" = None,
                 ) -> ThreadingHTTPServer:
     """创建一个绑定好的服务实例（未启动 serve_forever）
 
@@ -864,7 +902,7 @@ def make_server(service: HomewardService, host: str = DEFAULT_HOST,
         (HomewardHandler,),
         {"service": service, "start_time": time.time(),
          "auth": auth, "observation_store": observation_store,
-         "trend_store": trend_store},
+         "trend_store": trend_store, "history_store": history_store},
     )
     #启动时恢复上次未确认的「建议阻断」队列。
     # service.start() 是 async 且从未被 run_server 调用（信号注册也在那里），
@@ -877,14 +915,17 @@ def make_server(service: HomewardService, host: str = DEFAULT_HOST,
 def run_server(service: HomewardService, host: str = DEFAULT_HOST,
                port: int = DEFAULT_PORT, auth: "WebAuth | None" = None,
                observation_store: "SqliteObservationStore | None" = None,
-               trend_store: "TrendStore | None" = None) -> None:
+               trend_store: "TrendStore | None" = None,
+               history_store: "HistoryStore | None" = None) -> None:
     """阻塞运行直到 Ctrl-C"""
     httpd = make_server(service, host=host, port=port, auth=auth,
                         observation_store=observation_store,
-                        trend_store=trend_store)
+                        trend_store=trend_store,
+                        history_store=history_store)
     _warn_if_exposed(host, auth)
     logger.info("家卫 Web UI：http://%s:%d", host, port)
-    saver = _ObservationSaver(observation_store, service, trend_store=trend_store)
+    saver = _ObservationSaver(observation_store, service, trend_store=trend_store,
+                              history_store=history_store)
     saver.start()
     try:
         httpd.serve_forever()
@@ -932,17 +973,20 @@ class _ObservationSaver:
 
     def __init__(self, store: "SqliteObservationStore", service: HomewardService,
                  trend_store: "TrendStore | None" = None,
-                 interval: float = 60.0) -> None:
+                 interval: float = 60.0,
+                 history_store: "HistoryStore | None" = None) -> None:
         self.store = store
         self.service = service
         self.trend_store = trend_store
+        self.history_store = history_store
         self.interval = interval
         self._stop = threading.Event()
         self._thread: "threading.Thread | None" = None
         self._last_hour_sampled = 0  # 上一次采样的整点 epoch
 
     def start(self) -> None:
-        if self.store is None and self.trend_store is None:
+        if (self.store is None and self.trend_store is None
+                and self.history_store is None):
             return
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
@@ -954,11 +998,23 @@ class _ObservationSaver:
                     self.store.save(self.service.snapshot_observations())
             except Exception:
                 logger.exception("周期持久化观测快照失败")
+            # 旁路历史库：每 60 秒批量落盘一次（热路径只做内存自增）
+            try:
+                self.flush_history()
+            except Exception:
+                logger.exception("周期落盘历史库失败")
             # 叠加：整点趋势采样（同一线程、不额外增加轮询开销）
             try:
                 self._maybe_sample_trend()
             except Exception:
                 logger.exception("周期趋势采样失败")
+
+    def flush_history(self) -> None:
+        """把服务内存里的历史桶取走并批量 UPSERT；没有历史库时直接跳过。"""
+        if self.history_store is None:
+            return
+        hourly, daily = self.service.drain_history()
+        self.history_store.flush(hourly, daily)
 
     def _maybe_sample_trend(self) -> None:
         """每小时整点落一条趋势统计。由 60s 周期调用，内部用时间戳整除判断是否到点。"""
@@ -1001,6 +1057,11 @@ class _ObservationSaver:
                 self._maybe_sample_trend()
             except Exception:
                 logger.exception("关闭前趋势采样失败")
+        # 关闭前把内存里最后不到 60 秒的历史桶强制落盘
+        try:
+            self.flush_history()
+        except Exception:
+            logger.exception("关闭前落盘历史库失败")
 
 
 def main(argv=None) -> int:
@@ -1048,6 +1109,9 @@ def main(argv=None) -> int:
     ap.add_argument("--no-persist", action="store_true",
                     help="关闭观测状态持久化（默认生产模式开启：重启后保留设备/告警；"
                          "演示模式 --demo 默认关闭）")
+    ap.add_argument("--no-history", action="store_true",
+                    help="关闭旁路历史库（data/history.db：1h/6h/24h/7d/30d 去向时间轴）。"
+                         "默认生产模式开启；演示模式与 --no-persist 下自动关闭")
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -1090,6 +1154,9 @@ def main(argv=None) -> int:
         "actions_db_path": None if args.demo else (ROOT / "data" / "actions.db"),
         # 本机身份：宿主自身 IP。不填则 _resolve_self_ips 会尽力用主机名自动判定。
         "homeward_self_ips": args.self_ips,
+        # 有界历史：只有在「生产模式 + 持久化开启 + 未 --no-history」时才累加；
+        # 默认关闭是为了让 CLI / 单测里的裸 HomewardService 不产生无谓的内存桶。
+        "history_enabled": (not args.demo) and (not args.no_persist) and (not args.no_history),
         # 用户持久化配置（AI 后端等）
         **_user_cfg,
     })
@@ -1098,6 +1165,7 @@ def main(argv=None) -> int:
     # （避免把演示数据落进真实数据库）。--no-persist 可强制关闭。
     observation_store = None
     trend_store = None
+    history_store = None
     if (not args.demo) and (not args.no_persist):
         observation_store = SqliteObservationStore(ROOT / "data" / "observations.db")
         snapshot = observation_store.load()
@@ -1109,6 +1177,10 @@ def main(argv=None) -> int:
         # P1-4 趋势持久化：和 observations.db 同目录下的独立 trend_store.db
         trend_store = TrendStore(ROOT / "data" / "trends.db")
         logger.info("趋势持久化已启用（data/trends.db，每小时采样，30 天滚动）")
+        # 有界历史（旁路）：独立的 data/history.db，observations.db 零改动
+        if not args.no_history:
+            history_store = HistoryStore(ROOT / "data" / "history.db")
+            logger.info("历史库已启用（data/history.db，小时表 7 天 / 天表 30 天滚动）")
 
     runner = None
     if args.demo:
@@ -1133,7 +1205,8 @@ def main(argv=None) -> int:
     try:
         run_server(service, host=args.host, port=args.port, auth=auth,
                    observation_store=observation_store,
-                   trend_store=trend_store)
+                   trend_store=trend_store,
+                   history_store=history_store)
     finally:
         if runner is not None:
             runner.stop()

@@ -77,6 +77,17 @@
 
 > 飞牛 / OpenWrt 应用商店打包属平台适配，非公开仓开发范畴，排后续单独推进。
 
+### Phase 2 第二批交付清单（2026-11）
+
+| 项 | 分支 | 说明 |
+| --- | --- | --- |
+| 有界历史底座（`data/history.db`） | `feature/history-timeline` | 三表（小时 7 天 / 天 30 天 / 首访语义）；`observations.db` 零改动 |
+| 去向时间轴（Watchtower 最小版） | `feature/history-timeline` | 1h / 6h / 24h / 7d / 30d 五档 + 逐目的地序列 + 「本时段新出现」 |
+| Roster 首次发现 | `feature/history-timeline` | 设备表新增「首次发现」列（`Device.first_seen`，已有字段） |
+| 计量口径硬规则 | `feature/history-timeline` | 只记 `dns_count` 与 `bytes`，接口/文案不提供「连接数」 |
+
+> 设计、保留策略与实测数据见 [ARCHITECTURE.md](./ARCHITECTURE.md) 第五节。
+
 ### Phase 1.1 交付清单
 
 | 项 | Commit | 说明 |

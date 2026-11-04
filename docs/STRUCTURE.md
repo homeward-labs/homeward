@@ -41,6 +41,7 @@ homeward/
 │   │   ├── base.py                  # Capabilities + Collector/Enforcer + 撤销契约
 │   │   ├── capability.py            # CapabilitySet：can_show / can_enforce / blind_spots
 │   │   ├── sqlite_registry.py       # 建议与动作的持久化登记
+│   │   ├── history_store.py         # 旁路历史库（data/history.db：小时 7 天 / 天 30 天）
 │   │   └── trend_store.py           # 趋势数据存储
 │   ├── collectors/                  # 采集器实现（社区版开源）
 │   │   ├── dns.py                   # Tier 1：dnsmasq 查询日志
@@ -53,6 +54,7 @@ homeward/
 │   │   ├── ingest.py                # Observation → FlowRecord（补上 W1→W2 断掉的一截）
 │   │   ├── behavior.py              # 时间窗 + 设备级/目的地级粒度 → BehaviorFinding（带证据）
 │   │   ├── alerting.py              # 中文模板渲染 + 去重冷却收敛 → Alert
+│   │   ├── history_rollup.py        # 热路径内存累加（小时/天桶，saver 每 60 秒落盘）
 │   │   └── profiler.py              # 设备画像（行为基线）
 │   ├── rule_engine/                 # 规则匹配引擎
 │   │   └── engine.py                # 知识库加载 + 行为匹配 + 决策（产出建议，不产出动作）
