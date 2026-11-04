@@ -36,6 +36,13 @@ def _flow(**kw):
     return FlowRecord(**base)
 
 
+def _hour_epoch(ts):
+    """与 HistoryRollup 相同的本地时区小时对齐，用于断言桶键。"""
+    lt = time.localtime(ts)
+    return int(time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour,
+                            0, 0, 0, 0, -1)))
+
+
 class HistoryRollupTest(unittest.TestCase):
 
     def test_dns_event_counts_and_bytes_zero(self):
@@ -82,11 +89,20 @@ class HistoryRollupTest(unittest.TestCase):
 
     def test_accumulates_first_last_ts_and_device(self):
         r = HistoryRollup()
-        t0 = time.time() - 100
-        for ts in (t0, t0 + 20, t0 + 50):
+        # 锚定到「当小时起点 + 60 秒」：t0/t0+20/t0+50 三点必然同一小时桶。
+        # 不能写成 time.time() - 100 —— 那样在整点后约 51 秒内跑会跨桶，
+        # 导致 hourly[0] 只剩两条（历史上就是这样抖过一次）。
+        t0 = _hour_epoch(time.time()) + 60
+        offsets = (t0, t0 + 20, t0 + 50)
+        keys = [_hour_epoch(ts) for ts in offsets]
+        if len(set(keys)) != 1:
+            self.fail(f"用例自身跨小时桶：t0={t0} offsets={offsets} "
+                      f"桶键={keys}（本地时区小时起点 {_hour_epoch(t0)}）")
+        for ts in offsets:
             r.add(_flow(timestamp=ts, dns_query="x.com", packet_size=7),
                   _Dev("dev-a", "192.168.1.5"))
         hourly, _ = r.drain()
+        self.assertEqual(len(hourly), 1, "三点应只落在同一个小时桶")
         self.assertEqual(hourly[0].dns_count, 3)
         self.assertEqual(hourly[0].bytes, 21)
         self.assertAlmostEqual(hourly[0].first_ts, t0, places=3)
