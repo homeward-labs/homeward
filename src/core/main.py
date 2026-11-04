@@ -49,6 +49,7 @@ from inventory.attribution import AttributionResult, DomainAttribution
 from core.netclass import is_address_like
 from analysis.behavior import BehaviorDetector
 from analysis.alerting import Alert, AlertCenter
+from analysis.history_rollup import HistoryRollup
 from analysis.profiler import build_profiles
 from adapters.base import ActionRegistry
 from adapters.sqlite_registry import SqliteActionRegistry, SqliteObservationStore
@@ -259,6 +260,14 @@ class HomewardService:
         if self.config.get("load_system_devices", True):
             self.start_device_refresh()
 
+        # —— 有界历史（旁路）——
+        # 默认关闭：只有 Web 服务端在「生产模式 + 启用持久化 + 未 --no-history」时显式开启。
+        # 开启后热路径只做内存自增（见 analysis/history_rollup.py），由 saver 每 60 秒
+        # 批量落盘到 data/history.db；observations.db 的 schema 与写入方式不受影响。
+        self.history_enabled = bool(self.config.get("history_enabled", False))
+        self.history_rollup = HistoryRollup(
+            max_keys=int(self.config.get("history_max_keys", 5000)))
+
         # 统计
         self.stats = {
             "flows_processed": 0,
@@ -416,7 +425,11 @@ class HomewardService:
                     self._purge_dns_cache(now)
 
         # W2：把这条流量归到某台设备上，并解析域名归属
-        self.device_registry.observe_flow(flow)
+        device = self.device_registry.observe_flow(flow)
+
+        # 有界历史：热路径只做内存自增（不写库、不加新锁 —— 本方法已持 _state_lock）
+        if self.history_enabled:
+            self.history_rollup.add(flow, device)
 
         # W3：同一条观测也喂给行为窗口（与域名判定正交 —— 一个看"是谁"，一个看"在干什么"）
         self.behavior_detector.feed(flow)
@@ -600,6 +613,8 @@ class HomewardService:
             n_attr = self.attribution.clear_cache()
             n_alert = self.alert_center.clear()
             self.stats["unknown_domains"].clear()
+            # 内存历史桶也必须一起清：否则下一次 flush 会把清除前的累计又写回库
+            self.history_rollup.clear()
             after = {
                 "devices": len(self.device_registry.devices),
                 "alerts": len(self.alert_center.active()),
@@ -610,6 +625,14 @@ class HomewardService:
             return {"before": before, "after": after, "cleared": {
                 "devices": n_dev, "attribution_cache": n_attr, "alerts": n_alert,
             }}
+
+    def drain_history(self) -> "tuple[list, list]":
+        """取走内存历史桶（小时桶, 天桶）—— 由 saver 周期调用后交给 HistoryStore.flush。
+
+        在 ``_state_lock`` 内交换整个字典，和热路径的自增互斥；热路径本身不额外加锁。
+        """
+        with self._state_lock:
+            return self.history_rollup.drain()
 
     def get_alert_stats(self) -> dict:
         """告警统计：数量、按严重度分布、模板渲染是否健康"""

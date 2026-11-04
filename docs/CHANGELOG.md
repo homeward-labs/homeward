@@ -6,6 +6,39 @@
 
 ---
 
+## 2026-11-04 — 有界历史底座 + 去向时间轴（里程碑一）
+
+> 起因：现有 `observations.db` 是单 slot 全量覆盖快照，只能看「此刻」，无法回答
+> 「昨天这个域名出现了几次」。本批新增**旁路**历史库 `data/history.db`，
+> **`observations.db` 的 schema 与写入方式零改动**。
+
+### `feature/history-timeline` — feat(history): 旁路历史库 + 1h–30d 去向时间轴
+
+- **新存储** `src/adapters/history_store.py`：`flow_hourly`（7 天）/ `flow_daily`（30 天）/
+  `entity_meta`（首访语义）。WAL + `synchronous=NORMAL`；UPSERT 用
+  `dns_count=dns_count+excluded`、首末时间 `MIN/MAX`，重启不会覆盖旧量。
+- **新累加器** `src/analysis/history_rollup.py`：热路径只做内存自增（不加锁、不写库），
+  小时桶与天桶各一份；`drain()` 由 saver 每 60 秒取走并批量落盘；`stop()` 强制 flush。
+- **接线**：`main.py` `_process_flow_locked` 把原先丢弃的 `observe_flow()` 返回值接住，
+  传给 `history_rollup.add(flow, device)`；`reset_observations()` 同步清空内存桶。
+  `server.py` 新增 `--no-history`、`GET /api/history`、saver 的 `flush_history()`、
+  清除观测时 `history_store.clear()`。
+- **计量口径**：只记 `dns_count`（DNS 查询 / SNI 事件）与 `bytes`（conntrack 增量字节）；
+  conntrack 回填域名的流量**不计** DNS 次数；接口与 UI 不出现「连接数」。
+- **前端**：去向页签新增时间轴（1h/6h/24h/7d/30d 胶囊、请求次数面积图、逐目的地行 +
+  「本时段新出现」+ Top 20 sparkline）；设备表新增「首次发现」列。
+- **性能（实测，Windows，120k 行日表 / 120k 行小时表）**：30 天查询 237–324 ms、
+  24 小时 240–346 ms、30 天 + 设备过滤 124 ms、flush 5000+5000 桶 48 ms；
+  回归用例对 30 天 ≤ 500 ms 有硬断言。
+- **保留策略**：`flush` 内每小时最多裁剪一次；小时表 7 天、天表 30 天、
+  首访表超 2 万行按 `last_seen` 淘汰。测试覆盖裁剪、清理联动、聚合口径。
+- **测试**：新增 `tests/test_history_store.py`、`tests/test_history_rollup.py`（19 例）；
+  全量 396 例通过（skipped=80）。
+- **文档**：ARCHITECTURE.md 新增第五节（三库分工 / 建表 / 计量口径 / 写入路径 / 查询与保留）；
+  STRUCTURE.md 补两个模块；ROADMAP.md 增加 Phase 2 第二批交付清单。
+
+---
+
 ## 2026-10-31 — 前端图表渲染修复（图太大 / CSP 丢弃 inline style / 单柱过宽）
 
 > 用户实测反馈「图太大了」「几乎每个页面都有问题」「无痕模式还是不行」「这几个页面还是有点问题」。根因有三层，全部在手写 SVG 图表库 `HWCharts`（`src/ui/static/charts.js`）。

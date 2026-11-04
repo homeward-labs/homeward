@@ -313,6 +313,14 @@ box-shadow: 0 0 0 0 var(--ok-glow);
 }
 .tag.is-domain { font-family: var(--mono); color: var(--text); }
 .tag b { color: var(--text); font-weight: 600; }
+/* 本时段新出现的去向：用强调色描边区分，不靠 emoji */
+.tag.is-new { border-color: var(--accent); color: var(--accent); }
+
+/* 去向时间轴：档位胶囊 + 每目的地 mini 时间序列 */
+.history-pills { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.btn.is-on { border-color: var(--accent); color: var(--accent); background: transparent; }
+.hist-spark { width: 180px; max-width: 100%; margin-top: 8px; }
+.hist-spark svg { display: block; width: 100%; height: auto; }
 
 .sev {
   display: inline-block; border-radius: 6px; padding: 1px 8px;
