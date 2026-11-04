@@ -37,6 +37,17 @@
 - **文档**：ARCHITECTURE.md 新增第五节（三库分工 / 建表 / 计量口径 / 写入路径 / 查询与保留）；
   STRUCTURE.md 补两个模块；ROADMAP.md 增加 Phase 2 第二批交付清单。
 
+### `main` — test(history): 修正整点边界抖动，锚定小时桶偏移
+
+- **现象**：`tests/test_history_rollup.py::test_accumulates_first_last_ts_and_device` 偶发
+  `2 != 3`。根因在用例自身：`t0 = time.time() - 100`，当用例在整点后约 51 秒内执行时，
+  `t0 + 50` 会跨进下一个小时桶，`hourly` 变成两个桶，`hourly[0]` 只剩两条。
+  生产代码无问题，属测试抖动。
+- **修法**：`t0` 锚定到「当小时起点 + 60 秒」，三点必然同桶；并在写入前显式校验三个
+  桶键相等，不等即 `self.fail` 并打印 `t0 / offsets / 桶键`，避免将来再退化成 `2 != 3`。
+  另加 `len(hourly) == 1` 断言。同文件其余用例只写入单条流量，不依赖当前时间偏移，未改。
+- **验证**：该模块连跑 3 轮均 `Ran 9 tests ... OK`；全量 396 例通过（skipped=80）。
+
 ---
 
 ## 2026-10-31 — 前端图表渲染修复（图太大 / CSP 丢弃 inline style / 单柱过宽）
