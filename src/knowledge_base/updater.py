@@ -9,6 +9,7 @@ import re
 import shutil
 import tempfile
 import threading
+import uuid
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -56,6 +57,9 @@ except Exception:
     OPTIONAL_DATA_FILES = _c_mod.OPTIONAL_DATA_FILES
 
 USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
+
+#: 知识库替换互斥：避免两个更新线程同时换入同一份 KB 造成半新半旧。
+_KB_REPLACE_LOCK = threading.Lock()
 
 
 def _http_get(url: str, timeout: int) -> bytes:
@@ -292,12 +296,54 @@ class KnowledgeBaseUpdater:
             if not self._verify_signature(expected, url):
                 return False
 
-            # 原子替换
-            for fname in files:
-                src = tmpdir / fname
-                if src.exists():
-                    shutil.move(str(src), str(self.kb_dir / fname))
+            # 全或无替换：任一文件失败即整体回滚，保持原知识库不变
+            if not self._replace_all_atomic(tmpdir, files):
+                return False
 
+        return True
+
+    def _replace_all_atomic(self, tmpdir: Path, files) -> bool:
+        """把 staging 文件整体换入 kb_dir：要么全换，要么一个都不换。
+
+        ``tmpdir`` 常位于系统临时分区，与 ``kb_dir`` 未必同盘；直接
+        ``os.replace`` 跨分区会抛 EXDEV，故先复制到 kb_dir 内的同分区
+        临时文件，再逐个原子换入。任一环节失败则按备份逐文件回滚。
+        """
+        staged: list[tuple[Path, Path, str]] = []
+        backups: dict[str, bytes | None] = {}
+        try:
+            with _KB_REPLACE_LOCK:
+                for fname in files:
+                    src = tmpdir / fname
+                    if not src.is_file():
+                        continue
+                    dst = self.kb_dir / fname
+                    swap = self.kb_dir / f".{fname}.hwswap-{uuid.uuid4().hex[:8]}"
+                    shutil.copyfile(str(src), str(swap))
+                    staged.append((dst, swap, fname))
+                # 全部备妥后才开始换入，缩短半新半旧窗口
+                for dst, swap, fname in staged:
+                    backups[fname] = dst.read_bytes() if dst.exists() else None
+                    os.replace(str(swap), str(dst))
+        except Exception as exc:
+            # 只回滚已换入的文件；blob=None 表示原本不存在，回滚即删除
+            for fname, blob in backups.items():
+                dst = self.kb_dir / fname
+                try:
+                    if blob is None:
+                        dst.unlink(missing_ok=True)
+                    else:
+                        dst.write_bytes(blob)
+                except OSError as rb:
+                    print(f"[KB Update] 回滚 {fname} 失败：{rb}")
+            print(f"[KB Update] 替换中断，已回滚，保持原知识库不变：{exc}")
+            return False
+        finally:
+            for _, swap, _ in staged:
+                try:
+                    swap.unlink(missing_ok=True)
+                except OSError:
+                    pass
         return True
 
     def _load_kek(self) -> bytes | None:
@@ -451,16 +497,50 @@ class KnowledgeBaseUpdater:
         print("[KB Update] 降级模式：仍允许更新（建议核查内容源可信度）")
         return True
 
+    @staticmethod
+    def _safe_fname(fname: str) -> bool:
+        """远端 CHECKSUM 里的文件名必须先校验，才能拼进本地路径。
+
+        拒绝：空名、``.`` / ``..``、点开头隐藏名、目录分隔符、驱动器前缀、
+        NUL 与 Windows 保留设备名。只接受单层普通文件名。
+        """
+        if not fname or fname in (".", "..") or fname.startswith("."):
+            return False
+        if "/" in fname or "\\" in fname or "\x00" in fname:
+            return False
+        if os.path.splitdrive(fname)[0]:
+            return False
+        if Path(fname).name != fname:
+            return False
+        stem = os.path.splitext(fname)[0].upper()
+        if stem in {"CON", "PRN", "AUX", "NUL"} or (
+            len(stem) == 4 and stem[:3] in {"COM", "LPT"} and stem[3] in "123456789"
+        ):
+            return False
+        return True
+
     def _verify_checksum(self, directory: Path, expected: str) -> bool:
-        """验证下载文件的 checksum"""
-        # 简单实现：逐文件计算 sha256 并比对
+        """验证下载文件的 checksum；文件名来自远端响应，一律先过校验。"""
+        try:
+            base = directory.resolve()
+        except OSError:
+            return False
         for line in expected.strip().split("\n"):
             parts = line.split()
             if len(parts) != 2:
                 continue
             expected_hash, fname = parts
+            if not self._safe_fname(fname):
+                print(f"[KB Update] CHECKSUM 含非法文件名，拒绝更新：{fname!r}")
+                return False
             fpath = directory / fname
-            if not fpath.exists():
+            if not fpath.is_file():
+                return False
+            # 防符号链接 / 目录穿越：解析后必须仍在 staging 目录内
+            try:
+                fpath.resolve().relative_to(base)
+            except ValueError:
+                print(f"[KB Update] CHECKSUM 文件名越出 staging 目录，拒绝：{fname!r}")
                 return False
             actual = hashlib.sha256(fpath.read_bytes()).hexdigest()
             if actual != expected_hash:

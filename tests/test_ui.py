@@ -162,12 +162,14 @@ class TestApi(ServerTestCase):
 
     @unittest.skipUnless(_KB_PRESENT, _SKIP_NO_KB)
     def test_health(self):
+        # LO-1：免鉴权 health 只回存活状态，运行时指纹迁到 /api/overview
         d = self.get_json("/api/health")
-        self.assertTrue(d["ok"])
-        self.assertEqual(d["edition"]["edition"], "community")
-        self.assertFalse(d["edition"]["can_enforce"], "社区版不得声称能拦截")
-        self.assertGreater(d["kb_domains"], 0)
-        self.assertEqual(d["behaviors_unsupported"], [],
+        self.assertEqual(d, {"ok": True})
+        ov = self.get_json("/api/overview")
+        self.assertEqual(ov["edition"]["edition"], "community")
+        self.assertFalse(ov["edition"]["can_enforce"], "社区版不得声称能拦截")
+        self.assertGreater(ov["kb_domains"], 0)
+        self.assertEqual(ov["behaviors_unsupported"], [],
                          "行为库里不能有引擎不认的规则（会导致静默恒真）")
 
     def test_overview(self):
@@ -521,7 +523,7 @@ class TestImportAndReportApi(ServerTestCase):
         self.assertIn("alerts", d)
         self.assertIn("blind_spots", d)
         # 报告里出现的域名应当都是「用户观测到」的，而非知识库全部域名
-        kb = self.get_json("/api/health")["kb_domains"]
+        kb = self.get_json("/api/overview")["kb_domains"]
         reported_domains = {x["domain"] for x in d["destinations"]["items"]}
         self.assertLessEqual(len(reported_domains), kb,
                              "报告不应把整个知识库都列出来")

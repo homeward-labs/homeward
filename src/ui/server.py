@@ -32,6 +32,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -88,6 +89,26 @@ SECURITY_HEADERS = [
      "base-uri 'none'; "
      "form-action 'self'"),
 ]
+
+# ---- Stage 4A 加固参数（配套文档：docs/07-调研与诊断/安全加固最小补丁说明-2026-11-06.md）----
+# HI-4：登录失败限流。计数与锁由 make_server 逐实例注入，单测之间不会互相污染。
+LOGIN_WINDOW_SEC = 900
+LOGIN_MAX_FAILURES = 5
+LOGIN_BACKOFF_CAP = 1.0
+
+# ME-1：需要统一做 Fetch Metadata / Content-Type 前置校验的写接口
+WRITE_API_EXACT = frozenset({
+    "/api/login", "/api/logout", "/api/observations/clear",
+    "/api/domain-marks", "/api/scan", "/api/activate",
+    "/api/license/deactivate", "/api/import", "/api/ai/analyze", "/api/config",
+})
+ALLOWED_POST_CONTENT_TYPES = frozenset({
+    "application/x-www-form-urlencoded", "application/json", "text/plain",
+    "multipart/form-data", "application/octet-stream",
+})
+# LO-9：未配置 HOMEWARD_ALLOWED_HOSTS 时只做 Host 语法校验、不拒绝。
+# 252/254 按 IP 直连，默认强开白名单会把真机挡在门外；Stage 3 部署时显式配置才收紧。
+DEFAULT_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 # 社区版能力边界 —— 前端据此把不可用的操作显示为禁用态，而不是灰掉不给理由
 EDITION_INFO = {
@@ -270,12 +291,94 @@ class HomewardHandler(BaseHTTPRequestHandler):
     start_time: float = 0.0
     auth: "WebAuth | None" = None
     observation_store: "SqliteObservationStore | None" = None
+    # Stage 4A：由 make_server 逐实例注入（默认 None = 不启用 Host 白名单）
+    allowed_hosts: "frozenset | None" = None
+    login_failures: dict = {}
+    login_lock: object = threading.Lock()
 
     # ---- 基础 ----
 
     def log_message(self, fmt, *args):
         """默认实现写 stderr；统一收到 logger，便于容器收集"""
         logger.info("%s %s", self.address_string(), fmt % args)
+
+    # ---- Stage 4A 加固 ----
+
+    def version_string(self):
+        # LO-8：默认 "homeward/0.1.0 Python/3.12.15" 暴露精确解释器版本
+        return "homeward"
+
+    def do_OPTIONS(self):
+        # LO-10：Python 默认 501 错误页不带任何安全头，统一改走 _json
+        self._json(405, {"error": "method_not_allowed", "need": "GET/POST"})
+
+    def send_error(self, code, message=None, explain=None):
+        # LO-6/LO-10：未实现方法（TRACE 等）与请求解析失败都走这里；
+        # 覆写成带 SECURITY_HEADERS 的 JSON，且不回显 message/explain 内部细节
+        self.close_connection = True
+        self._json(code, {"error": "http_error", "status": code})
+
+    def _check_host(self) -> bool:
+        # LO-9：拒绝空 / 超长 / 含控制字符的 Host；配置白名单后再做归属校验
+        raw = (self.headers.get("Host") or "").strip()
+        if not raw or len(raw) > 253 or any(c in raw for c in "\r\n \t/\\@"):
+            self._json(400, {"error": "bad_host"})
+            return False
+        host = raw.lower()
+        if host.startswith("[") and "]" in host:
+            host = host[1:host.index("]")]
+        elif raw.count(":") == 1:
+            host = raw.rsplit(":", 1)[0].lower()
+        if self.allowed_hosts is not None and host not in self.allowed_hosts:
+            self._json(400, {"error": "host_not_allowed"})
+            return False
+        return True
+
+    @staticmethod
+    def _is_write_api(path: str) -> bool:
+        return (path in WRITE_API_EXACT
+                or (path.startswith("/api/alerts/")
+                    and (path.endswith("/dismiss") or path.endswith("/restore"))))
+
+    def _check_write_request(self, method: str, path: str) -> bool:
+        # ME-1：跨站写请求统一前置校验。浏览器一定带 Sec-Fetch-Site / Origin；
+        # curl 与旧客户端不带头时放行（避免打断现有 CLI / 单测），Stage 3 可收紧。
+        if method != "POST" or not self._is_write_api(path):
+            return True
+        site = (self.headers.get("Sec-Fetch-Site") or "").strip().lower()
+        if site and site not in ("same-origin", "none"):
+            self._json(403, {"error": "cross_site_write_blocked"})
+            return False
+        origin = (self.headers.get("Origin") or "").strip()
+        if origin:
+            host = (self.headers.get("Host") or "").strip().lower()
+            if origin.lower() not in (f"http://{host}", f"https://{host}"):
+                self._json(403, {"error": "origin_mismatch"})
+                return False
+        ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype and ctype not in ALLOWED_POST_CONTENT_TYPES:
+            self._json(415, {"error": "unsupported_content_type"})
+            return False
+        return True
+
+    def _login_failures_in_window(self, client: str) -> list:
+        now = time.time()
+        with self.login_lock:
+            hits = [t for t in self.login_failures.get(client, [])
+                    if now - t < LOGIN_WINDOW_SEC]
+            if hits:
+                self.login_failures[client] = hits
+            else:
+                self.login_failures.pop(client, None)
+        return hits
+
+    def _note_login_failure(self, client: str) -> None:
+        with self.login_lock:
+            self.login_failures.setdefault(client, []).append(time.time())
+
+    def _clear_login_failures(self, client: str) -> None:
+        with self.login_lock:
+            self.login_failures.pop(client, None)
 
     def do_GET(self):
         self._dispatch("GET")
@@ -291,6 +394,11 @@ class HomewardHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         query = parse_qs(parsed.query)
         try:
+            # Stage 4A：Host 语法/白名单 + 写请求 Fetch Metadata，先于路由分发
+            if not self._check_host():
+                return
+            if not self._check_write_request(method, path):
+                return
             # —— 鉴权门禁 ——
             # 白名单（免登录）：登录页 / 登录登出接口 / 健康检查 / 登录页样式
             if path in ("/login", "/api/login", "/api/logout", "/api/health",
@@ -311,8 +419,10 @@ class HomewardHandler(BaseHTTPRequestHandler):
             else:
                 self._json(405, {"error": "method_not_allowed", "path": path})
         except Exception as exc:  # 单条请求的异常不能把整个服务带下线
-            logger.exception("处理 %s %s 时出错", method, path)
-            self._json(500, {"error": "internal_error", "detail": str(exc)})
+            # ME-2：对外只给关联 id，异常详情只进服务端日志
+            ref = uuid.uuid4().hex
+            logger.exception("处理 %s %s 时出错 ref=%s: %s", method, path, ref, exc)
+            self._json(500, {"error": "internal_error", "ref": ref})
 
     # ---- 免鉴权路由（登录页 / 登录登出 / 健康 / 登录样式）----
 
@@ -343,11 +453,23 @@ class HomewardHandler(BaseHTTPRequestHandler):
         if method != "POST":
             self._json(405, {"error": "method_not_allowed", "need": "POST"})
             return
+        client = self.client_address[0] if self.client_address else "unknown"
+        hits = self._login_failures_in_window(client)
+        if len(hits) >= LOGIN_MAX_FAILURES:
+            retry = max(1, int(LOGIN_WINDOW_SEC - (time.time() - hits[0])))
+            self._send_json_with_headers(
+                429, {"error": "too_many_attempts"},
+                extra_headers=[("Retry-After", str(retry))])
+            return
         form = self._read_form()
         token = (form.get("token") or [""])[0]
         if self.auth is None or not self.auth.verify(token):
+            self._note_login_failure(client)
+            # HI-4：指数退避，上限 1s（提高在线爆破成本，不拖垮正常输错的体验）
+            time.sleep(min(0.05 * (2 ** len(hits)), LOGIN_BACKOFF_CAP))
             self._json(401, {"error": "invalid_token"})
             return
+        self._clear_login_failures(client)
         # 种会话 cookie 并跳回首页
         self._send_redirect("/",
                             extra_headers=[("Set-Cookie", self.auth.session_cookie())])
@@ -463,16 +585,8 @@ class HomewardHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/health":
-            self._json(200, {
-                "ok": True,
-                "version": VERSION,
-                "edition": EDITION_INFO,
-                "uptime_seconds": round(time.time() - self.start_time, 1),
-                "kb_domains": len(svc.kb.domains),
-                "behaviors_supported": len(svc.behavior_matcher.supported_rules),
-                "behaviors_unsupported": svc.behavior_matcher.unsupported(),
-                "vendor_lookup_enabled": svc.device_registry.vendor_lookup_enabled,
-            })
+            # LO-1：免鉴权接口只回存活状态；版本/运行时指纹迁到 /api/overview
+            self._json(200, {"ok": True})
             return
 
         if path == "/api/overview":
@@ -481,6 +595,11 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 "version": VERSION,
                 "edition": EDITION_INFO,
                 "uptime_seconds": round(time.time() - self.start_time, 1),
+                # LO-1：运行时指纹由免鉴权的 /api/health 迁入（需登录才可见）
+                "kb_domains": len(svc.kb.domains),
+                "behaviors_supported": len(svc.behavior_matcher.supported_rules),
+                "behaviors_unsupported": svc.behavior_matcher.unsupported(),
+                "vendor_lookup_enabled": svc.device_registry.vendor_lookup_enabled,
                 "stats": stats,
                 "alerts": svc.get_alert_stats(),
                 "coverage": svc.attribution_coverage(),
@@ -897,12 +1016,20 @@ def make_server(service: HomewardService, host: str = DEFAULT_HOST,
     用子类注入 service / auth / observation_store / trend_store，避免全局变量 ——
     单测里可以起多个互不干扰的实例。
     """
+    # LO-9：显式配置 HOMEWARD_ALLOWED_HOSTS 才启用白名单；未配置只做 Host 语法校验
+    _hosts_env = os.environ.get("HOMEWARD_ALLOWED_HOSTS", "").strip()
+    allowed_hosts = (frozenset(
+        h.strip().lower() for h in _hosts_env.split(",") if h.strip()
+    ) | DEFAULT_ALLOWED_HOSTS) if _hosts_env else None
     handler_cls = type(
         "HomewardHandler",
         (HomewardHandler,),
         {"service": service, "start_time": time.time(),
          "auth": auth, "observation_store": observation_store,
-         "trend_store": trend_store, "history_store": history_store},
+         "trend_store": trend_store, "history_store": history_store,
+         "allowed_hosts": allowed_hosts,
+         # HI-4：每个服务实例独享计数与锁，避免单测/多实例相互干扰
+         "login_failures": {}, "login_lock": threading.Lock()},
     )
     #启动时恢复上次未确认的「建议阻断」队列。
     # service.start() 是 async 且从未被 run_server 调用（信号注册也在那里），
