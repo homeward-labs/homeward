@@ -237,8 +237,10 @@ def main() -> int:
     if h_status == 200:
         try:
             h = json.loads(h_body)
-            print(f"      版本 {h.get('version')} / 版次 {h.get('edition', {}).get('label')} "
-                  f"/ 知识库域名 {h.get('kb_domains')} 个")
+            edition = (h.get("edition") or {}).get("label") or "未知"
+            kb_domains = h.get("kb_domains")
+            print(f"      版本 {h.get('version') or '未知'} / 版次 {edition} "
+                  f"/ 知识库域名 {kb_domains if kb_domains is not None else '未知'} 个")
         except json.JSONDecodeError:
             pass
     else:

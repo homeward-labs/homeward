@@ -12,6 +12,9 @@ set -u
 TARBALL="/tmp/hw.tar.gz"
 SRC_URL="https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz"
 MIRRORS="https://ghfast.top/ https://gh-proxy.com/"
+# 供应链：从可信渠道拿到该源码包 sha256 后设置 EXPECTED_SHA256，
+# 安装脚本会在解压前强制比对，不一致立即中止（发布侧补 checksums 后默认强制）。
+# 固定 commit/tag 需同步改 GitHub 归档顶层目录名，属发版流程改造，见 Stage 5 遗留。
 
 # 安装位置：遵循 iStoreOS 规范，Docker 应用统一放在 /userdata/apps/<应用名>/ 下
 # （/userdata 是 iStoreOS 的持久分区，重启/重装都不丢；/tmp 是 tmpfs，重启即清空，绝不能用）。
@@ -68,7 +71,12 @@ if [ -s "$TARBALL" ] && tar -tzf "$TARBALL" >/dev/null 2>&1; then
     ok "发现已下载好的压缩包 $TARBALL，跳过下载（想重新下载请先删掉它）"
 else
     DL_OK=0
-    for URL in $MIRRORS"$SRC_URL" "$SRC_URL"; do
+    # 修 bug：原写法 $MIRRORS"$SRC_URL" 只给第一个词加前缀，镜像列表被拼成一团。
+    URLS=""
+    for M in $MIRRORS; do
+        URLS="$URLS ${M}${SRC_URL}"
+    done
+    for URL in $URLS "$SRC_URL"; do
         echo "  尝试下载源：$URL"
         if command -v curl >/dev/null 2>&1; then
             curl -fL --connect-timeout 10 --max-time 300 --progress-bar -o "$TARBALL" "$URL" && DL_OK=1
@@ -76,6 +84,15 @@ else
             wget -O "$TARBALL" "$URL" && DL_OK=1
         fi
         if [ "$DL_OK" = "1" ] && [ -s "$TARBALL" ]; then
+            if [ -n "${EXPECTED_SHA256:-}" ]; then
+                _ACTUAL=$(sha256sum "$TARBALL" 2>/dev/null | awk '{print $1}')
+                if [ -z "$_ACTUAL" ] || [ "$_ACTUAL" != "$EXPECTED_SHA256" ]; then
+                    echo "  ✗ 源码包 sha256 校验失败（期望 ${EXPECTED_SHA256}；实得 ${_ACTUAL:-无法计算}）"
+                    echo "    拒绝解压执行。请确认 EXPECTED_SHA256 来自可信渠道，或清空该变量后重试。"
+                    exit 1
+                fi
+                ok "源码包 sha256 校验通过"
+            fi
             break
         fi
         echo "  （这个源下不动，自动换下一个…）"

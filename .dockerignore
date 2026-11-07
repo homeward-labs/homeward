@@ -12,6 +12,10 @@ fnpk
 hooks
 *.md
 LICENSE
+.env
+**/.env
+data/
+logs/
 .gitignore
 .dockerignore
 

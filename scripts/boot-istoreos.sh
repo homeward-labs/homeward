@@ -1,7 +1,9 @@
 #!/bin/sh
 # 家卫 Homeward · iStoreOS 一键引导
-# 用户只需执行一条命令（无任何引号，粘贴不会出错）：
-#   wget -qO- https://ghfast.top/https://raw.githubusercontent.com/homeward-labs/homeward/main/scripts/boot-istoreos.sh | sh
+# 安全用法（先落盘、再看、再执行；禁止 wget|sh 直执行未校验的远程脚本）：
+#   wget -qO /tmp/hw-boot.sh https://ghfast.top/https://raw.githubusercontent.com/homeward-labs/homeward/main/scripts/boot-istoreos.sh \
+#     && sh /tmp/hw-boot.sh
+# 可选硬校验：执行前 export EXPECTED_SHA256=<可信渠道拿到的源码包 sha256>
 set -u
 TARBALL="/tmp/hw.tar.gz"
 SRC_URL="https://github.com/homeward-labs/homeward/archive/refs/heads/main.tar.gz"
@@ -33,6 +35,15 @@ for U in "https://ghfast.top/$SRC_URL" "https://gh-proxy.com/$SRC_URL" "$SRC_URL
         wget -O "$TARBALL" "$U" && GOT=1
     fi
     if [ "$GOT" = "1" ] && tarball_ok; then
+    if [ -n "${EXPECTED_SHA256:-}" ]; then
+        _ACTUAL=$(sha256sum "$TARBALL" 2>/dev/null | awk '{print $1}')
+        if [ -z "$_ACTUAL" ] || [ "$_ACTUAL" != "$EXPECTED_SHA256" ]; then
+            echo "   ✗ 源码包 sha256 校验失败（期望 ${EXPECTED_SHA256}；实得 ${_ACTUAL:-无法计算}）"
+            echo "     拒绝解压执行。请确认 EXPECTED_SHA256 来自可信渠道，或清空该变量后重试。"
+            exit 1
+        fi
+        echo "   ✓ 源码包 sha256 校验通过"
+    fi
         break
     fi
     GOT=0
