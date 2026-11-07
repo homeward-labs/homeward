@@ -12,7 +12,11 @@
 #
 # 本地：pip install -r requirements-dev.txt
 
-pytest>=8.0
-segno>=1.6
-numpy>=1.26
-opencv-python-headless>=4.9
+# 供应链：版本固定到已验证组合（2026-11-07 实测）。
+# 剩余：为每个发行文件补 --hash=sha256:... 并在 CI 用 pip install --require-hashes；
+#      多平台 wheel 数量大，需逐平台生成，勿手填哈希。
+
+pytest==9.1.1
+segno==1.6.6
+numpy==2.5.4
+opencv-python-headless==5.0.0.93
