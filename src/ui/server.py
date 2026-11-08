@@ -134,11 +134,33 @@ EDITION_INFO = {
 
 # ---------------------------------------------------------------- 报告渲染
 
+MAX_EXPORT_CELL = 256
+
+
+def _md_escape(v, limit: int = MAX_EXPORT_CELL) -> str:
+    """Markdown 导出的外部值转义：限长 + 折行 + 表格/代码/HTML 元字符中和。
+
+    只作用于来自 DNS / DHCP / conntrack / 告警的可控字符串；内部数值与时间
+    不经过这里，保证正常报告的渲染逐字节不变。JSON 分支走 json.dumps，天然安全。
+    """
+    s = "" if v is None else str(v)
+    if limit and len(s) > limit:
+        s = s[:limit] + "…"
+    s = s.replace("\r", " ").replace("\n", " ")
+    s = s.replace("|", "\\|")
+    s = s.replace("`", "\\`")
+    s = s.replace("<", "&lt;").replace(">", "&gt;")
+    return s
+
+
 def _report_markdown(payload: dict) -> str:
     """把观测报告结构化数据渲染成给人看的 Markdown（只含用户自己的遥测）
 
-    注意：这是下载文件，不进浏览器渲染管线，无需 esc()。知识库仍是服务器端商业机密，
-    此处**不**输出知识库全表，只呈现用户自己观测到的域名及其本地查询结论。
+    注意：这是下载文件，不进浏览器渲染管线；但设备名 / 域名 / 厂商 / 组织 / 告警文本
+    均来自网络侧可控输入，直接插值会让竖线、换行、反引号伪造表格与标题，并在下游
+    转 HTML 时注入标签。故所有外部值统一经 _md_escape() 转义并限长；JSON 分支走
+    json.dumps，天然安全。知识库仍是服务器端商业机密，此处**不**输出知识库全表，
+    只呈现用户自己观测到的域名及其本地查询结论。
     """
     rep = payload.get("report", {})
     checkup = payload.get("checkup", {}) or {}
@@ -180,7 +202,7 @@ def _report_markdown(payload: dict) -> str:
         L.append(f"- 设备观测覆盖：可见 {vis_v} / 疑似不可见 {vis_y}（{vis_pct}）")
         top = checkup.get("top_unknown") or []
         if top:
-            L.append(f"- 主要未知去向（前 5）：{', '.join(top)}")
+            L.append(f"- 主要未知去向（前 5）：{', '.join(_md_escape(x) for x in top)}")
         L.append(f"- 已如实列出的盲区：{checkup.get('blind_spots', 0)} 项")
         L.append("")
 
@@ -201,13 +223,14 @@ def _report_markdown(payload: dict) -> str:
         L.append("| 名称 | IP | MAC | 厂商 | 品类 | 主要去向 |")
         L.append("| --- | --- | --- | --- | --- | --- |")
         for d in devices:
-            name = d.get("name") or "-"
-            ips = "、".join(d.get("ips") or []) or "-"
-            mac = d.get("mac") or "-"
-            vendor = d.get("vendor") or "-"
-            dtype = d.get("device_type") or "unknown"
+            name = _md_escape(d.get("name") or "-")
+            ips = _md_escape("、".join(d.get("ips") or []) or "-")
+            mac = _md_escape(d.get("mac") or "-")
+            vendor = _md_escape(d.get("vendor") or "-")
+            dtype = _md_escape(d.get("device_type") or "unknown")
             top = "、".join(
-                f"{t.get('domain')}({t.get('count')})" for t in (d.get("top_domains") or [])[:5]
+                f"{_md_escape(t.get('domain'))}({t.get('count')})"
+                for t in (d.get("top_domains") or [])[:5]
             )
             L.append(f"| {name} | {ips} | {mac} | {vendor} | {dtype} | {top} |")
     else:
@@ -221,10 +244,11 @@ def _report_markdown(payload: dict) -> str:
         L.append(f"共 {len(items)} 个域名，认出 {known} 个。")
         L.append("")
         for x in items[:200]:
-            org = x.get("organization") or "未识别"
+            org = _md_escape(x.get("organization") or "未识别")
             tail = f"；涉及 {len(x.get('devices', []))} 台设备" if x.get("devices") else ""
-            L.append(f"- `{x.get('domain')}` — {org}"
-                     f"（{x.get('category','?')}，置信度 {x.get('confidence','?')}）{tail}")
+            L.append(f"- `{_md_escape(x.get('domain'))}` — {org}"
+                     f"（{_md_escape(x.get('category','?'))}，"
+                     f"置信度 {_md_escape(x.get('confidence','?'))}）{tail}")
     else:
         L.append("（无）")
     L.append("")
@@ -232,7 +256,7 @@ def _report_markdown(payload: dict) -> str:
     L.append("")
     if unknowns:
         for u in unknowns:
-            L.append(f"- {u}")
+            L.append(f"- {_md_escape(u)}")
     else:
         L.append("（所有观测域名都能在知识库查到归属）")
     L.append("")
@@ -240,11 +264,13 @@ def _report_markdown(payload: dict) -> str:
     L.append("")
     if alerts:
         for a in alerts:
-            dom = a.get("domain") or a.get("destination")
-            L.append(f"- **[{a.get('severity_label','?')}] {a.get('title','')}**"
-                     f" · {a.get('device_name','?')} → {dom}（归属：{a.get('organization') or '未识别'}）")
-            L.append(f"  - 说明：{a.get('summary','')}")
-            L.append(f"  - 建议：{a.get('action_label','')}；后果：{a.get('side_effects','')}")
+            dom = _md_escape(a.get("domain") or a.get("destination"))
+            L.append(f"- **[{_md_escape(a.get('severity_label','?'))}] {_md_escape(a.get('title',''))}**"
+                     f" · {_md_escape(a.get('device_name','?'))} → {dom}"
+                     f"（归属：{_md_escape(a.get('organization') or '未识别')}）")
+            L.append(f"  - 说明：{_md_escape(a.get('summary',''))}")
+            L.append(f"  - 建议：{_md_escape(a.get('action_label',''))}；"
+                     f"后果：{_md_escape(a.get('side_effects',''))}")
     else:
         L.append("（无活跃告警）")
     L.append("")
@@ -252,7 +278,7 @@ def _report_markdown(payload: dict) -> str:
     L.append("")
     if spots:
         for s in spots:
-            L.append(f"- {s}")
+            L.append(f"- {_md_escape(s)}")
     else:
         L.append("（无）")
     L.append("")
