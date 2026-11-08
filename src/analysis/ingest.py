@@ -25,6 +25,7 @@ DNS 观测没有字节数（dnsmasq 日志里没有），``packet_size`` 记 0 �
 from __future__ import annotations
 
 import ipaddress
+from functools import lru_cache
 from typing import Iterable, Optional
 
 from adapters.base import Observation
@@ -36,23 +37,25 @@ DEFAULT_LOCAL_NETS: tuple[str, ...] = (
     "172.16.0.0/12",
 )
 
-_PRIVATE_CACHE: dict[str, bool] = {}
+@lru_cache(maxsize=4096)
+def _classify_local_ip(raw: str, nets: tuple[str, ...]) -> bool:
+    "带 LRU 上界的 IP 归属判定；缓存键含网段配置，改配置自动失效。"
+    # Stage 6 资源上限：原实现用无界 dict 缓存每个出现过的 IP 字符串，
+    # 长时间运行（或日志投毒）会持续吃内存。4096 条足够覆盖家庭场景，
+    # 淘汰由 functools 的 LRU 策略处理，热点 IP 不会被整表清空误伤。
+    addr = ipaddress.ip_address(raw)
+    return any(addr in ipaddress.ip_network(net, strict=False) for net in nets)
 
 
 def is_local_ip(raw: str, local_nets: Iterable[str] = DEFAULT_LOCAL_NETS) -> Optional[bool]:
     """IP 是否属于本地网段。不是合法 IP 时返回 None（表示判断不了）。"""
     if not raw:
         return None
-    cached = _PRIVATE_CACHE.get(raw)
-    if cached is not None:
-        return cached
     try:
-        addr = ipaddress.ip_address(raw)
-    except ValueError:
+        return _classify_local_ip(raw, tuple(local_nets))
+    except (ValueError, TypeError):
+        # 非法 IP / 非法网段配置：不缓存，保持「判断不了」的既有语义
         return None
-    result = any(addr in ipaddress.ip_network(net, strict=False) for net in local_nets)
-    _PRIVATE_CACHE[raw] = result
-    return result
 
 
 def observation_to_flow(

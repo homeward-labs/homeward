@@ -96,6 +96,22 @@ def _syslog_timestamp(match: re.Match, now: Optional[float] = None) -> float:
     return stamp
 
 
+# ---- Stage 6 输入边界（施工单 §八「输入边界」）----
+# dnsmasq 日志虽来自本地文件，但内容可由上游进程/伪造日志注入；超长域名、
+# 控制字符与非 DNS 字符会在下游画像、告警文案与 HTML 渲染里被放大。
+_MAX_DOMAIN_LEN = 253
+_DOMAIN_RE = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def _valid_domain(raw: str) -> bool:
+    "只放行合法 DNS 字符、长度 <=253 且不含控制字符的域名。"
+    if not raw or len(raw) > _MAX_DOMAIN_LEN:
+        return False
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in raw):
+        return False
+    return _DOMAIN_RE.fullmatch(raw) is not None
+
+
 def parse_dnsmasq_line(line: str, *, now: Optional[float] = None) -> Optional[dict]:
     """解析一行 dnsmasq 查询日志
 
@@ -110,12 +126,12 @@ def parse_dnsmasq_line(line: str, *, now: Optional[float] = None) -> Optional[di
     match = _QUERY_RE.match(line.strip())
     if not match:
         return None
-    domain = match.group("domain")
-    if not domain:
+    domain = (match.group("domain") or "").rstrip(".")
+    if not _valid_domain(domain):
         return None
     return {
         "timestamp": _syslog_timestamp(match, now),
-        "domain": domain.rstrip("."),
+        "domain": domain,
         "client_ip": match.group("client"),
         "query_type": match.group("qtype"),
     }

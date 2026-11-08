@@ -96,6 +96,16 @@ LOGIN_WINDOW_SEC = 900
 LOGIN_MAX_FAILURES = 5
 LOGIN_BACKOFF_CAP = 1.0
 
+# ---- Stage 6 资源上限（施工单 §八「资源上限」）----
+# 离线日志导入的文本上限为 16 MiB（core/import_log.MAX_TEXT_BYTES），JSON 包裹与
+# 转义会放大体积，故留 2 倍余量；声明长度超过此值直接在读取前拒 413，避免单个
+# 请求把常驻服务内存打爆。写成常量便于部署时按设备内存调整。
+MAX_BODY_BYTES = 32 * 1024 * 1024
+
+
+class PayloadTooLarge(ValueError):
+    "请求体超过 MAX_BODY_BYTES；由 _dispatch 统一转成 413 响应。"
+
 # ME-1：需要统一做 Fetch Metadata / Content-Type 前置校验的写接口
 WRITE_API_EXACT = frozenset({
     "/api/login", "/api/logout", "/api/observations/clear",
@@ -418,6 +428,10 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 self._static(method, path)
             else:
                 self._json(405, {"error": "method_not_allowed", "path": path})
+        except PayloadTooLarge:
+            # Stage 6：不读取超限请求体，直接回 413（与 /api/import 的既有语义一致）
+            self._json(413, {"error": "payload_too_large",
+                             "max_bytes": MAX_BODY_BYTES})
         except Exception as exc:  # 单条请求的异常不能把整个服务带下线
             # ME-2：对外只给关联 id，异常详情只进服务端日志
             ref = uuid.uuid4().hex
@@ -497,16 +511,29 @@ class HomewardHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self._send(status, body, "application/json; charset=utf-8", extra_headers)
 
+    def _read_body_bytes(self) -> bytes:
+        "Stage 6 资源上限：统一读取请求体，声明长度超限时在读取前拒 413。"
+        # 只按 Content-Length 声明值判定，不预先分配缓冲区；非法/负值按空体处理。
+        # 声明长度小于实际发送量由 http.server 报文边界处理，不引入流式读取，
+        # 避免改变既有请求语义。
+        raw_len = self.headers.get("Content-Length", "0") or "0"
+        try:
+            length = int(raw_len)
+        except (TypeError, ValueError):
+            length = 0
+        if length < 0:
+            length = 0
+        if length > MAX_BODY_BYTES:
+            raise PayloadTooLarge(
+                "请求体 %d 字节超过上限 %d" % (length, MAX_BODY_BYTES))
+        return self.rfile.read(length) if length > 0 else b""
+
     def _read_form(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        raw = self.rfile.read(length) if length > 0 else b""
-        return parse_qs(raw.decode("utf-8", "replace"))
+        return parse_qs(self._read_body_bytes().decode("utf-8", "replace"))
 
     def _read_text_body(self) -> str:
         """读取请求体原文（用于离线日志导入等非表单输入）"""
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        raw = self.rfile.read(length) if length > 0 else b""
-        return raw.decode("utf-8", "replace")
+        return self._read_body_bytes().decode("utf-8", "replace")
 
     def _parse_import_payload(self, text: str) -> str:
         """从请求体里取出日志文本：支持 JSON / form / 裸文本三种入参"""
