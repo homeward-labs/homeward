@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from analysis.ingest import _classify_local_ip, is_local_ip  # noqa: E402
 from collectors.dns import parse_dnsmasq_line  # noqa: E402
 from ui import server as ui_server  # noqa: E402
+from analysis.behavior import MAX_TRACKED_KEYS, BehaviorDetector  # noqa: E402
+from rule_engine.engine import FlowRecord  # noqa: E402
 
 
 class _FakeRfile:
@@ -106,6 +108,66 @@ class DomainBoundaryTest(unittest.TestCase):
     def test_non_dns_char_domain_dropped(self):
         self.assertIsNone(self._parse("bad/host"))
         self.assertIsNone(self._parse("bad@host"))
+
+
+class TrackedKeysBoundTest(unittest.TestCase):
+    """Stage 6：观测池键总数有界（负向优先，防伪造海量 IP/子域撑爆内存）"""
+
+    @staticmethod
+    def _flow(ip, domain, ts=1000.0):
+        return FlowRecord(timestamp=ts, src_ip=ip, dst_ip="203.0.113.1",
+                          dst_port=443, protocol="tcp", sni=domain, dns_query=None,
+                          packet_size=60, direction="out")
+
+    def test_default_cap_is_bounded(self):
+        self.assertEqual(MAX_TRACKED_KEYS, 4096)
+        self.assertEqual(BehaviorDetector().max_tracked_keys, MAX_TRACKED_KEYS)
+
+    def test_key_count_bounded_under_many_distinct_keys(self):
+        det = BehaviorDetector(max_tracked_keys=64)
+        for i in range(300):
+            ip = "10.%d.%d.%d" % ((i >> 16) & 255, (i >> 8) & 255, i & 255)
+            det.feed(self._flow(ip, "d%d.example.com" % i), now=1000.0)
+        total = sum(det.tracked_keys().values())
+        self.assertLessEqual(total, 64, "两个观测池的键总数不得超过上限")
+        self.assertGreater(det.stats["dropped_keys"], 0, "满表后必须有丢弃计数")
+
+    def test_existing_key_still_accepts_after_cap(self):
+        det = BehaviorDetector(max_tracked_keys=4)
+        det.feed(self._flow("10.0.0.1", "a.example.com"), now=1000.0)
+        for i in range(20):
+            det.feed(self._flow("10.1.0.%d" % i, "b%d.example.com" % i), now=1000.0)
+        before = len(det.device_flows["10.0.0.1"])
+        det.feed(self._flow("10.0.0.1", "a.example.com"), now=1000.0)
+        self.assertEqual(len(det.device_flows["10.0.0.1"]), before + 1,
+                         "满表只拒新键，不得影响既有键继续收记录")
+
+    def test_normal_scene_unchanged(self):
+        det = BehaviorDetector()
+        for i in range(12):
+            ts = 1000.0 + i * 30
+            det.feed(self._flow("192.168.1.50", "track.example.com", ts=ts), now=ts)
+        self.assertIn("192.168.1.50", det.device_flows)
+        self.assertIn(("192.168.1.50", "track.example.com"), det.dest_flows)
+        self.assertEqual(det.stats["dropped_keys"], 0)
+        self.assertEqual(det.stats["fed"], 12)
+
+    def test_empty_keys_recycled_after_prune(self):
+        det = BehaviorDetector()
+        det.feed(self._flow("10.0.0.9", "x.example.com", ts=0.0), now=100_000.0)
+        self.assertNotIn("10.0.0.9", det.device_flows,
+                         "记录被裁空后应回收键，别空占上限名额")
+        self.assertNotIn(("10.0.0.9", "x.example.com"), det.dest_flows)
+
+    def test_reset_clears_drop_counter_and_warning(self):
+        det = BehaviorDetector(max_tracked_keys=2)
+        det.feed(self._flow("10.0.0.1", "a.example.com"), now=1000.0)
+        det.feed(self._flow("10.0.0.2", "b.example.com"), now=1000.0)
+        det.feed(self._flow("10.0.0.3", "c.example.com"), now=1000.0)
+        self.assertGreater(det.stats["dropped_keys"], 0)
+        det.reset()
+        self.assertEqual(det.stats["dropped_keys"], 0)
+        self.assertFalse(det._keys_warned)
 
 
 if __name__ == "__main__":

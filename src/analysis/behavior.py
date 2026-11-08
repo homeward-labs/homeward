@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -31,6 +32,13 @@ from rule_engine.engine import (
 )
 
 DEFAULT_WINDOW_SECONDS = 3600.0
+
+# Stage 6 资源上限：两个观测池的「键总数」上限（与 ingest.py 的 LRU 4096 对齐）。
+# deque(maxlen) 只限制单个键里的记录数；伪造海量源 IP / 子域会不断新建键，
+# 而 _prune 只裁旧记录、从不删键，长时间运行或日志投毒可持续吃内存。
+MAX_TRACKED_KEYS = 4096
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -114,6 +122,7 @@ class BehaviorDetector:
         matcher: Optional[BehaviorMatcher] = None,
         attribution=None,
         max_records: int = 2000,
+        max_tracked_keys: int = MAX_TRACKED_KEYS,
     ):
         # required=False：社区版默认不内置知识库数据，缺 behaviors.json 时
         # 退化为空规则集（不崩溃），与 main.py 启动路径的容错策略保持一致。
@@ -124,6 +133,8 @@ class BehaviorDetector:
         if self.attribution is not None and self.matcher.attribution is None:
             self.matcher.attribution = self.attribution
         self.max_records = int(max_records)
+        self.max_tracked_keys = max(1, int(max_tracked_keys))
+        self._keys_warned = False
         self.rules = list(self.matcher.supported_rules)
 
         # retention 是 FIFO 观测池的裁剪阈值 —— 只看 rule_engine 常规规则的
@@ -137,11 +148,11 @@ class BehaviorDetector:
         ]
         self.retention_seconds = max(windows) if windows else DEFAULT_WINDOW_SECONDS
 
-        # 两个粒度的观测池，都是 FIFO 有界队列
+        # 两个粒度的观测池，都是 FIFO 有界队列；键总数另受 max_tracked_keys 约束
         self.device_flows: dict[str, deque] = {}
         self.dest_flows: dict[tuple[str, str], deque] = {}
 
-        self.stats = {"fed": 0, "scans": 0, "findings": 0}
+        self.stats = {"fed": 0, "scans": 0, "findings": 0, "dropped_keys": 0}
 
     # ---------------------------------------------------------------- 喂数据
 
@@ -156,6 +167,10 @@ class BehaviorDetector:
         self.stats["fed"] += 1
         ts = now if now is not None else flow.timestamp
 
+        # Stage 6：新建键前先过总量闸门；满表丢新键，不做 O(n) 淘汰（热路径）。
+        if flow.src_ip not in self.device_flows and not self._new_key_allowed():
+            return
+
         bucket = self.device_flows.get(flow.src_ip)
         if bucket is None:
             bucket = deque(maxlen=self.max_records)
@@ -166,12 +181,25 @@ class BehaviorDetector:
         if dest:
             key = (flow.src_ip, dest)
             d_bucket = self.dest_flows.get(key)
-            if d_bucket is None:
+            if d_bucket is None and self._new_key_allowed():
                 d_bucket = deque(maxlen=self.max_records)
                 self.dest_flows[key] = d_bucket
-            d_bucket.append(flow)
+            if d_bucket is not None:
+                d_bucket.append(flow)
 
         self._prune(flow.src_ip, dest, ts)
+
+    def _new_key_allowed(self) -> bool:
+        """键总数是否还有余量；满表时丢新键并计数，只告警一次。"""
+        if len(self.device_flows) + len(self.dest_flows) < self.max_tracked_keys:
+            return True
+        self.stats["dropped_keys"] += 1
+        if not self._keys_warned:
+            self._keys_warned = True
+            logger.warning(
+                "行为观测池键数达上限（%d），后续新设备/新去向不再建键；"
+                "详情见 tracked_keys()", self.max_tracked_keys)
+        return False
 
     def _prune(self, src_ip: str, dest: str, now: float) -> None:
         """丢掉超出最长窗口的旧记录，避免内存随运行时间线性膨胀"""
@@ -181,6 +209,15 @@ class BehaviorDetector:
                 continue
             while bucket and bucket[0].timestamp < cutoff:
                 bucket.popleft()
+
+        # Stage 6：记录裁完后回收空键，别让空 deque 一直占着上限名额
+        dev = self.device_flows.get(src_ip)
+        if dev is not None and not dev:
+            del self.device_flows[src_ip]
+        dkey = (src_ip, dest)
+        dst = self.dest_flows.get(dkey)
+        if dst is not None and not dst:
+            del self.dest_flows[dkey]
 
     def feed_many(self, flows, now: Optional[float] = None) -> None:
         for flow in flows:
@@ -402,4 +439,5 @@ class BehaviorDetector:
     def reset(self) -> None:
         self.device_flows.clear()
         self.dest_flows.clear()
-        self.stats = {"fed": 0, "scans": 0, "findings": 0}
+        self.stats = {"fed": 0, "scans": 0, "findings": 0, "dropped_keys": 0}
+        self._keys_warned = False
