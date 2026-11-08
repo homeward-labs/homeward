@@ -53,13 +53,9 @@ class BodyLimitTest(unittest.TestCase):
             h = _FakeHandler(raw)
             self.assertEqual(ui_server.HomewardHandler._read_body_bytes(h), b"")
 
-    def test_dispatch_maps_oversize_to_413(self):
-        # 静态检查 _dispatch 的 413 分支存在且带统一错误码
-        import inspect
-        src = inspect.getsource(ui_server.HomewardHandler._dispatch)
-        self.assertIn("except PayloadTooLarge", src)
-        self.assertIn("413", src)
-        self.assertIn("payload_too_large", src)
+    # 413 分支改由 tests/test_stage6_body_limit_http.py 真实 HTTP 回环验证
+    # （真起 127.0.0.1 服务并断言状态码）；原先基于 inspect.getsource 的
+    # 源码字符串断言不构成行为覆盖，第 400 批删除。
 
 
 class IpCacheBoundTest(unittest.TestCase):

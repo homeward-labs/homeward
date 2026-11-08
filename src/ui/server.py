@@ -136,21 +136,46 @@ EDITION_INFO = {
 
 MAX_EXPORT_CELL = 256
 
+#: 单个输入字符 -> 完整转义单元。必须「一次遍历、按单元输出」，不能串行
+#: str.replace()：否则新增的 & 会被后续规则二次转义，输入自带的反斜杠也会
+#: 与 | -> \\| 的反斜杠互相干扰（第 400 批修复的表格列注入绕过）。
+_MD_ESCAPE_UNITS = {
+    "\\": "\\\\",
+    "&": "&amp;",
+    "\r": " ",
+    "\n": " ",
+    "|": "\\|",
+    "`": "\\`",
+    "<": "&lt;",
+    ">": "&gt;",
+}
+
 
 def _md_escape(v, limit: int = MAX_EXPORT_CELL) -> str:
     """Markdown 导出的外部值转义：限长 + 折行 + 表格/代码/HTML 元字符中和。
 
     只作用于来自 DNS / DHCP / conntrack / 告警的可控字符串；内部数值与时间
     不经过这里，保证正常报告的渲染逐字节不变。JSON 分支走 json.dumps，天然安全。
+
+    输出按「完整转义单元」累计长度并在单元边界停止：既防止 < 与 & 经实体
+    转义膨胀后突破 MAX_EXPORT_CELL，也不会把截断落在转义单元中间留下残缺
+    实体或悬空反斜杠（后者会转义掉紧随其后的表格列分隔符）。末尾预留一个
+    字符放省略号；正常短值逐字节不变。
     """
     s = "" if v is None else str(v)
-    if limit and len(s) > limit:
-        s = s[:limit] + "…"
-    s = s.replace("\r", " ").replace("\n", " ")
-    s = s.replace("|", "\\|")
-    s = s.replace("`", "\\`")
-    s = s.replace("<", "&lt;").replace(">", "&gt;")
-    return s
+    if not limit:
+        return "".join(_MD_ESCAPE_UNITS.get(ch, ch) for ch in s)
+    out = []
+    used = 0
+    budget = limit - 1  # 预留省略号
+    for ch in s:
+        unit = _MD_ESCAPE_UNITS.get(ch, ch)
+        if used + len(unit) > budget:
+            out.append("…")
+            break
+        out.append(unit)
+        used += len(unit)
+    return "".join(out)
 
 
 def _report_markdown(payload: dict) -> str:

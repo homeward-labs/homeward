@@ -222,5 +222,70 @@ class TestCrashRecovery(unittest.TestCase):
         self.assertFalse(u.recover_if_interrupted())
 
 
+class TestCrashRecoveryHardening(unittest.TestCase):
+    """第 400 批：残留精确匹配、迭代期 IO 容错、marker 写失败 fail-closed。"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.kb = self.root / "kb"
+        self.stage = self.root / "stage"
+        self.kb.mkdir()
+        self.stage.mkdir()
+        (self.kb / "domains.csv").write_bytes(b"OLD-DOMAINS")
+        (self.kb / "behaviors.json").write_bytes(b"OLD-BEHAVIORS")
+        (self.stage / "domains.csv").write_bytes(b"NEW-DOMAINS")
+        (self.stage / "behaviors.json").write_bytes(b"NEW-BEHAVIORS")
+        self.u = KnowledgeBaseUpdater(kb_dir=str(self.kb))
+        self.files = ["domains.csv", "behaviors.json"]
+        self.marker = self.kb / UPDATE_MARKER_FILENAME
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_recovery_only_removes_own_swap_residue(self):
+        self.marker.write_text("interrupted_replace test\n", encoding="utf-8")
+        own = self.kb / ".domains.csv.hwswap-deadbeef"
+        own.write_bytes(b"PARTIAL")
+        decoys = [
+            "domains.csv.hwswap-backup",          # 无前导点
+            ".domains.csv.hwswap-1234567",        # 7 位
+            ".domains.csv.hwswap-123456789",      # 9 位
+            ".domains.csv.hwswap-ghijklmn",       # 非 hex 字符
+            ".domains.csv.hwswap-deadbeef.txt",   # 多余尾缀
+            "notes-hwswap-todo.txt",              # 完全无关
+        ]
+        for name in decoys:
+            (self.kb / name).write_bytes(b"KEEP")
+        self.assertTrue(self.u.recover_if_interrupted())
+        self.assertFalse(own.exists())
+        for name in decoys:
+            self.assertTrue((self.kb / name).exists(), "误删非本流程文件: " + name)
+        self.assertFalse(self.marker.exists())
+
+    def test_recovery_tolerates_iterdir_io_error(self):
+        self.marker.write_text("x\n", encoding="utf-8")
+        with mock.patch.object(Path, "iterdir",
+                               side_effect=OSError("simulated IO failure")):
+            self.assertFalse(self.u.recover_if_interrupted())
+        # 检测失败时保留标记，下次启动再试
+        self.assertTrue(self.marker.exists())
+
+    def test_marker_write_failure_fails_closed(self):
+        real_write_text = Path.write_text
+
+        def deny_marker(path_obj, *a, **kw):
+            if path_obj.name == UPDATE_MARKER_FILENAME:
+                raise OSError("simulated read-only kb dir")
+            return real_write_text(path_obj, *a, **kw)
+
+        with mock.patch.object(Path, "write_text", deny_marker):
+            ok = self.u._replace_all_atomic(self.stage, self.files)
+        self.assertFalse(ok)
+        self.assertEqual((self.kb / "domains.csv").read_bytes(), b"OLD-DOMAINS")
+        self.assertEqual((self.kb / "behaviors.json").read_bytes(), b"OLD-BEHAVIORS")
+        self.assertFalse(list(self.kb.glob(".*.hwswap-*")))
+        self.assertFalse(self.marker.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

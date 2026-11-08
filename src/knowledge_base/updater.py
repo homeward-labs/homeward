@@ -66,6 +66,11 @@ _KB_REPLACE_LOCK = threading.Lock()
 #: 下次启动由 recover_if_interrupted() 检出。内容只含随机 id，绝不含密钥或凭据。
 UPDATE_MARKER_FILENAME = ".update_in_progress"
 
+#: 只匹配 _replace_all_atomic() 自己生成的暂存文件：
+#: `.{fname}.hwswap-{8 位小写 hex}`。宽匹配（如 *hwswap-*）会误删
+#: kb_dir 内同名的手工备份或说明文件。
+_SWAP_RESIDUE_RE = re.compile(r"\..+\.hwswap-[0-9a-f]{8}\Z")
+
 
 def _http_get(url: str, timeout: int) -> bytes:
     """带产品 UA 的 GET。Cloudflare（及部分 CDN）会 403 掉默认 ``Python-urllib`` UA。"""
@@ -371,33 +376,42 @@ class KnowledgeBaseUpdater:
     def recover_if_interrupted(self) -> bool:
         """启动时检出上次 KB 替换是否被强杀 / 断电打断。
 
-        只做「检测 + 清理 .hwswap-* 残留 + 告警 + 删标记」四件事：
+        只做「检测 + 清理本流程生成的 .hwswap- 暂存残留 + 告警 + 删标记」四件事：
         **不联网、不重下、不自动回滚**。内存中的 backups 在进程消失时已丢失，
         半写态必须由人工核对 KB 的 VERSION / CHECKSUM 完整性后决定处置；
         默认不联网的知识库策略不因恢复流程而改变。幂等，可重复调用。
 
         返回是否确实检出过中断标记。
         """
-        if not self.kb_dir.is_dir():
-            return False
-        marker = self.kb_dir / UPDATE_MARKER_FILENAME
-        if not marker.exists():
-            return False
-        cleaned = 0
-        for residue in self.kb_dir.glob("*hwswap-*"):
+        try:
+            if not self.kb_dir.is_dir():
+                return False
+            marker = self.kb_dir / UPDATE_MARKER_FILENAME
+            if not marker.exists():
+                return False
+            cleaned = 0
+            # iterdir() 是惰性迭代，OSError 可能在迭代途中抛出；连同
+            # is_dir() 与 exists() 一起包住，保证启动期的恢复检测不拖垮服务。
+            for residue in self.kb_dir.iterdir():
+                if not _SWAP_RESIDUE_RE.fullmatch(residue.name):
+                    continue
+                try:
+                    residue.unlink()
+                    cleaned += 1
+                except OSError:
+                    pass
+            print("[KB Update] 检出上次更新被中断（%s）；已清理 %d 个残留临时文件。"
+                  "未联网重下、未自动回滚，请人工核对 KB 的 VERSION / CHECKSUM 完整性。"
+                  % (UPDATE_MARKER_FILENAME, cleaned))
             try:
-                residue.unlink()
-                cleaned += 1
+                marker.unlink(missing_ok=True)
             except OSError:
                 pass
-        print("[KB Update] 检出上次更新被中断（%s）；已清理 %d 个残留临时文件。"
-              "未联网重下、未自动回滚，请人工核对 KB 的 VERSION / CHECKSUM 完整性。"
-              % (UPDATE_MARKER_FILENAME, cleaned))
-        try:
-            marker.unlink(missing_ok=True)
-        except OSError:
-            pass
-        return True
+            return True
+        except OSError as ie:
+            # 检测失败时保留标记，下次启动再试；不联网、不重下、不改 KB。
+            print(f"[KB Update] 恢复检测遇到 IO 错误，已跳过（标记保留）：{ie}")
+            return False
 
     def _load_kek(self) -> bytes | None:
         """加载解密主密钥 KEK（仅闭源私有构建经 HOMEWARD_KB_DECRYPT_KEY 注入）。
