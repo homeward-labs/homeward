@@ -14,7 +14,10 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from knowledge_base.updater import KnowledgeBaseUpdater  # noqa: E402
+from knowledge_base.updater import (  # noqa: E402
+    KnowledgeBaseUpdater,
+    UPDATE_MARKER_FILENAME,
+)
 
 
 def _sha(blob: bytes) -> str:
@@ -140,6 +143,83 @@ class TestAtomicReplace(unittest.TestCase):
         self.assertEqual((self.kb / "domains.csv").read_bytes(), b"OLD-DOMAINS")
         self.assertFalse((self.kb / "asn.csv").exists())
         self.assertEqual(list(self.kb.glob("*.hwswap-*")), [])
+
+
+class TestCrashRecovery(unittest.TestCase):
+    """Stage 6：崩溃恢复标记（只检测/清理/告警，绝不联网重下或自动回滚）"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.kb = self.root / "kb"
+        self.stage = self.root / "stage"
+        self.kb.mkdir()
+        self.stage.mkdir()
+        (self.kb / "domains.csv").write_bytes(b"OLD-DOMAINS")
+        (self.kb / "behaviors.json").write_bytes(b"OLD-BEHAVIORS")
+        (self.stage / "domains.csv").write_bytes(b"NEW-DOMAINS")
+        (self.stage / "behaviors.json").write_bytes(b"NEW-BEHAVIORS")
+        self.u = KnowledgeBaseUpdater(kb_dir=str(self.kb))
+        self.files = ["domains.csv", "behaviors.json"]
+        self.marker = self.kb / UPDATE_MARKER_FILENAME
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_success_removes_marker(self):
+        self.assertTrue(self.u._replace_all_atomic(self.stage, self.files))
+        self.assertFalse(self.marker.exists())
+
+    def test_rollback_removes_marker(self):
+        real_replace = os.replace
+        calls = {"n": 0}
+
+        def flaky(src, dst):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise OSError("simulated disk failure")
+            return real_replace(src, dst)
+
+        with mock.patch("knowledge_base.updater.os.replace", side_effect=flaky):
+            ok = self.u._replace_all_atomic(self.stage, self.files)
+        self.assertFalse(ok)
+        self.assertFalse(self.marker.exists())
+        self.assertEqual((self.kb / "domains.csv").read_bytes(), b"OLD-DOMAINS")
+
+    def test_marker_present_during_replace_window(self):
+        seen = []
+        real_replace = os.replace
+
+        def probe(src, dst):
+            seen.append(self.marker.exists())
+            return real_replace(src, dst)
+
+        with mock.patch("knowledge_base.updater.os.replace", side_effect=probe):
+            self.assertTrue(self.u._replace_all_atomic(self.stage, self.files))
+        self.assertEqual(seen, [True, True], "每次 os.replace 时标记都应存在")
+        self.assertFalse(self.marker.exists())
+
+    def test_recovery_cleans_marker_and_swap_residue_without_network(self):
+        self.marker.write_text("interrupted_replace test\n", encoding="utf-8")
+        residue = self.kb / ".domains.csv.hwswap-deadbeef"
+        residue.write_bytes(b"PARTIAL")
+        with mock.patch("knowledge_base.updater.urlopen") as net:
+            self.assertTrue(self.u.recover_if_interrupted())
+            net.assert_not_called()
+        self.assertFalse(self.marker.exists())
+        self.assertFalse(residue.exists())
+        self.assertEqual((self.kb / "domains.csv").read_bytes(), b"OLD-DOMAINS",
+                         "恢复不得改动既有 KB 文件（不自动回滚/重下）")
+        self.assertEqual((self.kb / "behaviors.json").read_bytes(), b"OLD-BEHAVIORS")
+
+    def test_recovery_is_idempotent_and_noop_without_marker(self):
+        self.assertFalse(self.u.recover_if_interrupted())
+        self.marker.write_text("x\n", encoding="utf-8")
+        self.assertTrue(self.u.recover_if_interrupted())
+        self.assertFalse(self.u.recover_if_interrupted())
+
+    def test_recovery_tolerates_missing_kb_dir(self):
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root / "nonexistent"))
+        self.assertFalse(u.recover_if_interrupted())
 
 
 if __name__ == "__main__":

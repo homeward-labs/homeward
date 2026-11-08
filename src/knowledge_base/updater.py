@@ -61,6 +61,11 @@ USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
 #: 知识库替换互斥：避免两个更新线程同时换入同一份 KB 造成半新半旧。
 _KB_REPLACE_LOCK = threading.Lock()
 
+#: Stage 6 崩溃恢复标记：进入「逐个 os.replace」的半写窗口前写下，正常/异常/回滚
+#: 三条路径都在 finally 删除。进程被强杀或断电时 except 不会执行，标记会残留，
+#: 下次启动由 recover_if_interrupted() 检出。内容只含随机 id，绝不含密钥或凭据。
+UPDATE_MARKER_FILENAME = ".update_in_progress"
+
 
 def _http_get(url: str, timeout: int) -> bytes:
     """带产品 UA 的 GET。Cloudflare（及部分 CDN）会 403 掉默认 ``Python-urllib`` UA。"""
@@ -321,6 +326,17 @@ class KnowledgeBaseUpdater:
                     swap = self.kb_dir / f".{fname}.hwswap-{uuid.uuid4().hex[:8]}"
                     shutil.copyfile(str(src), str(swap))
                     staged.append((dst, swap, fname))
+                # Stage 6：进入半写窗口前留标记；写不上就拒绝替换（fail-closed），
+                # 避免留下「无标记可检测」的半新半旧状态。
+                marker = self.kb_dir / UPDATE_MARKER_FILENAME
+                try:
+                    marker.write_text(
+                        "interrupted_replace %s\n" % uuid.uuid4().hex[:16],
+                        encoding="utf-8")
+                except OSError as me:
+                    print(f"[KB Update] 无法写入更新标记，跳过本次替换：{me}")
+                    return False
+
                 # 全部备妥后才开始换入，缩短半新半旧窗口
                 for dst, swap, fname in staged:
                     backups[fname] = dst.read_bytes() if dst.exists() else None
@@ -339,11 +355,48 @@ class KnowledgeBaseUpdater:
             print(f"[KB Update] 替换中断，已回滚，保持原知识库不变：{exc}")
             return False
         finally:
+            # 成功、异常回滚、标记写入失败三条路径都要清标记；进程被强杀时
+            # 走不到这里，残留标记由 recover_if_interrupted() 在下次启动处理。
+            try:
+                (self.kb_dir / UPDATE_MARKER_FILENAME).unlink(missing_ok=True)
+            except OSError:
+                pass
             for _, swap, _ in staged:
                 try:
                     swap.unlink(missing_ok=True)
                 except OSError:
                     pass
+        return True
+
+    def recover_if_interrupted(self) -> bool:
+        """启动时检出上次 KB 替换是否被强杀 / 断电打断。
+
+        只做「检测 + 清理 .hwswap-* 残留 + 告警 + 删标记」四件事：
+        **不联网、不重下、不自动回滚**。内存中的 backups 在进程消失时已丢失，
+        半写态必须由人工核对 KB 的 VERSION / CHECKSUM 完整性后决定处置；
+        默认不联网的知识库策略不因恢复流程而改变。幂等，可重复调用。
+
+        返回是否确实检出过中断标记。
+        """
+        if not self.kb_dir.is_dir():
+            return False
+        marker = self.kb_dir / UPDATE_MARKER_FILENAME
+        if not marker.exists():
+            return False
+        cleaned = 0
+        for residue in self.kb_dir.glob("*hwswap-*"):
+            try:
+                residue.unlink()
+                cleaned += 1
+            except OSError:
+                pass
+        print("[KB Update] 检出上次更新被中断（%s）；已清理 %d 个残留临时文件。"
+              "未联网重下、未自动回滚，请人工核对 KB 的 VERSION / CHECKSUM 完整性。"
+              % (UPDATE_MARKER_FILENAME, cleaned))
+        try:
+            marker.unlink(missing_ok=True)
+        except OSError:
+            pass
         return True
 
     def _load_kek(self) -> bytes | None:

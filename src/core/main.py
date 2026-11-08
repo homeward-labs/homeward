@@ -211,6 +211,9 @@ class HomewardService:
             auto_update=self.config.get("kb_auto_update", False),
             interval=self.config.get("kb_update_interval", 604800),
         )
+        # Stage 6：上次 KB 替换若在半写窗口被强杀/断电，构造时只检测与清理，
+        # 不联网重下、不自动回滚；不挂 start()（async 且 run_server 从不调用）。
+        self.kb_updater.recover_if_interrupted()
 
         # 建议阻断队列（社区版只产出"建议"，从不产生已生效的阻断规则）
         self.suggested_rules: list[dict] = []
