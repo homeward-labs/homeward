@@ -36,9 +36,15 @@ class TestChecksumFname(unittest.TestCase):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def test_valid_fname_passes(self):
+        # 本用例验的是「合法文件名放行」，不是覆盖集判定；清单必须写全 required
+        # 文件（2026-11-12 起客户端要求 CHECKSUM 覆盖集 ⊇ REQUIRED_FILES，漏行即拒）。
         (self.root / "domains.csv").write_bytes(b"ok")
+        (self.root / "behaviors.json").write_bytes(b"{}")
         self.assertTrue(
-            self.u._verify_checksum(self.root, _sha(b"ok") + "  domains.csv\n")
+            self.u._verify_checksum(
+                self.root,
+                _sha(b"ok") + "  domains.csv\n" + _sha(b"{}") + "  behaviors.json\n",
+            )
         )
 
     def test_hash_mismatch_rejected(self):
