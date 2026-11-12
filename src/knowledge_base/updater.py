@@ -553,16 +553,16 @@ class KnowledgeBaseUpdater:
         签名是对 ``CHECKSUM`` 内容的 Ed25519 签名（由闭源侧的 ``make_kb_source.py --sign`` 生成）。
         返回 True=可继续替换；False=应拒绝替换。
 
-        降级策略由 ``HOMEWARD_KB_REQUIRE_SIGNATURE`` 控制：
-          - 未设 / 非真值：无签名、公钥缺失、或验签失败**仅告警**，仍允许更新
-            （开发/测试期默认，避免本地源还没签名就被卡死）；
-          - 设为 1/true/yes：无签名或验签失败**一律拒绝更新**。
+        策略由 ``HOMEWARD_KB_REQUIRE_SIGNATURE`` 控制，**默认强制验签（fail-closed）**：
+          - 未设 / 1 / true / yes：无签名、公钥缺失、或验签失败**一律拒绝更新**
+            （2026-11-12 起由观测期切到强制期）；
+          - 显式设 0 / false / no：降级为**仅告警**，仍允许更新（离线/开发自测用）。
         """
-        require = os.environ.get(self.ENV_REQUIRE_SIG, "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        # 2026-11-12 起默认强制验签（fail-closed）：只有显式关掉才降级为告警。
+        # 理由：内容源已在客户端统一带 KB 令牌头（403 已纳入异常面），签名是第二道门，
+        # 观测期（未设=放行）已跑满一轮，继续放行等于门禁形同虚设。
+        _raw = os.environ.get(self.ENV_REQUIRE_SIG, "1").strip().lower()
+        require = _raw not in ("0", "false", "no")
         try:
             from license.ed25519 import verify_signature
         except Exception:

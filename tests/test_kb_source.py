@@ -164,10 +164,17 @@ class TestUpdateLoop(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
         self.servers: list[_Server] = []
+        # 2026-11-12：签名门默认改强制验签。本类验的是「源没有 SIGNATURE 时的更新闭环」，
+        # 显式关掉强制验签以保留原用例语义（签名相关另见 TestSignature）。
+        self._old_req = os.environ.get("HOMEWARD_KB_REQUIRE_SIGNATURE")
+        os.environ["HOMEWARD_KB_REQUIRE_SIGNATURE"] = "0"
 
     def tearDown(self):
         for s in self.servers:
             s.stop()
+        os.environ.pop("HOMEWARD_KB_REQUIRE_SIGNATURE", None)
+        if self._old_req is not None:
+            os.environ["HOMEWARD_KB_REQUIRE_SIGNATURE"] = self._old_req
         shutil.rmtree(self.root, ignore_errors=True)
 
     def _serve(self, directory: Path) -> str:
@@ -284,6 +291,8 @@ class TestDomesticBackup(unittest.TestCase):
         self.servers: list[_Server] = []
         self._old_env = os.environ.get(ENV)
         os.environ.pop(ENV, None)
+        self._old_req = os.environ.get("HOMEWARD_KB_REQUIRE_SIGNATURE")
+        os.environ["HOMEWARD_KB_REQUIRE_SIGNATURE"] = "0"  # 本类源无签名，显式走降级
         import knowledge_base.updater as _upd
 
         self._upd = _upd
@@ -297,6 +306,9 @@ class TestDomesticBackup(unittest.TestCase):
         os.environ.pop(ENV, None)
         if self._old_env is not None:
             os.environ[ENV] = self._old_env
+        os.environ.pop("HOMEWARD_KB_REQUIRE_SIGNATURE", None)
+        if getattr(self, "_old_req", None) is not None:
+            os.environ["HOMEWARD_KB_REQUIRE_SIGNATURE"] = self._old_req
         self._upd.KB_SOURCE_BACKUP_URLS = self._old_backups
         KnowledgeBaseUpdater.DEFAULT_REPO = self._old_default_repo
         shutil.rmtree(self.root, ignore_errors=True)
@@ -413,11 +425,13 @@ class TestSignature(unittest.TestCase):
         from license.ed25519 import sign_message
 
         src = make_source(self.root / "src", version=version)
-        checksum = (src / "CHECKSUM").read_text(encoding="utf-8")
+        # 必须按字节签名：服务器返回的是文件原始字节，read_text 的通用换行会
+        # 把 CRLF 折成 LF，导致改强制验签后验签必然失败（2026-11-12 实测）。
+        checksum = (src / "CHECKSUM").read_bytes()
         if tamper:
             sig = sign_message(b"tampered", self.seed)
         else:
-            sig = sign_message(checksum.encode("utf-8"), self.seed)
+            sig = sign_message(checksum, self.seed)
         (src / "SIGNATURE").write_text(sig.hex() + "\n", encoding="utf-8")
         return src
 
@@ -439,7 +453,8 @@ class TestSignature(unittest.TestCase):
         self.assertEqual((kb / "domains.csv").read_text(), "keepme\n")
 
     def test_absent_signature_warns_when_not_required(self):
-        """降级模式：无签名仅告警，仍允许更新"""
+        """降级模式：无签名仅告警，仍允许更新（需显式关掉强制验签）"""
+        os.environ[self.ENV_REQ] = "0"
         src = make_source(self.root / "src")
         kb = make_kb(self.root / "kb")
         base = self._serve(src)
