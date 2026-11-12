@@ -646,6 +646,7 @@ class KnowledgeBaseUpdater:
             base = directory.resolve()
         except OSError:
             return False
+        seen: set[str] = set()
         for line in expected.strip().split("\n"):
             parts = line.split()
             if len(parts) != 2:
@@ -666,6 +667,14 @@ class KnowledgeBaseUpdater:
             actual = hashlib.sha256(fpath.read_bytes()).hexdigest()
             if actual != expected_hash:
                 return False
+            seen.add(fname)
+        # D1 铁律：CHECKSUM 覆盖集必须「等于」客户端下载集。只校验列出来的行是
+        # 漏行即跳过的假绿——远端少写一行 required，客户端照样判通过，等于
+        # 让「删掉 behaviors.json 的清单」蒙混过关（2026-11-12 由 a2 自检照出）。
+        missing = [f for f in self.REQUIRED_FILES if f not in seen]
+        if missing:
+            print(f"[KB Update] CHECKSUM 未覆盖必需文件，拒绝更新：{missing}")
+            return False
         return True
 
     # 这里**刻意不提供**任何"回传用户数据"的方法。
