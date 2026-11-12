@@ -11,7 +11,7 @@ import tempfile
 import threading
 import uuid
 from pathlib import Path
-from urllib.request import Request, urlopen
+from urllib.request import HTTPError, Request, urlopen
 
 #: 客户端 UA。Cloudflare 边缘默认拦截 ``Python-urllib`` UA（403），
 #: 必须用可识别的产品 UA 访问自建内容源（Cloudflare Worker 等）。
@@ -58,6 +58,24 @@ except Exception:
 
 USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
 
+#: 内容源门禁口令的环境变量名。值取自私有侧 deploy.env 的 KB_ACCESS_TOKEN，
+#: 由启动方注入进程环境；本仓不保存、不记录、不回显任何口令值。
+KB_TOKEN_ENV = "HOMEWARD_KB_TOKEN"
+
+
+class KBAuthDenied(RuntimeError):
+    """内容源门禁拒绝（HTTP 403）。
+
+    Worker 侧比对 ``X-Homeward-KB-Token`` 与 ``KB_ACCESS_TOKEN``，不一致即 403。
+    只在「确认是门禁拒绝」时抛出，**不降级、不重试**：不许把凭据问题伪装成
+    「源不可用 / 已是最新」。
+    """
+
+
+def _kb_token() -> str:
+    """读取注入的门禁口令；未配置返回空串（请求不带该头，随后 403 会被显式报出）。"""
+    return (os.environ.get(KB_TOKEN_ENV, "") or "").strip()
+
 #: 知识库替换互斥：避免两个更新线程同时换入同一份 KB 造成半新半旧。
 _KB_REPLACE_LOCK = threading.Lock()
 
@@ -73,10 +91,27 @@ _SWAP_RESIDUE_RE = re.compile(r"\..+\.hwswap-[0-9a-f]{8}\Z")
 
 
 def _http_get(url: str, timeout: int) -> bytes:
-    """带产品 UA 的 GET。Cloudflare（及部分 CDN）会 403 掉默认 ``Python-urllib`` UA。"""
-    req = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+    """带产品 UA + 门禁口令的 GET。
+
+    Cloudflare 会 403 掉默认 ``Python-urllib`` UA；内容源 Worker 还要校验
+    ``X-Homeward-KB-Token``。口令为空时照常发请求（只是不带该头），403 一律
+    转成 :class:`KBAuthDenied` 向上冒泡，**不在此处吞掉**。
+    """
+    headers = {"User-Agent": USER_AGENT}
+    token = _kb_token()
+    if token:
+        headers["X-Homeward-KB-Token"] = token
+    req = Request(url, headers=headers)
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.read()
+    except HTTPError as e:
+        if e.code == 403:
+            raise KBAuthDenied(
+                "内容源门禁拒绝（403）：请设置环境变量 "
+                f"{KB_TOKEN_ENV}（值取自 deploy.env 的 KB_ACCESS_TOKEN）"
+            ) from e
+        raise
 
 
 def _version_key(version: str) -> tuple:
@@ -171,12 +206,21 @@ class KnowledgeBaseUpdater:
 
     def check_and_update(self) -> bool:
         """检查并更新知识库（多源兜底）。返回是否更新了新数据。"""
+        denied: list[str] = []
         for url in self.repo_urls:
             try:
                 if self._try_update_from(url):
                     return True
+            except KBAuthDenied as e:
+                denied.append(url)
+                print(f"[KB Update] 门禁拒绝（{url}）：{e}")
             except Exception as e:
                 print(f"[KB Update] 源 {url} 更新异常：{e}")
+        if denied and len(denied) == len(self.repo_urls):
+            raise KBAuthDenied(
+                "所有内容源均返回 403：检查 HOMEWARD_KB_TOKEN 是否与 Worker 的 "
+                "KB_ACCESS_TOKEN 一致"
+            )
         return False
 
     def _try_update_from(self, url: str) -> bool:
@@ -240,6 +284,8 @@ class KnowledgeBaseUpdater:
         """获取远程版本号"""
         try:
             return _http_get(f"{url}/{VERSION_FILE}", 10).decode().strip()
+        except KBAuthDenied:
+            raise
         except Exception as e:
             print(f"[KB Update] 获取 VERSION 失败（{url}）：{e}")
             return None
@@ -298,6 +344,8 @@ class KnowledgeBaseUpdater:
                 if not self._verify_checksum(tmpdir, expected):
                     print("[KB Update] Checksum mismatch, aborting")
                     return False
+            except KBAuthDenied:
+                raise
             except Exception:
                 pass  # 校验文件不存在则跳过
 
@@ -463,11 +511,15 @@ class KnowledgeBaseUpdater:
                 enc = _http_get(f"{url}/{fname}.enc", 30)
                 dst.write_bytes(self._decrypt(enc, kek, fname))
                 return True
+            except KBAuthDenied:
+                raise
             except Exception as e:
                 print(f"[KB Update] 加密源 {fname}.enc 获取/解密失败，回退明文：{e}")
         try:
             dst.write_bytes(_http_get(f"{url}/{fname}", 30))
             return True
+        except KBAuthDenied:
+            raise
         except Exception as e:
             print(f"[KB Update] 文件下载失败：{fname} ({e})")
             return False
@@ -540,6 +592,8 @@ class KnowledgeBaseUpdater:
         sig_url = f"{url}/{self.SIGNATURE_FILENAME}"
         try:
             sig_hex = _http_get(sig_url, 10).decode("utf-8").strip()
+        except KBAuthDenied:
+            raise
         except Exception:
             print(f"[KB Update] 内容源未提供签名文件（{self.SIGNATURE_FILENAME}）")
             if require:

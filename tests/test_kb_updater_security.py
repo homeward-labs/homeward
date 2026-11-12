@@ -14,6 +14,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from knowledge_base import updater as kb_updater  # noqa: E402
 from knowledge_base.updater import (  # noqa: E402
     KnowledgeBaseUpdater,
     UPDATE_MARKER_FILENAME,
@@ -285,6 +286,98 @@ class TestCrashRecoveryHardening(unittest.TestCase):
         self.assertEqual((self.kb / "behaviors.json").read_bytes(), b"OLD-BEHAVIORS")
         self.assertFalse(list(self.kb.glob(".*.hwswap-*")))
         self.assertFalse(self.marker.exists())
+
+
+class TestKbTokenGate(unittest.TestCase):
+    """内容源门禁（X-Homeward-KB-Token / 403）：口令必须出示，403 必须显式失败。"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_http_get_sends_token_header_when_env_set(self):
+        captured = {}
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b"OK"
+
+        def fake_urlopen(req, timeout=None):
+            captured["headers"] = {str(k).lower(): str(v) for k, v in dict(req.header_items()).items()}
+            return _Resp()
+
+        with mock.patch.dict(os.environ, {"HOMEWARD_KB_TOKEN": "test-token-value"}):
+            with mock.patch("knowledge_base.updater.urlopen", side_effect=fake_urlopen):
+                self.assertEqual(kb_updater._http_get("http://example.invalid/v", 5), b"OK")
+
+        self.assertEqual(captured["headers"].get("x-homeward-kb-token"), "test-token-value")
+        self.assertIn("user-agent", captured["headers"])
+
+    def test_http_get_omits_token_header_when_env_missing(self):
+        captured = {}
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b"OK"
+
+        def fake_urlopen(req, timeout=None):
+            captured["headers"] = {str(k).lower(): str(v) for k, v in dict(req.header_items()).items()}
+            return _Resp()
+
+        env = {k: v for k, v in os.environ.items() if k != "HOMEWARD_KB_TOKEN"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch("knowledge_base.updater.urlopen", side_effect=fake_urlopen):
+                kb_updater._http_get("http://example.invalid/v", 5)
+
+        self.assertNotIn("x-homeward-kb-token", captured["headers"])
+
+    def test_http_get_raises_kbauthdenied_on_403(self):
+        err = kb_updater.HTTPError("http://example.invalid/v", 403, "Forbidden", {}, None)
+        with mock.patch("knowledge_base.updater.urlopen", side_effect=err):
+            with self.assertRaises(kb_updater.KBAuthDenied) as ctx:
+                kb_updater._http_get("http://example.invalid/v", 5)
+        self.assertIn("HOMEWARD_KB_TOKEN", str(ctx.exception))
+
+    def test_non_403_http_error_propagates_unchanged(self):
+        err = kb_updater.HTTPError("http://example.invalid/v", 404, "Not Found", {}, None)
+        with mock.patch("knowledge_base.updater.urlopen", side_effect=err):
+            with self.assertRaises(kb_updater.HTTPError):
+                kb_updater._http_get("http://example.invalid/v", 5)
+
+    def test_all_sources_403_raises_instead_of_silent_false(self):
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_urls=["http://a.invalid", "http://b.invalid"])
+        with mock.patch.object(u, "_try_update_from", side_effect=kb_updater.KBAuthDenied("403")):
+            with self.assertRaises(kb_updater.KBAuthDenied):
+                u.check_and_update()
+
+    def test_partial_403_still_returns_false(self):
+        u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_urls=["http://a.invalid", "http://b.invalid"])
+
+        def fake(url):
+            if url.endswith("a.invalid"):
+                raise kb_updater.KBAuthDenied("403")
+            return False
+
+        with mock.patch.object(u, "_try_update_from", side_effect=fake):
+            self.assertFalse(u.check_and_update())
+
+
+if __name__ == "__main__":
+    unittest.main()
 
 
 if __name__ == "__main__":
