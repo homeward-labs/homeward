@@ -1,0 +1,22 @@
+# 家卫 Homeward — 仅声明运行下限，非打包配置。
+#
+# 本文件只声明「最低 Python 兼容版本」，供工具链/CI 读取。
+# 刻意不含 [build-system]、[tool.setuptools]、[tool.pytest.ini_options] 或 packages 配置 ——
+# 本仓社区版运行时零第三方依赖、不依赖 packaging；多写一节就可能把 CI 或打包面改坏。
+#
+# 依据（实测 + 部署矩阵，非臆断）：
+#   · docker/Dockerfile L1 = `FROM python:3.12-slim`（生产/部署镜像 = 3.12）。
+#   · .github/workflows/*.yml 共 4 处 CI 跑 Python 3.12。
+#   · 本机开发/测试基准 = HOMEWARD_PYTHON（default env，3.13.14）。
+#   · 故声明运行下限 = 3.12；3.10/3.11 虽能跑源码（PEP 604 已在 3.10 解决），
+#     但 dev 依赖固定 numpy==2.5.4 需 Python>=3.12，部署/CI 均锚定 3.12，
+#     统一口径取 >=3.12 与 Dockerfile/CI 一致。
+#
+# ⚠ 测试注意：本仓测试必须用 HOMEWARD_PYTHON（含 segno/numpy/opencv 的
+#    default env，本机 3.13.14）复跑；仅装 pytest 会因 numpy/cv2 缺失使
+#    test_qr 多出 1 条 skip（80 而非 79）且部分用例假红。
+
+[project]
+name = "homeward"
+version = "0.1.0"
+requires-python = ">=3.12"
