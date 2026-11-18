@@ -43,6 +43,7 @@ sys.path.insert(0, str(SRC_DIR))
 from core.demo import seed_demo                    # noqa: E402
 from core.import_log import import_log_text        # noqa: E402
 from core.main import HomewardService, ROOT        # noqa: E402
+from core.ssrf_guard import SsrfError, check_url   # noqa: E402
 from ui.auth import SESSION_COOKIE, WebAuth        # noqa: E402
 from ui.qr import qr_svg, max_capacity_bytes      # noqa: E402
 from adapters.sqlite_registry import SqliteObservationStore  # noqa: E402
@@ -1045,11 +1046,39 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 obj = {}
             # 只允许 AI 相关键 + kb_source（显式白名单）
             _ALLOW = {"ai_backend", "ai_api_key", "ai_base_url", "ai_model",
+                      "ai_trusted_hosts",
                       "kb_source", "kb_auto_update", "kb_update_interval"}
             updates = {k: obj[k] for k in _ALLOW if k in obj}
             if not updates:
                 self._json(400, {"ok": False, "reason": "no_allowed_keys"})
                 return
+
+            # M1-4（待办-122）写入层收口：URL 类键先过 SSRF 守卫再落盘。
+            # ai_base_url 允许回环（本机 ollama 合法）；kb_source 只允许公网。
+            for _key, _allow_loop in (("ai_base_url", True), ("kb_source", False)):
+                _val = updates.get(_key)
+                if not _val:
+                    continue
+                if not isinstance(_val, str):
+                    self._json(400, {"ok": False, "reason": "bad_value", "key": _key})
+                    return
+                try:
+                    check_url(_val, allow_loopback=_allow_loop)
+                except SsrfError as _exc:
+                    self._json(400, {"ok": False, "reason": "url_rejected",
+                                     "key": _key, "detail": str(_exc)})
+                    return
+            # ai_trusted_hosts 归一化：字符串（逗号分隔）或列表 → 去空白小写
+            if "ai_trusted_hosts" in updates:
+                _th = updates["ai_trusted_hosts"]
+                if isinstance(_th, str):
+                    _th = [x for x in (p.strip() for p in _th.split(",")) if x]
+                elif isinstance(_th, (list, tuple)):
+                    _th = [str(x).strip() for x in _th if str(x).strip()]
+                else:
+                    self._json(400, {"ok": False, "reason": "bad_value", "key": "ai_trusted_hosts"})
+                    return
+                updates["ai_trusted_hosts"] = sorted({x.lower() for x in _th})
             _cfg_path = ROOT / "data" / "config.json"
             _cfg_path.parent.mkdir(parents=True, exist_ok=True)
             existing = {}
@@ -1073,6 +1102,7 @@ class HomewardHandler(BaseHTTPRequestHandler):
                 svc.ai.api_key = existing.get("ai_api_key")
                 svc.ai.base_url = existing.get("ai_base_url")
                 svc.ai.model = existing.get("ai_model")
+                svc.ai.trusted_hosts = tuple(existing.get("ai_trusted_hosts") or ())
             except Exception:
                 pass
             self._json(200, {"ok": True, "saved": list(updates.keys())})

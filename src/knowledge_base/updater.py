@@ -4,12 +4,14 @@
 """
 
 import hashlib
+import logging
 import os
 import re
 import shutil
 import tempfile
 import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import HTTPError, Request, urlopen
 
@@ -57,6 +59,10 @@ except Exception:
     OPTIONAL_DATA_FILES = _c_mod.OPTIONAL_DATA_FILES
 
 USER_AGENT = f"Homeward-KB/1.0 (+{USER_AGENT_HOMEPAGE})"
+
+#: 本模块日志通道。降级放行属安全事件，必须走 WARNING（默认经 lastResort 落到
+#: stderr），不能只靠 print 一句话带过（2026-11-18 第 580 批：只做「可见」）。
+LOGGER = logging.getLogger("homeward.kb")
 
 #: 内容源门禁口令的环境变量名。值取自私有侧 deploy.env 的 KB_ACCESS_TOKEN，
 #: 由启动方注入进程环境；本仓不保存、不记录、不回显任何口令值。
@@ -147,6 +153,9 @@ class KnowledgeBaseUpdater:
     KB_PUBKEY_FILENAME = "kb_pubkey.txt"
     #: 内容源签名文件名（对 CHECKSUM 内容的 Ed25519 签名，hex 编码）
     SIGNATURE_FILENAME = SIGNATURE_FILE
+    #: 降级放行留痕文件名（落在 ``kb_dir`` 下，随知识库目录一起被看见）。
+    #: 只在**显式关掉强制验签**（``HOMEWARD_KB_REQUIRE_SIGNATURE=0``）且确实放行时写入。
+    DEGRADED_LOG_FILENAME = "signature_degraded.log"
 
     def __init__(
         self,
@@ -547,6 +556,27 @@ class KnowledgeBaseUpdater:
                 print(f"[KB Update] 仓内公钥文件格式错误：{kb_file}")
         return None
 
+    def _note_degraded(self, code: str, detail: str) -> None:
+        """记录一次「降级放行」：WARNING 日志 + 追加一行到 ``kb_dir/signature_degraded.log``。
+
+        只做「可见」，**不改任何返回值**：是否放行仍由 ``_verify_signature`` 的
+        ``require`` 决定。设计意图是让「关掉强制验签后静默放行」无法再无声发生 ——
+        尤其是验签失败（内容源可能被篡改）时，必须留下可查的痕迹。
+
+        ``code`` 用稳定短码（``SIG_MODULE_MISSING`` / ``SIG_NO_PUBKEY`` /
+        ``SIG_ABSENT`` / ``SIG_BAD_HEX`` / ``SIG_MISMATCH``），便于事后 grep 与统计。
+        写盘失败只再报一条 WARNING，绝不因此改变放行/拒绝结论。
+        """
+        LOGGER.warning("[KB Update][SECURITY-DEGRADED] %s：%s", code, detail)
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        line = "%s\t%s\t%s\n" % (stamp, code, " ".join(detail.split()))
+        try:
+            self.kb_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.kb_dir / self.DEGRADED_LOG_FILENAME, "a", encoding="utf-8") as fh:
+                fh.write(line)
+        except OSError as exc:
+            LOGGER.warning("[KB Update] 降级留痕写入失败（不影响本次判定）：%s", exc)
+
     def _verify_signature(self, checksum_text: str, url: str) -> bool:
         """验证内容源签名（C2）。
 
@@ -582,11 +612,19 @@ class KnowledgeBaseUpdater:
                 verify_signature = _mod.verify_signature
             except Exception:
                 print("[KB Update] 无法加载 ed25519 验签模块，跳过签名验证")
+                if not require:
+                    self._note_degraded(
+                        "SIG_MODULE_MISSING", "ed25519 验签模块无法加载，本次放行且未做验签"
+                    )
                 return not require
 
         pubkey = self._load_pubkey()
         if pubkey is None:
             print("[KB Update] 未配置验签公钥，跳过签名验证（建议设置 HOMEWARD_KB_PUBKEY 或仓内 kb_pubkey.txt）")
+            if not require:
+                self._note_degraded(
+                    "SIG_NO_PUBKEY", "未配置验签公钥（环境变量与仓内 kb_pubkey.txt 均无可用值）"
+                )
             return not require
 
         sig_url = f"{url}/{self.SIGNATURE_FILENAME}"
@@ -599,12 +637,19 @@ class KnowledgeBaseUpdater:
             if require:
                 print("[KB Update] 强制验签模式：无签名，拒绝本次更新")
                 return False
+            self._note_degraded(
+                "SIG_ABSENT", f"内容源未提供 {self.SIGNATURE_FILENAME}，本次放行且未做验签"
+            )
             return True
 
         try:
             sig = bytes.fromhex(sig_hex)
         except ValueError:
             print("[KB Update] 签名文件不是合法 hex")
+            if not require:
+                self._note_degraded(
+                    "SIG_BAD_HEX", f"{self.SIGNATURE_FILENAME} 内容不是合法 hex，本次放行且未做验签"
+                )
             return not require
 
         if verify_signature(sig, checksum_text.encode("utf-8"), pubkey):
@@ -616,6 +661,9 @@ class KnowledgeBaseUpdater:
             print("[KB Update] 强制验签模式：拒绝本次更新")
             return False
         print("[KB Update] 降级模式：仍允许更新（建议核查内容源可信度）")
+        self._note_degraded(
+            "SIG_MISMATCH", "验签结果为 False（签名与 CHECKSUM 不匹配），内容源可能被篡改，本次仍放行"
+        )
         return True
 
     @staticmethod

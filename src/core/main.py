@@ -199,6 +199,7 @@ class HomewardService:
             backend=self.config.get("ai_backend", "none"),
             api_key=self.config.get("ai_api_key"),
             base_url=self.config.get("ai_base_url"),
+            trusted_hosts=tuple(self.config.get("ai_trusted_hosts") or ()),
         )
 
         # 知识库更新器

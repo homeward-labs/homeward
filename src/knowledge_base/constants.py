@@ -13,9 +13,11 @@
 from __future__ import annotations
 
 # 内容源（Cloudflare Worker / 内网镜像）默认地址。
-# ⚠️ 闭源核心资产：完整知识库数据本体不随公开仓发布（见 SECURITY.md 与 tools/closed_assets.txt）。
-# 默认留空；真实源地址仅由闭源私有构建通过环境变量 HOMEWARD_KB_SOURCE 注入，
-# 开源/社区构建不携带任何可用源，不会向公网发起内容源连接。
+# open-core：公开仓**不内置**内容源（空串）。真实地址属闭源核心资产，只由闭源私有
+# 构建经环境变量 HOMEWARD_KB_SOURCE 注入（见 docs/00-治理规范/BOUNDARY.md §2：
+# 「git 仅保留 loader，真实地址与解密密钥仅由闭源私有构建注入」）。
+# 未注入时 _resolve_sources 把空串过滤掉 → repo_urls 为空清单，客户端不会向任何
+# 地址发起 KB 请求（与 tests/test_kb_source.py::TestSourceConfig 的 open-core 判据一致）。
 KB_SOURCE_DEFAULT_URL = ""
 
 # 国内备源清单（内容源多源降级的第二跳，FEAT-01）。

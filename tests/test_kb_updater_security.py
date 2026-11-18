@@ -382,8 +382,69 @@ class TestKbTokenGate(unittest.TestCase):
             self.assertFalse(u.check_and_update())
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestSignatureDegradationVisibility(unittest.TestCase):
+    """降级放行必须留痕（第 580 批：只做「可见」，一行放行逻辑都没改）。
+
+    背景：``_verify_signature`` 有 5 个降级出口，默认强制验签时全部返回 False（安全），
+    但显式设 ``HOMEWARD_KB_REQUIRE_SIGNATURE=0`` 后会静默放行。本组用例锁住两件事：
+      - 降级放行必须写 ``kb_dir/signature_degraded.log``，且短码可 grep；
+      - 强制模式拒绝时不写留痕（否则留痕本身失去信号意义）。
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.u = KnowledgeBaseUpdater(kb_dir=str(self.root), repo_urls=["http://x.invalid"])
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _trace(self) -> str:
+        p = self.root / KnowledgeBaseUpdater.DEGRADED_LOG_FILENAME
+        return p.read_text(encoding="utf-8") if p.is_file() else ""
+
+    def test_degraded_absent_signature_writes_trace(self):
+        err = kb_updater.HTTPError("http://x.invalid/SIGNATURE", 404, "Not Found", {}, None)
+        with mock.patch.dict(os.environ, {"HOMEWARD_KB_REQUIRE_SIGNATURE": "0"}):
+            with mock.patch("knowledge_base.updater.urlopen", side_effect=err):
+                self.assertTrue(self.u._verify_signature("abc", "http://x.invalid"))
+        self.assertIn("SIG_ABSENT", self._trace())
+
+    def test_enforce_mode_absent_signature_rejects_without_trace(self):
+        err = kb_updater.HTTPError("http://x.invalid/SIGNATURE", 404, "Not Found", {}, None)
+        env = {k: v for k, v in os.environ.items() if k != "HOMEWARD_KB_REQUIRE_SIGNATURE"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch("knowledge_base.updater.urlopen", side_effect=err):
+                self.assertFalse(self.u._verify_signature("abc", "http://x.invalid"))
+        self.assertEqual(self._trace(), "")
+
+    def test_degraded_no_pubkey_writes_trace(self):
+        with mock.patch.dict(os.environ, {"HOMEWARD_KB_REQUIRE_SIGNATURE": "0"}):
+            with mock.patch.object(self.u, "_load_pubkey", return_value=None):
+                self.assertTrue(self.u._verify_signature("abc", "http://x.invalid"))
+        self.assertIn("SIG_NO_PUBKEY", self._trace())
+
+    def test_degraded_bad_hex_writes_trace(self):
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b"not-a-hex-signature"
+
+        with mock.patch.dict(os.environ, {"HOMEWARD_KB_REQUIRE_SIGNATURE": "0"}):
+            with mock.patch("knowledge_base.updater.urlopen", return_value=_Resp()):
+                self.assertTrue(self.u._verify_signature("abc", "http://x.invalid"))
+        self.assertIn("SIG_BAD_HEX", self._trace())
+
+    def test_trace_line_is_tsv_with_code(self):
+        self.u._note_degraded("SIG_MISMATCH", "验签结果为 False")
+        line = self._trace().strip().split("\t")
+        self.assertEqual(len(line), 3, "留痕行应是 时间\\t短码\\t说明")
+        self.assertEqual(line[1], "SIG_MISMATCH")
+        self.assertRegex(line[0], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
 if __name__ == "__main__":

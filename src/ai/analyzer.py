@@ -8,6 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from core.ssrf_guard import guarded_open, may_carry_credentials
+
 logger = logging.getLogger("homeward.ai")
 
 
@@ -56,17 +58,21 @@ class AIAnalyzer:
         api_key: str = None,
         base_url: str = None,
         model: str = None,
+        trusted_hosts: tuple = (),
     ):
         """
         backend: none | ollama | openai
         api_key: 用户自备 API Key
         base_url: 自定义 API 端点（支持国内中转）
         model: 模型名；留空则用 DEFAULT_MODELS 里该后端的默认值
+        trusted_hosts: 用户显式信任、允许携带 `Authorization` 的主机（M1-4）。
+            默认为空 —— 即除官方端点外**零凭据头**；国内中转要带 Key 必须显式登记。
         """
         self.backend = backend
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
+        self.trusted_hosts = tuple(trusted_hosts or ())
 
     def is_enabled(self) -> bool:
         """AI 是否可用"""
@@ -117,8 +123,7 @@ ASN: {request.destination_asn or "未知"}
 }}"""
 
     def _analyze_ollama(self, request: AnalysisRequest) -> AnalysisResult:
-        """调用本地 Ollama"""
-        import urllib.request
+        """调用本地 Ollama（只允许本机目标，零凭据头 —— M1-4 第 5 条）"""
         import json
 
         prompt = self._build_prompt(request)
@@ -129,15 +134,15 @@ ASN: {request.destination_asn or "未知"}
             "format": "json",
         }).encode()
 
-        req = urllib.request.Request(
+        body = guarded_open(
             f"{self.base_url or 'http://localhost:11434'}/api/generate",
-            data=data,
-            headers={"Content-Type": "application/json"},
+            data,
+            {"Content-Type": "application/json"},
+            allow_loopback=True,
+            timeout=30.0,
         )
-
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            output = json.loads(result.get("response", "{}"))
+        result = json.loads(body.decode())
+        output = json.loads(result.get("response", "{}"))
 
         return AnalysisResult(
             domain=request.domain,
@@ -150,9 +155,9 @@ ASN: {request.destination_asn or "未知"}
         )
 
     def _analyze_openai(self, request: AnalysisRequest) -> AnalysisResult:
-        """调用 OpenAI 兼容 API"""
-        import urllib.request
+        """调用 OpenAI 兼容 API（凭据只发给官方端点或用户显式信任的主机 —— M1-4）"""
         import json
+        from urllib.parse import urlsplit
 
         prompt = self._build_prompt(request)
         data = json.dumps({
@@ -164,18 +169,20 @@ ASN: {request.destination_asn or "未知"}
             "response_format": {"type": "json_object"},
         }).encode()
 
-        req = urllib.request.Request(
-            f"{self.base_url or 'https://api.openai.com/v1/chat/completions'}",
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-        )
+        url = f"{self.base_url or 'https://api.openai.com/v1/chat/completions'}"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key and may_carry_credentials(urlsplit(url).hostname or "", self.trusted_hosts):
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            output = json.loads(result["choices"][0]["message"]["content"])
+        body = guarded_open(
+            url,
+            data,
+            headers,
+            trusted_hosts=self.trusted_hosts,
+            timeout=30.0,
+        )
+        result = json.loads(body.decode())
+        output = json.loads(result["choices"][0]["message"]["content"])
 
         return AnalysisResult(
             domain=request.domain,
