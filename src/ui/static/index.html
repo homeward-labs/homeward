@@ -113,7 +113,13 @@
     <svg width="16" height="16" aria-hidden="true"><use href="#i-upgrade"/></svg>升级</button>
 </nav>
 
-<main id="view" class="view"></main>
+<main id="view" class="view">
+  <!-- 首屏静态占位：脚本要等 /api/overview 等接口回来才首次 render；
+       隧道慢时这段空白会持续数秒，先给一个明确的“加载中”，避免被当成坏页。 -->
+  <div class="section" id="boot-loading">
+    <div class="card"><div class="empty" role="status">加载中… 正在拉取设备清单、观测记录与告警。首次启动约 5–15 秒。</div></div>
+  </div>
+</main>
 
 <footer class="foot">
   <span id="foot-meta">—</span>
