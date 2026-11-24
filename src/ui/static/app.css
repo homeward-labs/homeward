@@ -267,10 +267,17 @@ box-shadow: 0 0 0 0 var(--ok-glow);
 .chart-card svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 /* 图表 SVG 尺寸：不用 inline style（CSP style-src 'self' 会丢弃），统一走 class。
-   —— donut 保持原设计的 168/180px 上限并居中；条形/柱状/趋势图铺满卡片宽度。 */
+   —— donut 保持原设计的 168/180px 上限并居中；
+   —— 面积/走势图：固定像素高度（.h150/.h90/.h46），横向铺满卡片、纵向不再被 viewBox 比例撑高；
+   —— 条形/柱状图含文字：限宽 640px 居中，避免文本被等比放大成巨字。 */
 .hw-chart { display: block; height: auto; }
-.hw-donut { width: 100%; max-width: var(--donut-max, 180px); margin: 0 auto; }
-.hw-hbar, .hw-vbar, .hw-area { width: 100%; max-width: none; }
+/* 复合选择器（.hw-chart.xxx）是为了盖过上面的 .chart-card svg{height:auto}（0,1,1 特异度） */
+.hw-chart.hw-donut { width: 100%; max-width: var(--donut-max, 180px); margin: 0 auto; height: auto; }
+.hw-chart.hw-hbar, .hw-chart.hw-vbar { width: 100%; max-width: 640px; margin: 0 auto; height: auto; }
+.hw-chart.hw-area { width: 100%; max-width: none; height: var(--hw-h, 150px); }
+.hw-chart.hw-area.h46 { --hw-h: 46px; }
+.hw-chart.hw-area.h90 { --hw-h: 90px; }
+.hw-chart.hw-area.h150 { --hw-h: 150px; }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 10px; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -371,6 +378,11 @@ td.mono { font-family: var(--mono); font-size: 12.5px; }
 .scroll-x { overflow-x: auto; }
 
 /* ---------------------------------------------------------- 趋势图（Apple 风 SVG） */
+.trend-card { padding-bottom: 12px; }
+.trend-kpis { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--text-2); margin-bottom: 10px; }
+.trend-kpis b { color: var(--text); font-weight: 600; }
+.trend-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.trend-sub { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid var(--border); }
 .trend-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
 .trend-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .trend-legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }

@@ -151,8 +151,20 @@
       (opts.clickable ? ' data-clickable="1"' : '') + '>' + body + '</svg>';
   }
 
+  // 水平网格线（零文字，纯线；配合 CSS 固定高度 + 非缩放描边，避免被拉伸成粗带）
+  function gridLines(W, yTop, yBottom) {
+    var ys = [yTop, (yTop + yBottom) / 2, yBottom];
+    return ys.map(function (y) {
+      return '<line x1="0" y1="' + y.toFixed(2) + '" x2="' + W + '" y2="' + y.toFixed(2) +
+        '" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 4" ' +
+        'vector-effect="non-scaling-stroke" opacity="0.9"/>';
+    }).join("");
+  }
+
   // 面积 / 折线：points = [{x, y}]（y 为原始值，用 max 归一）
-  // opts: { max, height=120, color="var(--accent)", fill=true, dots=false }
+  // opts: { max, height=120, color="var(--accent)", fill=true, dots=false, cls, grid }
+  //   cls：追加 class（配合 app.css 的 .h150/.h90/.h46 固定像素高度）
+  //   grid：画三条水平参考线
   function area(opts) {
     opts = opts || {};
     var pts = opts.points || [];
@@ -186,13 +198,15 @@
       '<path d="' + areaPath + '" fill="url(#' + gid + ')" stroke="none"/>';
 
     return '<svg viewBox="0 0 ' + W + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势图") +
-      '" class="hw-chart hw-area" preserveAspectRatio="none">' +
-      fillSvg + '<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '" class="hw-chart hw-area' + (opts.cls ? " " + esc(opts.cls) : "") + '" preserveAspectRatio="none">' +
+      (opts.grid ? gridLines(W, pad, pad + plotH) : "") +
+      fillSvg + '<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>' +
       dots + '</svg>';
   }
 
   // 多序列叠加面积图（趋势专用）：series = [{points:[{x,y}], color, fill?}]
   // 共享同一 max / 坐标系，便于对比
+  // opts: { height, max, cls, grid }
   function areaMulti(opts) {
     opts = opts || {};
     var series = opts.series || [];
@@ -224,7 +238,7 @@
           '<stop offset="100%" stop-color="' + esc(color) + '" stop-opacity="0"/></linearGradient>');
         bodies.push('<path d="' + line + ' L' + W + ' ' + (pad + plotH) + ' L0 ' + (pad + plotH) + ' Z" fill="url(#' + gid + ')" stroke="none"/>');
       }
-      bodies.push('<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+      bodies.push('<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>');
       // 末点圆点
       if (coords.length) {
         var last = coords[coords.length - 1];
@@ -233,7 +247,8 @@
     });
 
     return '<svg viewBox="0 0 ' + W + ' ' + height + '" role="img" aria-label="' + esc(opts.ariaLabel || "趋势对比图") +
-      '" class="hw-chart hw-area" preserveAspectRatio="none"><defs>' + defs.join("") + '</defs>' +
+      '" class="hw-chart hw-area' + (opts.cls ? " " + esc(opts.cls) : "") + '" preserveAspectRatio="none"><defs>' + defs.join("") + '</defs>' +
+      (opts.grid ? gridLines(W, pad, pad + plotH) : "") +
       bodies.join("") + '</svg>';
   }
 

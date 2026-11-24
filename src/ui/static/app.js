@@ -614,7 +614,7 @@ function renderHistory() {
     const spark = pts && pts.length
       ? HWCharts.area({
           points: pts.map((p) => ({ x: p.ts, y: p.dns_count })),
-          height: 46, fill: false, color: "var(--accent)",
+          height: 46, fill: false, color: "var(--accent)", cls: "h46",
           ariaLabel: `${x.dest} 时间序列`,
         })
       : '<span class="small muted">—（仅本轮 Top 20 有序列）</span>';
@@ -643,7 +643,7 @@ function renderHistory() {
         <div class="chart-hint">按${d.bucket === "day" ? "天" : "小时"}聚合的 DNS/SNI 请求次数；首批数据 30 天后可看完整月度窗口。</div>
         ${points.length ? HWCharts.area({
           points: points.map((p) => ({ x: p.ts, y: p.dns_count })),
-          height: 140, ariaLabel: "请求次数走势",
+          height: 140, cls: "h150", grid: true, ariaLabel: "请求次数走势",
         }) : '<div class="empty">暂无数据</div>'}
         <div class="small muted">流量口径：conntrack 增量字节（只加不减，按轮询增量累计）。</div>
       </div>
@@ -841,12 +841,11 @@ function renderTrends() {
   const scorePts = points.map((p) => ({ y: p.privacy_score }));
 
   const summary = `
-    <div class="card" style="display:flex;gap:24px;flex-wrap:wrap">
-      <div><div class="muted small">窗口</div><div><b>${points.length}</b> 小时（${currentDays} 天）</div></div>
-      <div><div class="muted small">设备峰值</div><div><b>${maxDevices}</b> 台</div></div>
-      <div><div class="muted small">告警峰值</div><div><b>${maxAlerts}</b> 条</div></div>
-      <div><div class="muted small">起始隐私分</div><div><b>${first.privacy_score}</b></div></div>
-      <div><div class="muted small">当前隐私分</div><div><b>${last.privacy_score}</b></div></div>
+    <div class="trend-kpis">
+      <span>窗口 <b>${points.length}</b> 小时 / ${currentDays} 天</span>
+      <span>设备峰值 <b>${maxDevices}</b></span>
+      <span>告警峰值 <b>${maxAlerts}</b></span>
+      <span>隐私分 <b>${esc(first.privacy_score)} → ${esc(last.privacy_score)}</b></span>
     </div>`;
 
   const rangeBtn = (days, label) => `
@@ -863,28 +862,31 @@ function renderTrends() {
           ${rangeBtn(30, "30 天")}
         </div>
       </div>
-      ${summary}
-      <div class="card">
+      <div class="card trend-card">
+        ${summary}
         <div class="trend-legend">
           <span class="trend-legend-item"><span class="trend-legend-swatch" style="background:var(--accent)"></span>设备数</span>
           <span class="trend-legend-item"><span class="trend-legend-swatch trend-alert"></span>告警</span>
-          <span class="trend-legend-item"><span class="trend-legend-swatch trend-score"></span>隐私分（0-100）</span>
         </div>
         ${HWCharts.areaMulti({
-          height: 170, max: Math.max(maxDevices, maxAlerts),
+          height: 150, max: Math.max(maxDevices, maxAlerts), cls: "h150", grid: true,
           series: [
             { points: devPts, color: "var(--accent)", fill: true },
             { points: alertPts, color: "var(--danger)", fill: false },
           ],
           ariaLabel: "设备数与告警趋势",
         })}
+        <div class="trend-axis"><span>${esc(fmtTime(first.hour_epoch))}</span><span>${esc(fmtTime(last.hour_epoch))}</span></div>
+        <div class="trend-sub">
+          <span class="trend-legend-item"><span class="trend-legend-swatch trend-score"></span>隐私分（0–100）</span>
+        </div>
         ${HWCharts.areaMulti({
-          height: 120, max: 100,
+          height: 90, max: 100, cls: "h90",
           series: [{ points: scorePts, color: "var(--cat-productivity)", fill: true }],
           ariaLabel: "隐私分趋势（0-100）",
         })}
       </div>
-      <div class="muted small" style="margin-top:8px">提示：设备数（蓝）与告警（红）共享左轴；隐私分（青，0-100）单独成图。数据只存在本地 SQLite，不联网。</div>
+      <div class="muted small" style="margin-top:8px">设备数（蓝）与告警（红）同轴；隐私分（青，0–100）单独成图。数据只存本地 SQLite，不联网。</div>
     </div>`;
 }
 
