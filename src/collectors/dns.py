@@ -22,6 +22,7 @@ Tier 1 —— DNS 查询采集器（社区版开源范围）
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -30,6 +31,8 @@ from typing import Callable, Iterator, Optional
 from adapters.base import Capabilities, Collector, Observation, ProbeResult
 
 __all__ = ["DnsLogCollector", "parse_dnsmasq_line"]
+
+logger = logging.getLogger("homeward.collectors.dns")
 
 
 # ==================== 日志解析（纯函数，便于单测） ====================
@@ -157,6 +160,10 @@ class DnsLogCollector(Collector):
         "/tmp/dnsmasq.log",
     )
 
+    # 停更哨兵（方案 §5）：文件在但 5 分钟没有新行 → 判异常；同一路径 30 分钟最多报一次，避免刷屏
+    STALL_SECONDS = 300
+    STALL_LOG_EVERY = 1800
+
     def __init__(
         self,
         log_path: Optional[str] = None,
@@ -221,11 +228,18 @@ class DnsLogCollector(Collector):
 
         path = self._resolve_path()
         if path is None:
+            # 无日志 = 无 DNS 观测。以前这里直接 return（静默空转，UI 显示成"没上网"），
+            # 小存储设备上日志被截断/清理是常态，必须显式说明状态（方案 §5-3）。
+            logger.warning(
+                "DNS 日志缺失：%s 均不可读 → 进入「无 DNS 观测」状态（不是设备没上网）",
+                "、".join(self.DEFAULT_LOG_PATHS),
+            )
             return
 
         try:
             handle = open(path, "r", errors="replace")
         except OSError:
+            logger.warning("DNS 日志打开失败：%s → 进入「无 DNS 观测」状态", path)
             return
 
         with handle:
@@ -235,6 +249,9 @@ class DnsLogCollector(Collector):
                 last_inode = os.fstat(handle.fileno()).st_ino
             except OSError:
                 last_inode = None
+
+            last_progress = time.monotonic()
+            last_stall_log = 0.0
 
             while True:
                 pos = handle.tell()
@@ -248,6 +265,7 @@ class DnsLogCollector(Collector):
                     else:
                         rec = parse_dnsmasq_line(line)
                         if rec is not None:
+                            last_progress = time.monotonic()
                             yield self._to_observation(rec)
                         continue
 
@@ -261,6 +279,15 @@ class DnsLogCollector(Collector):
                 if last_inode is not None and (
                     st.st_ino != last_inode or st.st_size < handle.tell()
                 ):
+                    # 轮转代价必须可观测：自上次读位到 EOF 之间的内容没被消费（方案 §5-2）
+                    dropped = max(0, pos - st.st_size)
+                    logger.info(
+                        "DNS 日志轮转/截断：%s（inode %s→%s，丢弃未读约 %d B）",
+                        path,
+                        last_inode,
+                        st.st_ino,
+                        dropped,
+                    )
                     try:
                         new_handle = open(path, "r", errors="replace")
                     except OSError:
@@ -271,6 +298,19 @@ class DnsLogCollector(Collector):
                         last_inode = os.fstat(handle.fileno()).st_ino
                     except OSError:
                         last_inode = None
+                    last_progress = time.monotonic()
+
+                # 停更哨兵：文件在、却 5 分钟没有新行 → tmpfs 满 / 写失败 / 路径错（方案 §5-1）
+                now = time.monotonic()
+                if now - last_progress >= self.STALL_SECONDS:
+                    if now - last_stall_log >= self.STALL_LOG_EVERY:
+                        logger.warning(
+                            "DNS 日志停更 %d 秒：%s（size=%d B）—— 检查 /tmp 容量、dnsmasq 是否仍在写、路径是否正确",
+                            int(now - last_progress),
+                            path,
+                            st.st_size,
+                        )
+                        last_stall_log = now
 
     # —— 内部 ——
 
