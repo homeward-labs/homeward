@@ -73,9 +73,15 @@ check)
     [ -n "$TAIL_DIR" ] && [ -d "$TAIL_DIR" ] && TIER=精简档+尾片
     printf '档位=%s\n' "$TIER"
     printf '日志=%s\n' "$LOG"
-    printf '当前=%s B（%.1f MB）\n' "$SIZE" "$((SIZE))"
-    printf '阈值=%s B（%.1f MB，= min(%s MB, 可用 %s KB * %s%%）)\n' \
-        "$LIMIT_BYTES" "$LIMIT_BYTES" "$MAX_MB" "$AVAIL_KB" "$PCT"
+    # busybox 的 printf 不认 %.1f（真机会把 2583574 B 打成「2583574.0 MB」），
+    # 改用整数除法拼一位小数，任何 shell 都准。
+    SIZE_I=$((SIZE / 1048576))
+    SIZE_F=$(( (SIZE % 1048576) * 10 / 1048576 ))
+    LIM_I=$((LIMIT_BYTES / 1048576))
+    LIM_F=$(( (LIMIT_BYTES % 1048576) * 10 / 1048576 ))
+    printf '当前=%s B（%s.%s MB）\n' "$SIZE" "$SIZE_I" "$SIZE_F"
+    printf '阈值=%s B（%s.%s MB，= min(%s MB, 可用 %s KB * %s%%）)\n' \
+        "$LIMIT_BYTES" "$LIM_I" "$LIM_F" "$MAX_MB" "$AVAIL_KB" "$PCT"
     printf '超限=%s\n' "$([ "$SIZE" -ge "$LIMIT_BYTES" ] && echo yes || echo no)"
     exit 0
 ;;

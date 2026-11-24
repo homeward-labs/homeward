@@ -45,6 +45,19 @@ else
   cd homeward
 fi
 
+# 1.5) 存储自检（小存储设备同样适用，只拦不装）
+AVAIL_MB=$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4/1024)}')
+[ -n "${AVAIL_MB:-}" ] || AVAIL_MB=0
+if [ "$AVAIL_MB" -lt 500 ]; then
+  if [ "${HOMEWARD_ALLOW_TIGHT_DISK:-0}" = "1" ]; then
+    warn "可用空间仅 ${AVAIL_MB} MB（低于 500 MB 底线），已按 HOMEWARD_ALLOW_TIGHT_DISK=1 继续"
+  else
+    die "可用空间仅 ${AVAIL_MB} MB，低于 500 MB 底线。请清理磁盘或换设备；确认要试装就加 HOMEWARD_ALLOW_TIGHT_DISK=1 重跑"
+  fi
+else
+  info "可用空间 ${AVAIL_MB} MB，够跑"
+fi
+
 # 2) 构建并启动容器
 info "构建并启动容器（首次会拉取镜像，请稍候）"
 if docker compose version >/dev/null 2>&1; then
@@ -78,6 +91,14 @@ done
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 if [ -z "$IP" ] || [ "$IP" = "127.0.0.1" ]; then
   IP=$(ip -4 addr show 2>/dev/null | grep -oP 'inet \K[\d.]+' | grep -v '^127\.' | head -1)
+fi
+
+# 4.5) 日志档位自检（有精简档脚本就打印，绝不改动日志）
+TRIM="docker/dnsmasq/dnsmasq-log-trim.sh"
+if [ -f "$TRIM" ]; then
+  echo
+  info "日志档位自检（只读）："
+  HOMEWARD_DNS_LOG="${HOMEWARD_DNS_LOG:-/tmp/dnsmasq.log}" sh "$TRIM" check 2>/dev/null | sed 's/^/    /' || true
 fi
 
 # 5) 完成

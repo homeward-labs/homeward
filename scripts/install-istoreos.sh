@@ -42,13 +42,32 @@ step() { echo ""; echo "===== $1 ====="; }
 ok()   { echo "  ✓ $1"; }
 no()   { echo "  ✗ $1"; }
 
+# ---------- 第 2 步：存储自检（小存储设备硬拦） ----------
+# 客户基线设备只有 1 GB 存储（2026-11-24 实测口径：镜像 191 MB + 数据 3.5 MB 起）。
+# 可用空间不足 500 MB 就直接停在安装前，别装完了写满分区再拖垮整台路由器。
+step "第 2 步 / 共 6 步：检查存储空间"
+AVAIL_KB=$(df -Pk "$BASE" 2>/dev/null | awk 'NR==2 {print $4}')
+[ -n "${AVAIL_KB:-}" ] || AVAIL_KB=0
+AVAIL_MB=$((AVAIL_KB / 1024))
+if [ "$AVAIL_MB" -lt 500 ]; then
+    no "可用空间只有 ${AVAIL_MB} MB（$BASE 所在分区），低于 500 MB 底线"
+    echo "    处理（任选其一）："
+    echo "    ① 清理 $BASE 下不用的旧文件后重跑（df -h $BASE 看占用）；"
+    echo "    ② 换一台存储更大的设备（镜像 + 数据需要独立空间）；"
+    echo "    ③ 确认要冒险试装：HOMEWARD_ALLOW_TIGHT_DISK=1 sh /tmp/hw-install.sh"
+    echo "       （装完日志会被压到 16 MB 以内，但数据增长时仍可能写满）"
+    [ "${HOMEWARD_ALLOW_TIGHT_DISK:-0}" = "1" ] || exit 1
+    echo "  ！ 已按 HOMEWARD_ALLOW_TIGHT_DISK=1 继续"
+else
+    ok "可用空间 ${AVAIL_MB} MB（$BASE），够跑家卫"
+fi
 echo ""
 echo "======================================"
 echo " 家卫 Homeward · iStoreOS 分步安装"
 echo "======================================"
 
 # ---------- 第 1 步：检查网络 ----------
-step "第 1 步 / 共 5 步：检查路由器网络"
+step "第 1 步 / 共 6 步：检查路由器网络"
 NET_OK=0
 if ping -c 1 -W 3 223.5.5.5 >/dev/null 2>&1; then
     NET_OK=1
@@ -66,7 +85,7 @@ else
 fi
 
 # ---------- 第 2 步：下载源码包 ----------
-step "第 2 步 / 共 5 步：下载家卫源码包"
+step "第 2 步 / 共 6 步：下载家卫源码包"
 if [ -s "$TARBALL" ] && tar -tzf "$TARBALL" >/dev/null 2>&1; then
     ok "发现已下载好的压缩包 $TARBALL，跳过下载（想重新下载请先删掉它）"
 else
@@ -111,7 +130,7 @@ else
 fi
 
 # ---------- 第 3 步：校验、备份既有数据并解压 ----------
-step "第 3 步 / 共 5 步：校验、备份既有数据并解压"
+step "第 4 步 / 共 6 步：校验、备份既有数据并解压"
 if ! tar -tzf "$TARBALL" >/dev/null 2>&1; then
     no "压缩包损坏（下载不完整）"
     echo "    处理：rm -f $TARBALL 后重新运行本脚本。"
@@ -160,7 +179,7 @@ else
 fi
 
 # ---------- 第 4 步：配置 DNS 查询日志 ----------
-step "第 4 步 / 共 5 步：让路由器开始记录 DNS 查询"
+step "第 5 步 / 共 6 步：让路由器开始记录 DNS 查询"
 if command -v uci >/dev/null 2>&1; then
     if uci set dhcp.@dnsmasq[0].logqueries='1' \
        && uci set dhcp.@dnsmasq[0].logfacility="$LOG_FILE" \
@@ -182,12 +201,33 @@ if command -v uci >/dev/null 2>&1; then
     else
         echo "  ！ 日志文件还没出现——配置已生效，设备开始上网后文件会自动出现，不影响安装"
     fi
+    echo "  ！ 日志文件还没出现——配置已生效，设备开始上网后文件会自动出现，不影响安装"
+fi
+
+# —— 日志档位自检 + 精简档定时任务（小存储设备必需） ——
+TRIM="$DIR/docker/dnsmasq/dnsmasq-log-trim.sh"
+if [ -f "$TRIM" ]; then
+    echo "  · 日志档位自检（check 只读，不改任何文件）："
+    HOMEWARD_DNS_LOG="$LOG_FILE" sh "$TRIM" check 2>/dev/null | sed 's/^/      /'
+    ok "精简档就绪：超 16 MB 就地截断（保 inode，不复制日志）"
+    if [ -f /etc/crontabs/root ]; then
+        if grep -q "dnsmasq-log-trim.sh trim" /etc/crontabs/root 2>/dev/null; then
+            ok "精简档定时任务已存在（跳过）"
+        else
+            echo "*/5 * * * * HOMEWARD_DNS_LOG=$LOG_FILE sh $TRIM trim >/dev/null 2>&1" >> /etc/crontabs/root
+            /etc/init.d/cron reload >/dev/null 2>&1 || /etc/init.d/cron restart >/dev/null 2>&1 || true
+            ok "已添加精简档定时任务（每 5 分钟检查一次）"
+        fi
+    else
+        echo "  ！ 未找到 /etc/crontabs/root（非 OpenWrt 系），请自行加 cron："
+        echo "      */5 * * * * HOMEWARD_DNS_LOG=$LOG_FILE sh $TRIM trim >/dev/null 2>&1"
+    fi
 else
-    echo "  ！ 当前系统没有 uci（不是 iStoreOS/OpenWrt？），跳过 DNS 配置"
+    echo "  ！ 未找到 dnsmasq-log-trim.sh，跳过节流配置（日志会无限增长，小存储设备请升级源码包）"
 fi
 
 # ---------- 第 5 步：拉起家卫容器 ----------
-step "第 5 步 / 共 5 步：拉起家卫容器"
+step "第 6 步 / 共 6 步：拉起家卫容器"
 cd "$DIR" || { no "找不到源码目录 $DIR"; exit 1; }
 if [ ! -f "$COMPOSE_FILE" ]; then
     no "找不到 $COMPOSE_FILE"
@@ -226,7 +266,7 @@ fi
 # ---------- 完成 ----------
 echo ""
 echo "======================================"
-echo " ✓ 全部 5 步完成！"
+echo " ✓ 全部 6 步完成！"
 LAN_IP=$(uci -q get network.lan.ipaddr 2>/dev/null | sed 's|/.*||')
 if [ -n "$LAN_IP" ]; then
     echo "   浏览器打开：  http://$LAN_IP:9595"
